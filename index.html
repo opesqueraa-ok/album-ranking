@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <title>Album Rater v3.1</title>
+  <link rel="manifest" href="manifest.webmanifest?v=3.1" />
+  <link rel="icon" href="favicon.png?v=3.1" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3.1" />
+  <style>
+    :root {
+      --bg:#0f0f10; --panel:#151517; --muted:#a9acb3; --text:#e9ecf1; --acc:#4da3ff;
+      --ok:#23be32; --warn:#f0ca15; --bad:#e12928;
+      --radius:18px;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);}
+    header{position:sticky;top:0;background:rgba(15,15,16,.85);backdrop-filter:saturate(160%) blur(10px);z-index:20;border-bottom:1px solid #222;}
+    .wrap{max-width:1060px;margin:0 auto;padding:18px;}
+    h1{margin:0;font-size:1.2rem;letter-spacing:.3px}
+    .grid{display:grid;gap:14px;grid-template-columns:1.2fr .9fr}
+    .card{background:var(--panel);border:1px solid #232327;border-radius:var(--radius);padding:14px}
+    label{font-size:.84rem;color:var(--muted)}
+    input, select, textarea{width:100%;padding:12px 12px;border-radius:12px;border:1px solid #2a2a2f;background:#0d0d0f;color:var(--text)}
+    input[type="date"]{padding:10px 12px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{border-bottom:1px solid #24242a;padding:8px;font-size:.92rem}
+    th{text-align:left;color:var(--muted)}
+    .row{display:flex;gap:8px;align-items:center}
+    .btn{cursor:pointer;border:none;background:#1c1c21;color:#dfe4ea;padding:10px 14px;border-radius:12px;border:1px solid #2a2a2f}
+    .btn:hover{background:#22222a}
+    .btn.primary{background:var(--acc);color:#0b1220;border-color:transparent}
+    .muted{color:var(--muted)}
+    .footer{text-align:center;color:var(--muted);padding:20px 0}
+    .chip{padding:6px 10px;border:1px solid #2a2a2f;border-radius:999px;background:#101014;font-size:.8rem;color:#cfd5de}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .colorBox{min-width:30px;height:22px;border-radius:6px;border:1px solid #222}
+    .track-row input[type="number"]{width:80px}
+    .export-frames{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .preview{border:1px dashed #30303a;border-radius:12px;padding:8px;display:flex;justify-content:center;align-items:center;aspect-ratio:9/16;background:#0b0b0c;color:#777}
+    .lang{margin-left:auto}
+    @media (max-width:880px){ .grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap row">
+    <h1>⭐🎵 Album Rater <span class="muted">v3.1</span></h1>
+    <div class="row lang">
+      <label for="lang" class="muted" style="margin-right:6px">🌐</label>
+      <select id="lang">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+    <section class="card">
+      <div class="row" style="gap:12px;align-items:flex-end">
+        <div style="flex:1">
+          <label data-t="album">Álbum</label>
+          <input id="album" placeholder="Nombre del álbum" />
+        </div>
+        <div style="flex:1">
+          <label data-t="artist">Artista</label>
+          <input id="artist" placeholder="Artista" />
+        </div>
+        <div style="width:180px">
+          <label data-t="date">Fecha</label>
+          <input id="date" type="date" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;gap:12px">
+        <div style="flex:1">
+          <label data-t="rankedBy">Ranked by</label>
+          <input id="rankedBy" placeholder="Tu nombre" />
+        </div>
+        <div style="width:220px">
+          <label data-t="duration">Duración total (min)</label>
+          <input id="duration" type="number" step="0.1" min="0" placeholder="42.0" />
+        </div>
+        <div style="width:220px">
+          <label data-t="cover">Cover</label>
+          <input id="cover" type="file" accept="image/*" />
+        </div>
+      </div>
+
+      <div class="toolbar" style="margin-top:12px">
+        <button class="btn" id="addTrack">+ <span data-t="addTrack">Añadir track</span></button>
+        <button class="btn" id="clearAll"><span data-t="clear">Borrar todo</span></button>
+        <span class="chip"><span data-t="autosave">Auto-guardado activo</span></span>
+        <div style="margin-left:auto" class="row">
+          <button class="btn" id="importBtn"><span data-t="import">Importar JSON</span></button>
+          <button class="btn" id="exportBtn"><span data-t="export">Exportar JSON</span></button>
+          <input type="file" id="importFile" accept="application/json" style="display:none" />
+        </div>
+      </div>
+
+      <table id="tracksTbl">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th data-t="track">Track</th>
+            <th data-t="score">Puntaje (1-10)</th>
+            <th data-t="color">Color</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+
+      <div class="row" style="margin-top:10px;gap:12px">
+        <div class="chip"><span data-t="avg">Promedio</span>: <b id="avg">0</b></div>
+        <div class="chip"><span data-t="count">Tracks</span>: <b id="count">0</b></div>
+      </div>
+    </section>
+
+    <aside class="card">
+      <h3 style="margin-top:0" data-t="exportTitle">Exportar imagen</h3>
+      <div class="export-frames">
+        <button class="btn primary" id="exportStory">Export Story 1080×1920</button>
+        <button class="btn primary" id="exportPost">Export 4:5 1080×1350</button>
+      </div>
+      <div class="preview" id="previewBox" style="margin-top:12px" data-t="preview">Vista previa (elige tamaño para exportar)</div>
+      <p class="muted" style="margin-top:10px" data-t="exportHint">
+        La exportación incluye álbum, artista, fecha, promedio, duración, tabla con colores, timeline, “Ranked by” y el pie “Created by Ok Pretty Boy with help from ChatGPT”.
+      </p>
+    </aside>
+  </div>
+
+  <div class="footer">Created by Ok Pretty Boy with help from ChatGPT • ⭐🎵</div>
+</main>
+
+<script>
+const VERSION = '3.1';
+// ---------- i18n ----------
+const STRINGS = {
+  es: {
+    album: 'Álbum', artist: 'Artista', date:'Fecha', duration:'Duración total (min)', cover:'Cover',
+    rankedBy:'Ranked by', addTrack:'Añadir track', clear:'Borrar todo', autosave:'Auto-guardado activo',
+    import:'Importar JSON', export:'Exportar JSON', track:'Track', score:'Puntaje (1-10)',
+    color:'Color', avg:'Promedio', count:'Tracks', exportTitle:'Exportar imagen',
+    exportHint:'La exportación incluye álbum, artista, fecha, promedio, duración, tabla con colores, timeline, “Ranked by” y el pie “Created by Ok Pretty Boy with help from ChatGPT”.',
+    preview:'Vista previa (elige tamaño para exportar)',
+    confirmClear:'¿Borrar todo? Esto eliminará los datos guardados.'
+  },
+  en: {
+    album: 'Album', artist: 'Artist', date:'Date', duration:'Total duration (min)', cover:'Cover',
+    rankedBy:'Ranked by', addTrack:'Add track', clear:'Clear all', autosave:'Auto‑save enabled',
+    import:'Import JSON', export:'Export JSON', track:'Track', score:'Score (1-10)',
+    color:'Color', avg:'Average', count:'Tracks', exportTitle:'Export image',
+    exportHint:'Export includes album, artist, date, average, duration, color table, timeline, “Ranked by”, and the footer “Created by Ok Pretty Boy with help from ChatGPT”.',
+    preview:'Preview (choose a size to export)',
+    confirmClear:'Clear everything? This removes saved data.'
+  }
+};
+
+const COLORS = [
+  [10, '#2e47ee'],
+  [9, '#0285c6'],
+  [8, '#02aec6'],
+  [7, '#23be32'],
+  [6, '#f0ca15'],
+  [5, '#e12928']
+];
+
+// ---------- State & persistence ----------
+const SKEY = 'albumrater-state-v31';
+let state = { album:'', artist:'', date:'', duration:'', rankedBy:'', tracks:[], cover: null, lang: localStorage.getItem('albumrater-lang') || 'es' };
+
+function save(){ localStorage.setItem(SKEY, JSON.stringify(state)); }
+function load(){
+  const s = localStorage.getItem(SKEY);
+  if (s) try{ state = JSON.parse(s); }catch{}
+}
+load();
+
+// ---------- DOM refs ----------
+const el = (id)=>document.getElementById(id);
+const tbody = el('tbody');
+['album','artist','date','duration','rankedBy'].forEach(k=>{
+  el(k).value = state[k]||'';
+  el(k).addEventListener('input', e=>{ state[k]=e.target.value; save(); renderStats(); });
+});
+const langSel = el('lang'); langSel.value = state.lang; applyLang();
+langSel.addEventListener('change', ()=>{ state.lang=langSel.value; localStorage.setItem('albumrater-lang', state.lang); applyLang(); });
+
+function applyLang(){
+  const dict = STRINGS[state.lang] || STRINGS.es;
+  document.querySelectorAll('[data-t]').forEach(n=>{
+    const key = n.getAttribute('data-t'); if (dict[key]) n.textContent = dict[key];
+  });
+}
+
+// cover handling
+const coverInput = el('cover');
+if (state.cover) { coverInput.dataset.loaded='1'; }
+coverInput.addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if (!f) return;
+  const b64 = await fileToDataURL(f);
+  state.cover = b64; save();
+});
+
+function fileToDataURL(file){
+  return new Promise(res=>{ const r = new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); });
+}
+
+// ---------- Tracks ----------
+function addTrackRow(track={title:'',score:'',color:''}){
+  state.tracks.push(track);
+  save();
+  renderTracks();
+}
+
+function renderTracks(){
+  tbody.innerHTML = '';
+  state.tracks.forEach((t, i)=>{
+    const tr = document.createElement('tr'); tr.className='track-row';
+    const tdIdx = document.createElement('td'); tdIdx.textContent = i+1; tr.appendChild(tdIdx);
+
+    const tdTitle = document.createElement('td');
+    const inTitle = document.createElement('input'); inTitle.value = t.title||'';
+    inTitle.placeholder = 'Track name';
+    inTitle.addEventListener('input', (e)=>{ t.title=e.target.value; save(); });
+    tdTitle.appendChild(inTitle); tr.appendChild(tdTitle);
+
+    const tdScore = document.createElement('td');
+    const inScore = document.createElement('input'); inScore.type='number'; inScore.min=1; inScore.max=10; inScore.step='1'; inScore.value=t.score||'';
+    inScore.addEventListener('input', (e)=>{ let v = parseInt(e.target.value||''); if (isNaN(v)) v=''; t.score=v; t.color = colorForScore(v); save(); renderTracks(); renderStats(); });
+    tdScore.appendChild(inScore); tr.appendChild(tdScore);
+
+    const tdColor = document.createElement('td');
+    const box = document.createElement('div'); box.className='colorBox'; box.style.background=t.color||'#151517';
+    tdColor.appendChild(box); tr.appendChild(tdColor);
+
+    const tdDel = document.createElement('td');
+    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='×';
+    btn.addEventListener('click', ()=>{ state.tracks.splice(i,1); save(); renderTracks(); renderStats(); });
+    tdDel.appendChild(btn); tr.appendChild(tdDel);
+
+    tbody.appendChild(tr);
+  });
+  renderStats();
+}
+
+function colorForScore(s){
+  if (!s) return '';
+  for (const [min,c] of COLORS) { if (s>=min) return c; }
+  return '#303035';
+}
+
+function renderStats(){
+  const nums = state.tracks.map(t=>parseInt(t.score)).filter(n=>!isNaN(n));
+  const avg = nums.length? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2) : '0';
+  el('avg').textContent = avg;
+  el('count').textContent = state.tracks.length;
+}
+
+renderTracks();
+
+// ---------- Toolbar actions ----------
+el('addTrack').addEventListener('click', ()=> addTrackRow());
+el('clearAll').addEventListener('click', ()=>{
+  const msg = (STRINGS[state.lang]||STRINGS.es).confirmClear;
+  if (!confirm(msg)) return;
+  state = { album:'', artist:'', date:'', duration:'', rankedBy:'', tracks:[], cover:null, lang: state.lang };
+  ['album','artist','date','duration','rankedBy'].forEach(k=>el(k).value='');
+  coverInput.value='';
+  save(); renderTracks(); renderStats();
+});
+
+// import/export
+el('exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'album_rater_state.json'; a.click();
+});
+
+el('importBtn').addEventListener('click', ()=> el('importFile').click());
+el('importFile').addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if (!f) return;
+  const txt = await f.text();
+  try{ const obj = JSON.parse(txt); state = Object.assign({lang: state.lang}, obj); save(); location.reload(); }
+  catch(err){ alert('Invalid JSON'); }
+});
+
+// ---------- Export to Image (Canvas renderer) ----------
+async function exportImage(w, h){
+  const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  // bg
+  ctx.fillStyle = '#0b0c10'; ctx.fillRect(0,0,w,h);
+  if (state.cover) {
+    const img = await loadImage(state.cover);
+    // draw cover blurred as background
+    const scale = Math.max(w/img.width, h/img.height);
+    const bw = img.width*scale, bh = img.height*scale;
+    ctx.filter = 'blur(24px) brightness(0.6)';
+    ctx.drawImage(img, (w-bw)/2, (h-bh)/2, bw, bh);
+    ctx.filter = 'none';
+    // overlay
+    ctx.fillStyle = 'rgba(12,12,16,0.55)';
+    ctx.fillRect(0,0,w,h);
+  }
+
+  // content margins
+  const pad = Math.floor(w*0.05);
+  const colW = Math.floor((w - pad*2) * 0.42);
+  const rightX = pad + colW + Math.floor(w*0.04);
+  const line = (y0,len=30)=>{ ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y0); ctx.lineTo(pad+len,y0); ctx.stroke(); };
+
+  // cover panel
+  if (state.cover) {
+    const img = await loadImage(state.cover);
+    const coverSize = Math.min(colW, Math.floor(h*0.35));
+    // frame
+    roundRect(ctx, pad, pad, coverSize, coverSize, 18, '#111217', 'rgba(255,255,255,0.05)');
+    const sc = Math.max(coverSize/img.width, coverSize/img.height);
+    const dw = img.width*sc, dh = img.height*sc;
+    ctx.drawImage(img, pad+(coverSize-dw)/2, pad+(coverSize-dh)/2, dw, dh);
+  }
+
+  // titles
+  ctx.fillStyle = '#e9ecf1';
+  ctx.font = `${Math.floor(w*0.035)}px Inter, system-ui, sans-serif`;
+  ctx.fillText(state.album||'—', rightX, pad+36);
+  ctx.fillStyle = '#c4c8cf';
+  ctx.font = `${Math.floor(w*0.022)}px Inter, system-ui, sans-serif`;
+  ctx.fillText((state.artist||'') + (state.date? ' • '+state.date:''), rightX, pad+36+28);
+
+  // stats chips
+  const avg = (function(){ const nums = state.tracks.map(t=>parseInt(t.score)).filter(n=>!isNaN(n)); return nums.length? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2) : '0'; })();
+  const chips = [
+    ['Avg', avg],
+    ['Tracks', String(state.tracks.length)],
+    ['Duration', state.duration? (state.duration+'m') : '—'],
+    ['Ranked by', state.rankedBy || '—']
+  ];
+  let cx = rightX, cy = pad+36+28+22;
+  ctx.font = `${Math.floor(w*0.018)}px Inter, system-ui, sans-serif`;
+  chips.forEach(ch=>{
+    const label = ch[0]+': '+ch[1];
+    const tw = ctx.measureText(label).width;
+    roundRect(ctx, cx, cy, tw+24, 30, 14, '#16171c', 'rgba(255,255,255,0.06)');
+    ctx.fillStyle = '#cfd5de'; ctx.fillText(label, cx+12, cy+20);
+    cx += tw + 24 + 10;
+  });
+
+  // table header
+  let ty = cy + 48;
+  ctx.fillStyle = '#b0b6c0';
+  ctx.font = `${Math.floor(w*0.018)}px Inter, system-ui, sans-serif`;
+  ctx.fillText('#', rightX, ty);
+  ctx.fillText('Track', rightX+30, ty);
+  ctx.fillText('Score', rightX + Math.floor(colW*0.62), ty);
+  ty += 12;
+  line(ty, w - rightX - pad);
+  ty += 18;
+
+  // rows
+  ctx.font = `${Math.floor(w*0.019)}px Inter, system-ui, sans-serif`;
+  state.tracks.forEach((t,i)=>{
+    const y = ty + i*28;
+    ctx.fillStyle = '#8f95a1'; ctx.fillText(String(i+1), rightX, y);
+    ctx.fillStyle = '#e1e6ee'; ctx.fillText(t.title||'—', rightX+30, y);
+    // color box
+    const col = t.color || '#30343a';
+    roundRect(ctx, rightX + Math.floor(colW*0.56), y-18, 22, 22, 6, col, 'rgba(255,255,255,0.08)');
+    // score
+    ctx.fillStyle = '#dde3eb'; ctx.fillText((t.score||'—'), rightX + Math.floor(colW*0.62), y);
+  });
+
+  // color legend & timeline
+  const legendY = h - pad - 120;
+  ctx.font = `${Math.floor(w*0.018)}px Inter, system-ui, sans-serif`;
+  ctx.fillStyle = '#cbd1da'; ctx.fillText('Timeline', pad, legendY - 10);
+  // timeline
+  const trackW = w - pad*2;
+  const tH = 12;
+  let x = pad; const total = Math.max(1, state.tracks.length);
+  state.tracks.forEach((t,i)=>{
+    const segW = trackW/total - 2;
+    const col = t.color || '#2a2c31';
+    ctx.fillStyle = col; ctx.fillRect(x, legendY, segW, tH);
+    x += segW + 2;
+  });
+
+  // legend
+  let lx = pad, ly = legendY + 26;
+  COLORS.forEach(([min,c])=>{
+    roundRect(ctx, lx, ly-12, 18, 18, 4, c, 'rgba(255,255,255,0.05)');
+    ctx.fillStyle = '#c9cfd8';
+    ctx.fillText((min+'+'), lx+24, ly+3);
+    lx += 70;
+  });
+
+  // footer credit
+  ctx.fillStyle = '#98a0ac';
+  ctx.font = `${Math.floor(w*0.016)}px Inter, system-ui, sans-serif`;
+  const credit = 'Created by Ok Pretty Boy with help from ChatGPT';
+  ctx.fillText(credit, pad, h - pad);
+
+  const blob = await new Promise(res=> canvas.toBlob(res, 'image/png', 0.95));
+  return blob;
+}
+
+function roundRect(ctx, x,y,w,h,r, fill, stroke){
+  const rr = (radius)=>{ const r = Math.min(radius, w/2, h/2); return r; }
+  r = rr(r);
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
+}
+
+function loadImage(src){
+  return new Promise((res, rej)=>{ const i = new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src; });
+}
+
+async function handleExport(w,h){
+  const blob = await exportImage(w,h);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  const ref = (state.album||'album') + '_' + w + 'x' + h + '.png';
+  a.download = ref;
+  a.click();
+  el('previewBox').textContent = 'Ready: ' + ref;
+}
+
+document.getElementById('exportStory').addEventListener('click', ()=> handleExport(1080,1920));
+document.getElementById('exportPost').addEventListener('click', ()=> handleExport(1080,1350));
+
+// ---------- Boot ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js?v=' + VERSION));
+}
+</script>
+</body>
+</html>
