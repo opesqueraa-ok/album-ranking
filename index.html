@@ -307,27 +307,165 @@ function drawRowsOnCanvas(ctx, rows, left, yStart){
 
   return y;
 }
-function exportCanvas(w,h,filename){
-  const s=getState();
-  const cv=new Image();
-  cv.onload=()=>{
-    const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d');
-    ctx.filter='blur(24px)';
-    const rw=Math.max(w, h*cv.width/cv.height), rh=Math.max(h, w*cv.height/cv.width);
-    ctx.drawImage(cv,(w-rw)/2,(h-rh)/2,rw,rh); ctx.filter='none';
-    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,w,h);
-    ctx.fillStyle='#fff'; ctx.font='bold 60px system-ui'; ctx.fillText(s.album||'—',80,140);
-    ctx.font='bold 36px system-ui'; ctx.fillText(s.artist||'—',80,190);
-    ctx.font='28px system-ui'; ctx.fillText(s.released||'—',80,230);
-    const scores=(s.tracks||[]).map(t=>t.score).filter(v=>v>=5&&v<=10); const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):0;
-    ctx.font='bold 120px system-ui'; ctx.fillText(scores.length?avg.toFixed(1):'—',80,340);
-    if(s.rankedby){ ctx.font='28px system-ui'; ctx.fillText((LANG==='es'?'Rankeado por: ':'Ranked by: ')+s.rankedby,80,h-120); }
-    ctx.font='22px system-ui'; ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText('Created by Ok Pretty Boy with help from ChatGPT',80,h-80);
-    const left=80, top=380;
-    ctx.font='26px system-ui'; ctx.fillStyle='#cfd9ff'; ctx.fillText('Duration   #   Name                                  Score', left, top);
-    drawRowsOnCanvas(ctx, s.tracks||[], left, top+40);
-    const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
+function exportCanvas(w, h, filename){
+  const s = getState();
+  const bg = new Image();
+  bg.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    // Fondo con blur
+    ctx.filter = 'blur(24px)';
+    const rw = Math.max(w, h * bg.width / bg.height);
+    const rh = Math.max(h, w * bg.height / bg.width);
+    ctx.drawImage(bg, (w-rw)/2, (h-rh)/2, rw, rh);
+    ctx.filter = 'none';
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.fillRect(0,0,w,h);
+
+    // Panel glass (ligero)
+    const panel = { x: 64, y: 64, w: w-128, h: h-128, r: 28 };
+    ctx.fillStyle = 'rgba(15,17,21,.55)';
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.lineWidth = 1.2;
+    // rounded rect
+    ctx.beginPath();
+    const r = panel.r;
+    ctx.moveTo(panel.x+r, panel.y);
+    ctx.arcTo(panel.x+panel.w, panel.y, panel.x+panel.w, panel.y+panel.h, r);
+    ctx.arcTo(panel.x+panel.w, panel.y+panel.h, panel.x, panel.y+panel.h, r);
+    ctx.arcTo(panel.x, panel.y+panel.h, panel.x, panel.y, r);
+    ctx.arcTo(panel.x, panel.y, panel.x+panel.w, panel.y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const pad = 36;
+    const left = panel.x + pad;
+    const right = panel.x + panel.w - pad;
+
+    // Títulos
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 72px system-ui, Arial';
+    ctx.fillText(s.album || '—', left, panel.y + 90);
+
+    ctx.font = '600 36px system-ui, Arial';
+    ctx.fillText(s.artist || '—', left, panel.y + 130);
+
+    ctx.font = '500 26px system-ui, Arial';
+    ctx.fillText(s.released || '—', left, panel.y + 165);
+
+    // Mini portada a la derecha
+    const coverSize = 360;
+    const coverY = panel.y + pad;
+    const coverX = right - coverSize;
+    const coverImg = new Image();
+    coverImg.onload = () => {
+      ctx.drawImage(coverImg, coverX, coverY, coverSize, coverSize);
+
+      // Score grande DEBAJO de portada
+      const scores = (s.tracks||[]).map(t=>t.score).filter(v=>v>=5&&v<=10);
+      const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 120px system-ui, Arial';
+      ctx.fillText(scores.length?avg.toFixed(1):'—', coverX, coverY + coverSize + 120);
+
+      // Tabla de canciones (columnas fijas)
+      const tableTop = panel.y + 220;
+      const yEnd = drawRowsOnCanvas(ctx, s.tracks||[], left, tableTop);
+
+      // Gráfica transparente abajo
+      const chartTop = Math.max(yEnd + 30, coverY + coverSize + 160);
+      const chartH = 260;
+      const chartW = right - left;
+      drawExportChart(ctx, (s.tracks||[]).map(t=>t.score), left, chartTop, chartW, chartH);
+
+      // Rankeado por…
+      if (s.rankedby) {
+        ctx.fillStyle = 'rgba(255,255,255,.9)';
+        ctx.font = '500 24px system-ui, Arial';
+        const tag = (LANG==='es'?'Rankeado por: ':'Ranked by: ')+s.rankedby;
+        ctx.fillText(tag, left, panel.y + panel.h - 26);
+      }
+
+      // Marca
+      ctx.fillStyle = 'rgba(255,255,255,.7)';
+      ctx.font = '500 20px system-ui, Arial';
+      ctx.fillText('Created by Ok Pretty Boy with help from ChatGPT', left, panel.y + panel.h - 60);
+
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    };
+    coverImg.onerror = () => {
+      // Si no hay portada, aún generamos con score en el lugar previsto
+      const scores = (s.tracks||[]).map(t=>t.score).filter(v=>v>=5&&v<=10);
+      const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 120px system-ui, Arial';
+      ctx.fillText(scores.length?avg.toFixed(1):'—', right - coverSize, panel.y + pad + coverSize + 120);
+
+      const tableTop = panel.y + 220;
+      const yEnd = drawRowsOnCanvas(ctx, s.tracks||[], left, tableTop);
+      const chartTop = Math.max(yEnd + 30, panel.y + pad + coverSize + 160);
+      const chartH = 260;
+      const chartW = right - left;
+      drawExportChart(ctx, (s.tracks||[]).map(t=>t.score), left, chartTop, chartW, chartH);
+
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    };
+    coverImg.src = s.cover || '';
   };
+  bg.onerror = () => {
+    // Fallback sin fondo
+    const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0f1115'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle = '#fff'; ctx.font = '800 72px system-ui, Arial';
+    ctx.fillText('Album Rater', 80, 140);
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  };
+  bg.src = s.cover || '';
+}
+  function drawExportChart(ctx, values, x, y, w, h){
+  // Fondo transparente, ejes sutiles
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.stroke();
+
+  // Grid horizontal tenue
+  for(let s=5; s<=10; s++){
+    const yy = y + h - ((s-5)/5)*h;
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x+w, yy); ctx.stroke();
+  }
+
+  if (!values?.length){ ctx.restore(); return; }
+
+  const n = values.length;
+  const X = i => x + (i/(Math.max(1,n-1))) * w;
+  const Y = v => y + h - ((v-5)/5)*h;
+
+  // Línea más gruesa
+  ctx.strokeStyle = 'rgba(255,255,255,.9)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(X(0), Y(values[0]));
+  for (let i=1;i<n;i++) ctx.lineTo(X(i), Y(values[i]));
+  ctx.stroke();
+
+  // Puntos
+  ctx.fillStyle = '#fff';
+  for (let i=0;i<n;i++){
+    ctx.beginPath(); ctx.arc(X(i), Y(values[i]), 5, 0, 2*Math.PI); ctx.fill();
+  }
+  ctx.restore();
+}
   cv.onerror=()=>{ const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d'); ctx.fillStyle='#0f1115'; ctx.fillRect(0,0,w,h); ctx.fillStyle='#fff'; ctx.font='bold 60px system-ui'; ctx.fillText('Album Rater',80,140); const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); };
   cv.src = s.cover || '';
 }
