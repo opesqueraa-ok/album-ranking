@@ -253,23 +253,58 @@ document.getElementById('importJSON').addEventListener('change',ev=>{ const f=ev
 document.getElementById('clearAll').onclick=()=>{ const msg=I18N[LANG].confirmClear; if(!confirm(msg)) return; localStorage.removeItem(KEY); setState({lang:LANG, album:'', artist:'', released:'', rankedby:'', cover:'', tracks:[]}); };
 
 // Export images (tabla simple + fondo blur)
-function drawRowsOnCanvas(ctx, rows, x, yStart){
-  let y=yStart; const lineH=34;
-  rows.forEach(t=>{
-    const dur=(t.dur||'—').padStart(5,' ');
-    const num=String(t.n||'').padStart(2,' ');
-    const name=(t.name||'—'); const nameTrim = name.length>28? name.slice(0,28): name;
-    const leftText = dur+'   '+num+'   '+nameTrim+'   ';
-    ctx.fillStyle='#fff';
-    ctx.font='26px system-ui';
-    ctx.fillText(leftText, x, y);
-    const sx = x + ctx.measureText(leftText).width;
-    const color = COLORS[Math.max(5,Math.min(10,Math.floor(t.score||0)))];
-    const scoreTxt = (t.score||0).toFixed(1).replace(/\.0$/,'');
-    ctx.fillStyle=color; ctx.fillRect(sx, y-24, 54, 28);
-    ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui'; ctx.fillText(scoreTxt, sx+10, y-3);
-    y+=lineH;
+function drawRowsOnCanvas(ctx, rows, left, yStart){
+  // Columnas fijas
+  const COL = {
+    dur: left,
+    num: left + 110,
+    name: left + 150,
+    score: left + 700
+  };
+  let y = yStart, lineH = 36;
+
+  // Encabezados
+  ctx.fillStyle = 'rgba(207,217,255,.9)';
+  ctx.font = '600 24px system-ui, Arial';
+  ctx.fillText('Duration', COL.dur,  y);
+  ctx.fillText('#',        COL.num,  y);
+  ctx.fillText('Name',     COL.name, y);
+  ctx.fillText('Score',    COL.score,y);
+  y += 10;
+
+  rows.forEach((t, i) => {
+    y += lineH;
+    const dur = (t.dur || '—');
+    const num = String(t.n || (i+1));
+    const name = (t.name || '—');
+    const score = (t.score || 0).toFixed(1).replace(/\.0$/,'');
+
+    // Texto
+    ctx.fillStyle = '#fff';
+    ctx.font = '500 26px system-ui, Arial';
+    ctx.fillText(dur,  COL.dur,  y);
+    ctx.fillText(num,  COL.num,  y);
+
+    // Recorta nombre a ancho máx
+    const maxNameW = COL.score - COL.name - 24;
+    let shown = name;
+    while (ctx.measureText(shown).width > maxNameW && shown.length > 3) {
+      shown = shown.slice(0, -1);
+    }
+    if (shown !== name) shown = shown.slice(0, -1) + '…';
+    ctx.fillText(shown, COL.name, y);
+
+    // Badge de score en columna fija
+    const w = 62, h = 28;
+    const bx = COL.score, by = y - 22;
+    const color = COLORS[Math.max(5, Math.min(10, Math.floor(t.score || 0)))];
+    ctx.fillStyle = color;
+    ctx.fillRect(bx, by, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 22px system-ui, Arial';
+    ctx.fillText(score, bx + 12, by + 22);
   });
+
   return y;
 }
 function exportCanvas(w,h,filename){
