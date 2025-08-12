@@ -466,9 +466,6 @@ function exportCanvas(w, h, filename){
   }
   ctx.restore();
 }
-  cv.onerror=()=>{ const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d'); ctx.fillStyle='#0f1115'; ctx.fillRect(0,0,w,h); ctx.fillStyle='#fff'; ctx.font='bold 60px system-ui'; ctx.fillText('Album Rater',80,140); const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); };
-  cv.src = s.cover || '';
-}
 document.getElementById('exportStory').onclick=()=> exportCanvas(1080,1920,'album-story.png');
 document.getElementById('export45').onclick=()=> exportCanvas(1080,1350,'album-4x5.png');
 
