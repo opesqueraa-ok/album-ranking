@@ -19,7 +19,7 @@
 
   // --- GENIUS via Worker ---
 async function fetchGeniusTracks(artist, album){
-    const base = (window.GENIUS_PROXY_URL||'').trim();
+    const base = 'https://empty-bread-de3e.opesqueraa.workers.dev';
     if(!base) return null;
     const url = `${base}/album?${q({artist, album})}`;
     const res = await fetch(url);
