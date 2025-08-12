@@ -162,8 +162,9 @@
   }
 
   // Relleno en el DOM (adaptable a tu estructura)
-  function fillDOM(sel, payload) {
-    const qs = (q) => q ? document.querySelector(q) : null;
+  function fillDOM(sel, payload);
+// <<< NUEVO: dispara evento para que tu app rellene filas >>>
+window.dispatchEvent(new CustomEvent('album-autofilled', { detail: payload }));
 
     const albumEl = qs(sel.album);
     if (albumEl && payload.title) albumEl.value = payload.title;
