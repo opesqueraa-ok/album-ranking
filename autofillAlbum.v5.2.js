@@ -18,7 +18,7 @@
   function q(obj){ return new URLSearchParams(obj).toString(); }
 
   // --- GENIUS via Worker ---
-  async function fetchGeniusTracks(artist, album){
+async function fetchGeniusTracks(artist, album){
     const base = (window.GENIUS_PROXY_URL||'').trim();
     if(!base) return null;
     const url = `${base}/album?${q({artist, album})}`;
