@@ -30,7 +30,6 @@
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,.15)';
     ctx.lineWidth = 1; ctx.beginPath(); ctx.rect(x, y, w, h); ctx.stroke();
-    for(let s=5; s<=10; s++){ const yy = y + h - ((s-5)/5)*h; ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x+w, yy); ctx.stroke(); }
     values = (values||[]).filter(v=>Number.isFinite(v));
     if (!values.length){ ctx.restore(); return; }
     const n = values.length;
