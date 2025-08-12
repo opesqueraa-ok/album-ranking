@@ -46,7 +46,7 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
     document.querySelector('#trackcount').value = list.length;
     ensureRows(list.length);
     // 2) Rellena duración + nombre en tus inputs dinámicos
-    [...tracksEl.children].forEach((row, i) => {
+    [.....tracksEl.children].forEach((row, i) => {
       const inputs = row.querySelectorAll('input'); // [num, dur, name]
       const t = list[i] || {};
       if (inputs[1]) inputs[1].value = t.duration || ''; // mm:ss
@@ -203,7 +203,7 @@ function render(){
   const pair=(L,V)=>{const l=document.createElement('div'); l.className='label'; l.textContent=L; const v=document.createElement('div'); v.innerHTML=V; info.append(l,v);};
   const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
   pair(t.album+':','<strong><em>'+(album||'—')+'</em></strong>'); pair(t.artist+':','<strong>'+(artist||'—')+'</strong>'); pair(t.released+':',released||'—'); if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
-  const tracks=[...tracksEl.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||tr.score).sort((a,b)=>a.n-b.n);
+  const tracks=[[...tracksEl.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||tr.score).sort((a,b)=>a.n-b.n);
   const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">'+t.duration+'</th><th style="width:36px">'+t.num+'</th><th>'+t.name+'</th><th style="width:90px">'+t.score.split('(')[0]+'</th></tr>'; table.appendChild(thead);
   const tbody=document.createElement('tbody'); table.appendChild(tbody);
   let totalSec=0, scores=[]; tracks.forEach(tr=>{ totalSec+=durationToSeconds(tr.dur); if(tr.score>=5&&tr.score<=10) scores.push(tr.score);
@@ -327,7 +327,7 @@ function exportCanvas(w, h, filename){
     // Panel glass (ligero)
     const panel = { x: 64, y: 64, w: w-128, h: h-128, r: 28 };
     ctx.fillStyle = 'rgba(15,17,21,.55)';
-    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.strokeStyle = 'rgba(255,255,255,.15)';
     ctx.lineWidth = 1.2;
     // rounded rect
     ctx.beginPath();
