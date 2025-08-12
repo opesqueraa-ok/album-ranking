@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest?v=5.2">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=5.2">
+<link rel="icon" href="favicon.png?v=5.2">
+<meta name="theme-color" content="#0f1115">
+<title>Album Rater</title>
+<style>
+:root{--c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;--bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#444c5e;}
+*{box-sizing:border-box}html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:0}
+.wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
+h1{font-size:20px;margin:0 0 6px}.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.select,input,select,button{background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px}
+button{cursor:pointer;font-weight:600}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px}.pad{padding:14px}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.pair{display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;margin-bottom:8px}.label{font-size:13px;color:var(--muted)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.row{display:grid;grid-template-columns:60px 90px 1fr 160px 90px;gap:8px;align-items:center;margin-bottom:6px}
+.pill{display:inline-flex;justify-content:center;align-items:center;padding:6px 10px;border-radius:8px;color:white;font-weight:800;min-width:52px;text-align:center}
+.cover{width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--line);border-radius:10px;background:#0d1117}
+table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;font-size:14px}th{color:var(--muted);font-weight:600}
+.final{font-size:52px;font-weight:800;text-align:center;margin-top:10px}
+canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;background:#0e1218}
+.footer{margin-top:10px;font-size:12px;color:#93a0b6}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#c9d3e3}
+.badge-dot{width:8px;height:8px;border-radius:999px;background:var(--neutral);display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="toolbar">
+    <h1 style="margin-right:auto">Album Rater</h1>
+    <select id="lang" class="select"><option value="en">English</option><option value="es">Español</option></select>
+    <button id="exportJSON">Export Data</button>
+    <label style="position:relative"><span id="importLabel" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;display:inline-block">Import Data</span>
+      <input id="importJSON" type="file" accept="application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
+    <button id="clearAll">Clear All Data</button>
+    <button id="exportStory">Export Story (1080×1920)</button>
+    <button id="export45">Export 4:5 (1080×1350)</button>
+  </div>
+  <div class="sub" id="subtitle"></div>
+
+  <div class="grid">
+    <div class="card pad">
+      <div class="pair"><div class="label" data-i18n="album">Album</div><input id="album" placeholder="Album name"></div>
+      <div class="pair"><div class="label" data-i18n="artist">Artist</div><input id="artist" placeholder="Artist"></div>
+      <div class="pair"><div class="label" data-i18n="released">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
+      <div class="pair"><div class="label" data-i18n="rankedby">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
+      <div class="pair"><div class="label" data-i18n="cover">Cover</div><input id="cover" type="file" accept="image/*"></div>
+      <div class="pair"><div class="label" data-i18n="trackcount">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
+      <div class="controls">
+        <button id="applyCount">Apply Track Count</button>
+        <button id="addRow">+ Add Row</button>
+        <button id="delRow">– Remove Last</button>
+        <span class="badge" title="Unscored tracks are '-'">
+          <span class="badge-dot"></span>
+          Unscored = '-'
+        </span>
+      </div>
+      <div class="row" style="font-size:12px;color:#aeb5c0">
+        <div data-i18n="num">#</div><div data-i18n="duration">Duration</div><div data-i18n="name">Name</div><div data-i18n="score">Score (int + decimal)</div><div data-i18n="color">Color</div>
+      </div>
+      <div id="tracks"></div>
+    </div>
+
+    <div class="card pad">
+      <div style="display:grid;grid-template-columns:1fr 360px;gap:16px">
+        <div>
+          <div style="display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:center" id="info"></div>
+          <table id="table"></table>
+        </div>
+        <div>
+          <img id="coverOut" class="cover" alt="Cover">
+          <div class="final" id="finalScore">—</div>
+        </div>
+      </div>
+      <div style="margin-top:12px"><div style="font-size:12px;color:#aeb5c0;margin:6px 0">Enjoyment Timeline</div><canvas id="chart" width="900" height="360"></canvas></div>
+      <div class="footer">Created by Ok Pretty Boy with help from ChatGPT</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script>
+const VERSION='5.2';
+const I18N={
+  en:{subtitle:"Quick form to score albums. Choose track count, pick scores with two taps (integer + decimal), and everything updates live.",
+      album:"Album",artist:"Artist",released:"Release Date",rankedby:"Ranked by",cover:"Cover",trackcount:"Tracks",
+      num:"#",duration:"Duration",name:"Name",score:"Score (int + decimal)",color:"Color",
+      apply:"Apply Track Count",addRow:"+ Add Row",delRow:"– Remove Last",clearAll:"Clear All Data",
+      import:"Import Data",export:"Export Data",total:"Duration",avg:"Average",
+      confirmClear:"Are you sure you want to clear all fields?"
+  },
+  es:{subtitle:"Formulario rápido para puntuar álbumes. Elige número de canciones, selecciona puntaje en dos toques (entero + decimal) y todo se actualiza al instante.",
+      album:"Álbum",artist:"Artista",released:"Fecha de lanzamiento",rankedby:"Rankeado por",cover:"Cover",trackcount:"Canciones",
+      num:"#",duration:"Duración",name:"Nombre",score:"Puntaje (entero + decimal)",color:"Color",
+      apply:"Aplicar cantidad",addRow:"+ Añadir fila",delRow:"– Quitar última",clearAll:"Borrar todos los datos",
+      import:"Importar datos",export:"Exportar datos",total:"Duración total",avg:"Promedio",
+      confirmClear:"¿Seguro que deseas borrar todos los campos?"
+  }
+};
+let LANG=localStorage.getItem('albumrater_lang')||(navigator.language.startsWith('es')?'es':'en');
+const $=s=>document.querySelector(s);
+
+function applyI18N(){const t=I18N[LANG]; $('#subtitle').textContent=t.subtitle;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t[el.dataset.i18n]||el.textContent;});
+  $('#applyCount').textContent=t.apply; $('#addRow').textContent=t.addRow; $('#delRow').textContent=t.delRow;
+  $('#clearAll').textContent=t.clearAll; $('#importLabel').textContent=t.import; $('#exportJSON').textContent=t.export; $('#lang').value=LANG;
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('lang').addEventListener('change',e=>{LANG=e.target.value; localStorage.setItem('albumrater_lang',LANG); applyI18N(); render();});
+});
+const COLORS={10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
+const NEUTRAL='#2a3140';
+function durationToSeconds(d){ if(!d)return 0; const m=d.match(/^(\\d{1,2}):(\\d{2})$/); if(!m)return 0; return parseInt(m[1],10)*60+parseInt(m[2],10); }
+function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
+function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
+const tracksEl=document.getElementById('tracks');
+
+function rankPicker(initial){
+  // initial puede ser number o NaN
+  const wrap=document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 1fr'; wrap.style.gap='6px';
+  const iSel=document.createElement('select');
+  // Opción '-' (sin puntuar)
+  let o=document.createElement('option'); o.value=''; o.textContent='-'; iSel.appendChild(o);
+  for(let i=5;i<=10;i++){ o=document.createElement('option'); o.value=i; o.textContent=i; iSel.appendChild(o); }
+  const dSel=document.createElement('select'); dSel.disabled=true;
+
+  function fillDec(max){
+    dSel.innerHTML='';
+    let o2=document.createElement('option'); o2.value='0'; o2.textContent='0.0'; dSel.appendChild(o2);
+    if(max){ for(let t=1;t<=9;t++){ const val=(t/10).toFixed(1); o2=document.createElement('option'); o2.value=val; o2.textContent=val; dSel.appendChild(o2);} }
+  }
+  fillDec(false);
+
+  function setFromNumber(v){
+    if(!Number.isFinite(v)){ iSel.value=''; dSel.disabled=true; dSel.value='0'; return; }
+    const b=Math.floor(v); const dec=Math.round((v-b)*10)/10;
+    iSel.value=String(b); dSel.disabled=false; fillDec(b<10); dSel.value=dec.toFixed(1);
+  }
+  function current(){
+    const ib=iSel.value; if(ib==='') return NaN;
+    const dd=parseFloat(dSel.value||'0'); return parseFloat(ib)+dd;
+  }
+  function trigger(){ wrap.dispatchEvent(new CustomEvent('change-score',{detail:current()})); }
+
+  iSel.addEventListener('change', ()=>{
+    if(iSel.value===''){ dSel.disabled=true; dSel.value='0'; }
+    else { dSel.disabled=false; fillDec(Number(iSel.value)<10); }
+    trigger();
+  });
+  dSel.addEventListener('change', trigger);
+
+  setFromNumber(initial);
+  wrap.append(iSel,dSel);
+  return {el:wrap,get:current,set:setFromNumber};
+}
+
+function makeRow(i,data={}){
+  const row=document.createElement('div'); row.className='row';
+  const n=document.createElement('input'); n.type='number'; n.min=1; n.value=(data.n ?? (i+1));
+  const dur=document.createElement('input'); dur.placeholder='mm:ss'; dur.value=data.dur||'';
+  const name=document.createElement('input'); name.placeholder=(LANG==='es'?'Nombre de la canción':'Track name'); name.value=data.name||'';
+  const initScore = (typeof data.score==='number' && Number.isFinite(data.score)) ? data.score : NaN;
+  const picker=rankPicker(initScore); const pill=document.createElement('div'); pill.className='pill'; pill.textContent='—'; pill.style.background=NEUTRAL;
+  row.append(n,dur,name,picker.el,pill);
+  function paint(v){ if(!Number.isFinite(v)){ pill.style.background=NEUTRAL; pill.textContent='-'; return; }
+    const c=colorFor(v); pill.style.background=c; pill.textContent=(v||0).toFixed(1).replace(/\\.0$/,''); }
+  picker.el.addEventListener('change-score', e=>{ paint(e.detail); render(); });
+  [n,dur,name].forEach(el=> el.addEventListener('input', render));
+  paint(picker.get());
+  row.value=()=>({n:Number(n.value||0), dur:dur.value.trim(), name:name.value.trim(), score:picker.get()});
+  return row;
+}
+
+function ensureRows(n){ const cur=tracksEl.children.length; if(cur<n){for(let i=cur;i<n;i++) tracksEl.appendChild(makeRow(i));} else if(cur>n){for(let i=cur-1;i>=n;i--) tracksEl.removeChild(tracksEl.children[i]);} render(); }
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('addRow').onclick=()=> ensureRows(tracksEl.children.length+1);
+  document.getElementById('delRow').onclick=()=> ensureRows(Math.max(1, tracksEl.children.length-1));
+  document.getElementById('applyCount').onclick=()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10));
+  document.getElementById('cover').addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{document.getElementById('coverOut').src=e.target.result; save();}; r.readAsDataURL(f);});
+});
+
+function render(){
+  const t=I18N[LANG]; const info=document.getElementById('info'); info.innerHTML='';
+  const pair=(L,V)=>{const l=document.createElement('div'); l.className='label'; l.textContent=L; const v=document.createElement('div'); v.innerHTML=V; info.append(l,v);};
+  const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
+  pair(t.album+':','<strong><em>'+(album||'—')+'</em></strong>'); pair(t.artist+':','<strong>'+(artist||'—')+'</strong>'); pair(t.released+':',released||'—'); if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
+  const tracks=[...tracksEl.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
+  const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">'+t.duration+'</th><th style="width:36px">'+t.num+'</th><th>'+t.name+'</th><th style="width:90px">'+t.score.split('(')[0]+'</th></tr>'; table.appendChild(thead);
+  const tbody=document.createElement('tbody'); table.appendChild(tbody);
+  let totalSec=0, scores=[]; tracks.forEach(tr=>{ totalSec+=durationToSeconds(tr.dur); if(Number.isFinite(tr.score) && tr.score>=5&&tr.score<=10) scores.push(tr.score);
+    const badge = Number.isFinite(tr.score) ? ('<span class="pill" style="background:'+colorFor(tr.score)+'">'+tr.score.toFixed(1).replace(/\\.0$/,'')+'</span>') : ('<span class="pill" style="background:'+NEUTRAL+'">-</span>');
+    const el=document.createElement('tr'); el.innerHTML='<td>'+(tr.dur||'—')+'</td><td>'+(tr.n||'')+'</td><td>'+(tr.name||'—')+'</td><td>'+badge+'</td>'; tbody.appendChild(el); });
+  const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):NaN; document.getElementById('finalScore').textContent=Number.isFinite(avg)?avg.toFixed(1):'—';
+  pair(t.total, secondsToMinutesText(totalSec));
+  const series = tracks.map(tr=>tr.score).filter(v=>Number.isFinite(v));
+  drawChart('chart', series); save();
+}
+function drawChart(id,values){
+  const canvas=document.getElementById(id), ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
+  const P={l:60,r:20,t:20,b:36}, W=canvas.width-P.l-P.r, H=canvas.height-P.t-P.b;
+  ctx.strokeStyle='#2a3140'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(P.l,P.t); ctx.lineTo(P.l,P.t+H); ctx.lineTo(P.l+W,P.t+H); ctx.stroke();
+  ctx.fillStyle='#aeb5c0'; ctx.font='12px system-ui';
+  for(let y=5;y<=10;y++){ const yy=P.t+H-((y-5)/5)*H; ctx.strokeStyle='#1a2130'; ctx.beginPath(); ctx.moveTo(P.l,yy); ctx.lineTo(P.l+W,yy); ctx.stroke(); ctx.fillText(String(y),18,yy+4); }
+  if(!values.length) return; const n=values.length, x=i=>P.l+(i/(Math.max(1,n-1)))*W, y=v=>P.t+H-((v-5)/5)*H;
+  ctx.strokeStyle='#7aa2ff'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x(0),y(values[0])); for(let i=1;i<n;i++) ctx.lineTo(x(i), y(values[i])); ctx.stroke();
+  ctx.fillStyle='#cfd9ff'; for(let i=0;i<n;i++){ ctx.beginPath(); ctx.arc(x(i), y(values[i]), 4, 0, 2*Math.PI); ctx.fill(); }
+  ctx.fillStyle='#aeb5c0'; for(let i=0;i<n;i++){ ctx.fillText(String(i+1), x(i)-3, P.t+H+16); }
+}
+
+// Save/Load/Export/Import
+const KEY='albumrater_v5_2_state';
+function getState(){ const tracks=[...tracksEl.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score));
+  return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks}; }
+function setState(s){
+  LANG=s.lang||LANG; localStorage.setItem('albumrater_lang',LANG); applyI18N();
+  $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
+  if(s.cover) $('#coverOut').src=s.cover;
+  tracksEl.innerHTML=''; (s.tracks||[]).forEach((t,i)=> tracksEl.appendChild(makeRow(i,t)));
+  if(!(s.tracks||[]).length) ensureRows(7);
+  render();
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(getState())); }
+function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ setState(JSON.parse(raw)); return; } }catch(e){}
+  setState({lang:LANG, album:'', artist:'', released:'', rankedby:'', cover:'', tracks:[
+    {n:1,dur:'',name:'',score:NaN},
+    {n:2,dur:'',name:'',score:NaN},
+    {n:3,dur:'',name:'',score:NaN},
+    {n:4,dur:'',name:'',score:NaN},
+    {n:5,dur:'',name:'',score:NaN},
+    {n:6,dur:'',name:'',score:NaN},
+    {n:7,dur:'',name:'',score:NaN},
+  ]});
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('exportJSON').onclick=()=>{ const blob=new Blob([JSON.stringify(getState(),null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='albumrater-data.json'; a.click(); URL.revokeObjectURL(url); };
+  document.getElementById('importJSON').addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{ try{ setState(JSON.parse(e.target.result)); save(); alert(LANG==='es'?'Datos importados.':'Data imported.'); }catch(err){ alert(LANG==='es'?'Archivo inválido.':'Invalid file.'); } }; r.readAsText(f); });
+  document.getElementById('clearAll').onclick=()=>{ const msg=I18N[LANG].confirmClear; if(!confirm(msg)) return; localStorage.removeItem(KEY); setState({lang:LANG, album:'', artist:'', released:'', rankedby:'', cover:'', tracks:[]}); };
+});
+
+// Export images (tabla con columnas fijas + panel glass)
+function drawRowsOnCanvas(ctx, rows, left, yStart){
+  const COL = { dur:left, num:left+110, name:left+150, score:left+700 };
+  let y = yStart, lineH = 36;
+  ctx.fillStyle = 'rgba(207,217,255,.9)'; ctx.font = '600 24px system-ui, Arial';
+  ctx.fillText('Duration', COL.dur, y); ctx.fillText('#', COL.num, y); ctx.fillText('Name', COL.name, y); ctx.fillText('Score', COL.score, y);
+  y += 10;
+  rows.forEach((t,i)=>{
+    y += lineH;
+    const dur = (t.dur || '—'), num = String(t.n || (i+1)), name = (t.name || '—');
+    const isScore = Number.isFinite(t.score);
+    const score = isScore ? t.score.toFixed(1).replace(/\\.0$/,'') : '-';
+    ctx.fillStyle='#fff'; ctx.font='500 26px system-ui, Arial';
+    ctx.fillText(dur, COL.dur, y); ctx.fillText(num, COL.num, y);
+    const maxNameW = COL.score - COL.name - 24; let shown = name;
+    while (ctx.measureText(shown).width > maxNameW && shown.length > 3) { shown = shown.slice(0, -1); }
+    if (shown !== name) shown = shown.slice(0, -1) + '…';
+    ctx.fillText(shown, COL.name, y);
+    const w = 62, h = 28; const bx = COL.score, by = y - 22;
+    const color = isScore ? colorFor(t.score) : NEUTRAL;
+    ctx.fillStyle = color; ctx.fillRect(bx, by, w, h);
+    ctx.fillStyle = '#fff'; ctx.font = '700 22px system-ui, Arial'; ctx.fillText(score, bx + 12, by + 22);
+  });
+  return y;
+}
+
+function drawExportChart(ctx, values, x, y, w, h){
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,.15)';
+  ctx.lineWidth = 1; ctx.beginPath(); ctx.rect(x, y, w, h); ctx.stroke();
+  for(let s=5; s<=10; s++){
+    const yy = y + h - ((s-5)/5)*h; ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x+w, yy); ctx.stroke();
+  }
+  if (!values || !values.length){ ctx.restore(); return; }
+  const n = values.length;
+  const X = i => x + (i/(Math.max(1,n-1))) * w;
+  const Y = v => y + h - ((v-5)/5)*h;
+  ctx.strokeStyle = 'rgba(255,255,255,.9)';
+  ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X(0), Y(values[0]));
+  for (let i=1;i<n;i++) ctx.lineTo(X(i), Y(values[i])); ctx.stroke();
+  ctx.fillStyle = '#fff'; for (let i=0;i<n;i++){ ctx.beginPath(); ctx.arc(X(i), Y(values[i]), 5, 0, 2*Math.PI); ctx.fill(); }
+  ctx.restore();
+}
+
+function exportCanvas(w, h, filename){
+  const s = getState();
+  const bg = new Image();
+  bg.onload = () => {
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    ctx.filter = 'blur(24px)';
+    const rw = Math.max(w, h * bg.width / bg.height);
+    const rh = Math.max(h, w * bg.height / bg.width);
+    ctx.drawImage(bg, (w-rw)/2, (h-rh)/2, rw, rh);
+    ctx.filter = 'none';
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0,0,w,h);
+
+    const panel = { x: 64, y: 64, w: w-128, h: h-128, r: 28 };
+    ctx.fillStyle = 'rgba(15,17,21,.55)'; ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    const r = panel.r;
+    ctx.moveTo(panel.x+r, panel.y);
+    ctx.arcTo(panel.x+panel.w, panel.y, panel.x+panel.w, panel.y+panel.h, r);
+    ctx.arcTo(panel.x+panel.w, panel.y+panel.h, panel.x, panel.y+panel.h, r);
+    ctx.arcTo(panel.x, panel.y+panel.h, panel.x, panel.y, r);
+    ctx.arcTo(panel.x, panel.y, panel.x+panel.w, panel.y, r);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    const pad = 36; const left = panel.x + pad; const right = panel.x + panel.w - pad;
+
+    ctx.fillStyle = '#fff'; ctx.font = '800 72px system-ui, Arial'; ctx.fillText(s.album || '—', left, panel.y + 90);
+    ctx.font = '600 36px system-ui, Arial'; ctx.fillText(s.artist || '—', left, panel.y + 130);
+    ctx.font = '500 26px system-ui, Arial'; ctx.fillText(s.released || '—', left, panel.y + 165);
+
+    const coverSize = 360; const coverY = panel.y + pad; const coverX = right - coverSize;
+    const coverImg = new Image();
+    coverImg.onload = () => {
+      const canvas2 = document.createElement('canvas'); canvas2.width = coverSize; canvas2.height = coverSize;
+      const ctx2 = canvas2.getContext('2d'); ctx2.drawImage(coverImg, 0, 0, coverSize, coverSize);
+      ctx.drawImage(canvas2, coverX, coverY);
+
+      const scores = (s.tracks||[]).map(t=>t.score).filter(v=>Number.isFinite(v));
+      const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length) : NaN;
+      ctx.fillStyle = '#fff'; ctx.font = '800 120px system-ui, Arial';
+      ctx.fillText(Number.isFinite(avg)?avg.toFixed(1):'—', coverX, coverY + coverSize + 120);
+
+      const tableTop = panel.y + 220; const yEnd = drawRowsOnCanvas(ctx, s.tracks||[], left, tableTop);
+      const chartTop = Math.max(yEnd + 30, coverY + coverSize + 160);
+      const chartH = 260; const chartW = right - left;
+      drawExportChart(ctx, (s.tracks||[]).map(t=>t.score).filter(v=>Number.isFinite(v)), left, chartTop, chartW, chartH);
+
+      if (s.rankedby) {
+        ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = '500 24px system-ui, Arial';
+        const tag = (LANG==='es'?'Rankeado por: ':'Ranked by: ')+s.rankedby; ctx.fillText(tag, left, panel.y + panel.h - 26);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '500 20px system-ui, Arial';
+      ctx.fillText('Created by Ok Pretty Boy with help from ChatGPT', left, panel.y + panel.h - 60);
+
+      const url = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    };
+    coverImg.onerror = () => {
+      const scores = (s.tracks||[]).map(t=>t.score).filter(v=>Number.isFinite(v));
+      const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length) : NaN;
+      ctx.fillStyle = '#fff'; ctx.font = '800 120px system-ui, Arial';
+      ctx.fillText(Number.isFinite(avg)?avg.toFixed(1):'—', right - coverSize, panel.y + pad + coverSize + 120);
+
+      const tableTop = panel.y + 220; const yEnd = drawRowsOnCanvas(ctx, s.tracks||[], left, tableTop);
+      const chartTop = Math.max(yEnd + 30, panel.y + pad + coverSize + 160);
+      const chartH = 260; const chartW = right - left;
+      drawExportChart(ctx, (s.tracks||[]).map(t=>t.score).filter(v=>Number.isFinite(v)), left, chartTop, chartW, chartH);
+
+      const url = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    };
+    coverImg.src = s.cover || '';
+  };
+  bg.onerror = () => {
+    const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#0f1115'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle = '#fff'; ctx.font = '800 72px system-ui, Arial'; ctx.fillText('Album Rater', 80, 140);
+    const url = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  };
+  bg.src = s.cover || '';
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('exportStory').onclick=()=> exportCanvas(1080,1920,'album-story.png');
+  document.getElementById('export45').onclick=()=> exportCanvas(1080,1350,'album-4x5.png');
+  applyI18N(); load();
+  if('serviceWorker' in navigator){ window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v='+VERSION)); }
+});
+</script>
+
+<!-- Autofill module and hooks -->
+<script src="autofillAlbum.v5.2.js?v=5.2"></script>
+<script>
+// Listener que recibe los datos y rellena filas (duración + nombre) y recalcula totales
+window.addEventListener('album-autofilled', (e) => {
+  const d = e.detail || {}; const list = d.tracks || [];
+  document.querySelector('#trackcount').value = list.length;
+  ensureRows(list.length);
+  [...tracksEl.children].forEach((row, i) => {
+    const inputs = row.querySelectorAll('input'); // [num, dur, name]
+    const t = list[i] || {};
+    if (inputs[1]) inputs[1].value = t.duration || ''; // mm:ss
+    if (inputs[2]) inputs[2].value = t.title || '';
+  });
+  if (d.year) document.querySelector('#released').value = d.year;
+  render();
+});
+
+// Inicializa el módulo con tus selectores actuales
+document.addEventListener('DOMContentLoaded', () => {
+  AlbumAutofill.init({
+    selectors: {
+      artist: '#artist',
+      album: '#album',
+      year: '#released',
+      trackCount: '#trackcount',
+      totalTime: null,
+      coverImg: '#coverOut',
+      coverUrlInput: null,
+      tracksTable: null,
+      btnBuscar: '#btnBuscarAlbum'
+    }
+  });
+});
+</script>
+</body>
+</html>
