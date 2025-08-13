@@ -1,4 +1,4 @@
-// Export images v6.2 (unchanged)
+// Export images v6.3 (glass panel, fixed columns, supports '-')
 (function(){
   const COLORS={10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL='#2a3140';

@@ -1,18 +1,19 @@
-/*! Album Autofill v6.2 — iOS-safe
- *  MusicBrainz (CORS OK) + iTunes fallback. Sin headers especiales y sin HEAD para máxima compatibilidad móvil.
+/*! Album Autofill v6.3 — App Punteo Álbumes
+ *  Primario: MusicBrainz (CORS OK). Fallback: iTunes Search API (sin token).
+ *  iOS-safe: sin headers custom; sin HEAD cross-origin.
  */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL = '#2a3140';
   let LANG = (navigator.language||'en').startsWith('es') ? 'es' : 'en';
 
-  const $ = (s)=>document.querySelector(s);
-  function q(obj){ return new URLSearchParams(obj).toString(); }
+  const $ = s => document.querySelector(s);
+  const tracksEl = document.getElementById('tracks');
+
+  // ------- Helpers UI
   function durationToSeconds(d){ if(!d)return 0; const m=d.match(/^(\d{1,2}):(\d{2})$/); if(!m)return 0; return parseInt(m[1],10)*60+parseInt(m[2],10); }
   function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
   function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
-
-  const tracksEl = document.getElementById('tracks');
 
   function rankPicker(initial){
     const wrap=document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 1fr'; wrap.style.gap='6px';
@@ -48,17 +49,25 @@
   }
   function ensureRows(n){ const cur=tracksEl.children.length; if(cur<n){for(let i=cur;i<n;i++) tracksEl.appendChild(makeRow(i));} else if(cur>n){for(let i=cur-1;i>=n;i--) tracksEl.removeChild(tracksEl.children[i]);} render(); }
 
+  // ------- State + render
   const KEY='albumrater_v6_state';
   function getState(){ const tracks=[...tracksEl.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score)); return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks}; }
   function setState(s){
-    LANG=s.lang||LANG; $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
+    LANG=s.lang||LANG; $('#lang').value = LANG;
+    $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
     if(s.cover) $('#coverOut').src=s.cover;
     tracksEl.innerHTML=''; (s.tracks||[]).forEach((t,i)=> tracksEl.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
     if(!(s.tracks||[]).length) ensureRows(7);
     render();
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(getState())); }
-  function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ setState(JSON.parse(raw)); return; } }catch(e){} ensureRows(7); render(); }
+  function load(){
+    try{
+      const raw=localStorage.getItem(KEY);
+      if(raw){ setState(JSON.parse(raw)); return; }
+    }catch(e){}
+    ensureRows(7); render();
+  }
 
   function render(){
     const info=document.getElementById('info'); info.innerHTML='';
@@ -89,18 +98,22 @@
     ctx.fillStyle='#aeb5c0'; for(let i=0;i<n;i++){ ctx.fillText(String(i+1), x(i)-3, P.t+H+16); }
   }
 
-  // ---- MUSICBRAINZ ----
+  // ------- MB + iTunes (iOS friendly)
   let lastFetchTs = 0;
   async function safeFetch(url, opts = {}) {
     const now = Date.now();
     const wait = Math.max(0, 1000 - (now - lastFetchTs));
     if (wait) await new Promise(r => setTimeout(r, wait));
     lastFetchTs = Date.now();
-    return fetch(url, opts); // sin headers especiales (iOS friendly)
+    // No custom headers for iOS
+    return fetch(url, opts);
   }
+  function mmss(ms){ if (!Number.isFinite(ms) || ms <= 0) return ''; const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const r = s % 60; return `${m}:${String(r).padStart(2,'0')}`; }
+  function query(obj){ return new URLSearchParams(obj).toString(); }
+
   async function searchReleasesMB(artist, album) {
-    const query = encodeURIComponent(`release:${album} AND artist:${artist}`);
-    const url = `https://musicbrainz.org/ws/2/release/?query=${query}&fmt=json&limit=7`;
+    const queryStr = encodeURIComponent(`release:${album} AND artist:${artist}`);
+    const url = `https://musicbrainz.org/ws/2/release/?query=${queryStr}&fmt=json&limit=7`;
     const res = await safeFetch(url);
     if (!res.ok) throw new Error('MB search failed');
     const data = await res.json();
@@ -115,81 +128,10 @@
     return { title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '), year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mmss(totalMs): '' , id:data.id };
   }
   async function fetchCoverMB(releaseId){
-    // evito HEAD — uso JSON metadata y tomo la imagen grande
     const meta = await safeFetch(`https://coverartarchive.org/release/${releaseId}`);
-    if (!meta.ok) return null;
-    const json = await meta.json().catch(()=>null);
-    const big = json?.images?.find(i => i.front) || json?.images?.[0];
+    if (!meta.ok) return null; const json = await meta.json().catch(()=>null);
+    const big = json?.images?.find(i => i.thumbnails?.large) || json?.images?.[0];
     return big?.image || big?.thumbnails?.large || null;
-  }
-
-  // ---- iTunes fallback ----
-  async function itunesSearchAlbum(artist, album){
-    const term = `${artist} ${album}`;
-    const url = `https://itunes.apple.com/search?${q({term,entity:'album',limit:5})}`;
-    const res = await fetch(url); if(!res.ok) return null;
-    const json = await res.json().catch(()=>null); if(!json || !json.resultCount) return null;
-    const low = (s)=> (s||'').toLowerCase();
-    const best = json.results.find(r => low(r.collectionName).includes(low(album)) && low(r.artistName).includes(low(artist))) || json.results[0];
-    return best || null;
-  }
-  async function itunesFetchTracks(collectionId){
-    const url = `https://itunes.apple.com/lookup?${q({id:collectionId, entity:'song'})}`;
-    const res = await fetch(url); if(!res.ok) return null;
-    const json = await res.json().catch(()=>null); if(!json || !json.results || json.results.length<=1) return null;
-    const albumInfo = json.results[0];
-    const tracks = json.results.slice(1).filter(x=>x.wrapperType==='track').map(t => ({ n: t.trackNumber, title: t.trackName, duration: t.trackTimeMillis ? mmss(t.trackTimeMillis) : '' }));
-    const cover = albumInfo.artworkUrl100 ? albumInfo.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
-    const year = (albumInfo.releaseDate||'').slice(0,4);
-    return {title: albumInfo.collectionName, artist: albumInfo.artistName, year, tracks, trackCount: tracks.length, coverUrl: cover, totalTime: ''};
-  }
-  function mmss(ms){ if (!Number.isFinite(ms) || ms <= 0) return ''; const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const r = s % 60; return `${m}:${String(r).padStart(2,'0')}`; }
-  function fillDOM(payload){ if(payload.title) $('#album').value = payload.title; if(payload.artist) $('#artist').value = payload.artist; if(payload.year) $('#released').value = payload.year; if(payload.trackCount) $('#trackcount').value = String(payload.trackCount); if(payload.coverUrl) $('#coverOut').src = payload.coverUrl; }
-
-  async function runAutofill(){
-    const artist = $('#artist').value.trim();
-    const album  = $('#album').value.trim();
-    if(!artist || !album){ alert((LANG==='es'?'Escribe artista y álbum primero.':'Type artist and album first.')); return; }
-
-    try{
-      const cands = await searchReleasesMB(artist, album);
-      if(cands.length){
-        const modal = showCandidates(cands);
-        modal.querySelectorAll('.aam_pick').forEach(btn => {
-          btn.addEventListener('click', async (ev) => {
-            const id = ev.currentTarget.getAttribute('data-id');
-            ev.currentTarget.disabled = true; ev.currentTarget.textContent = 'Cargando…';
-            try {
-              const base = await fetchReleaseMB(id);
-              const coverUrl = await fetchCoverMB(id);
-              const payload = { title: base.title, artist: base.artist, year: base.year, trackCount: base.trackCount, totalTime: base.totalTime, coverUrl, tracks: base.tracks };
-              fillDOM(payload);
-              window.dispatchEvent(new CustomEvent('album-autofilled', { detail: payload }));
-              closeModal();
-            } catch (e) {
-              console.error(e);
-              alert('No se pudo cargar la edición seleccionada.');
-              ev.currentTarget.disabled = false; ev.currentTarget.textContent = 'Usar';
-            }
-          }, { once: true });
-        });
-        return;
-      }
-    }catch(e){ console.warn('MB error', e); }
-
-    try{
-      const albumRes = await itunesSearchAlbum(artist, album);
-      if(albumRes){
-        const payload = await itunesFetchTracks(albumRes.collectionId);
-        if(payload && payload.tracks && payload.tracks.length){
-          fillDOM(payload);
-          window.dispatchEvent(new CustomEvent('album-autofilled', { detail: payload }));
-          return;
-        }
-      }
-    }catch(e){ console.warn('iTunes error', e); }
-
-    alert('No encontré info automática. Puedes llenar manualmente.');
   }
 
   function ensureModal() {
@@ -226,12 +168,71 @@
   }
   function closeModal(){ const modal=document.getElementById('albumAutofillModal'); if(modal) modal.style.display='none'; }
 
-  document.getElementById('btnBuscarAlbum').addEventListener('click', runAutofill);
-  document.getElementById('addRow').onclick=()=> ensureRows(tracksEl.children.length+1);
-  document.getElementById('delRow').onclick=()=> ensureRows(Math.max(1, tracksEl.children.length-1));
-  document.getElementById('applyCount').onclick=()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10));
-  document.getElementById('cover').addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{$('#coverOut').src=e.target.result; save();}; r.readAsDataURL(f);});
+  async function runAutofill(){
+    const artist = $('#artist').value.trim();
+    const album  = $('#album').value.trim();
+    if(!artist || !album){ alert((LANG==='es'?'Escribe artista y álbum primero.':'Type artist and album first.')); return; }
 
+    // MusicBrainz primero
+    try{
+      const cands = await searchReleasesMB(artist, album);
+      if(cands.length){
+        const modal = showCandidates(cands);
+        modal.querySelectorAll('.aam_pick').forEach(btn => {
+          btn.addEventListener('click', async (ev) => {
+            const id = ev.currentTarget.getAttribute('data-id');
+            ev.currentTarget.disabled = true; ev.currentTarget.textContent = 'Cargando…';
+            try {
+              const base = await fetchReleaseMB(id);
+              const coverUrl = await fetchCoverMB(id);
+              const payload = { title: base.title, artist: base.artist, year: base.year, trackCount: base.trackCount, totalTime: base.totalTime, coverUrl, tracks: base.tracks };
+              fillDOM(payload);
+              window.dispatchEvent(new CustomEvent('album-autofilled', { detail: payload }));
+              closeModal();
+            } catch (e) {
+              console.error(e);
+              alert('No se pudo cargar la edición seleccionada.');
+              ev.currentTarget.disabled = false; ev.currentTarget.textContent = 'Usar';
+            }
+          }, { once: true });
+        });
+        return;
+      }
+    }catch(e){ console.warn('MB error', e); }
+
+    // iTunes fallback
+    try{
+      const term = `${artist} ${album}`;
+      const searchUrl = `https://itunes.apple.com/search?${new URLSearchParams({term,entity:'album',limit:'5'}).toString()}`;
+      const res = await fetch(searchUrl); if(!res.ok) throw new Error('itunes search');
+      const json = await res.json(); if(!json.resultCount) throw new Error('no results');
+      const low = s => (s||'').toLowerCase();
+      const best = json.results.find(r => low(r.collectionName).includes(low(album)) && low(r.artistName).includes(low(artist))) || json.results[0];
+      const lookupUrl = `https://itunes.apple.com/lookup?${new URLSearchParams({id:String(best.collectionId),entity:'song'}).toString()}`;
+      const res2 = await fetch(lookupUrl); if(!res2.ok) throw new Error('itunes lookup');
+      const json2 = await res2.json(); if(!json2.results || json2.results.length<=1) throw new Error('no tracks');
+      const albumInfo = json2.results[0];
+      const tracks = json2.results.slice(1).filter(x=>x.wrapperType==='track').map(t => ({ title: t.trackName, duration: t.trackTimeMillis ? mmss(t.trackTimeMillis) : '' }));
+      const cover = albumInfo.artworkUrl100 ? albumInfo.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
+      const year = (albumInfo.releaseDate||'').slice(0,4);
+      const payload = { title: albumInfo.collectionName, artist: albumInfo.artistName, year, trackCount: tracks.length, coverUrl: cover, totalTime: '', tracks };
+      fillDOM(payload);
+      window.dispatchEvent(new CustomEvent('album-autofilled', { detail: payload }));
+      return;
+    }catch(e){ console.warn('iTunes error', e); }
+
+    alert('No encontré info automática. Puedes llenar manualmente.');
+  }
+
+  function fillDOM(payload){
+    if(payload.title) $('#album').value = payload.title;
+    if(payload.artist) $('#artist').value = payload.artist;
+    if(payload.year) $('#released').value = payload.year;
+    if(payload.trackCount) $('#trackcount').value = String(payload.trackCount);
+    if(payload.coverUrl) $('#coverOut').src = payload.coverUrl;
+  }
+
+  // ------- Wire events
   window.addEventListener('album-autofilled', (e) => {
     const d = e.detail || {}; const list = d.tracks || [];
     $('#trackcount').value = list.length || $('#trackcount').value;
@@ -245,6 +246,20 @@
     if (d.year) $('#released').value = d.year;
     render();
   });
+
+  // Expose minimal API for UI module
+  const AlbumApp = {
+    getState, setState, save, load,
+    ensureRows,
+  };
+  window.AlbumApp = AlbumApp;
+
+  // Boot
+  document.getElementById('btnBuscarAlbum').addEventListener('click', runAutofill);
+  document.getElementById('addRow').onclick=()=> ensureRows(tracksEl.children.length+1);
+  document.getElementById('delRow').onclick=()=> ensureRows(Math.max(1, tracksEl.children.length-1));
+  document.getElementById('applyCount').onclick=()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10));
+  document.getElementById('cover').addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{$('#coverOut').src=e.target.result; save();}; r.readAsDataURL(f);});
 
   load();
 })();
