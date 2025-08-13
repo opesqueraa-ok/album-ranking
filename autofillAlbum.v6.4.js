@@ -1,16 +1,11 @@
-/*! Album Autofill v6.3 — App Punteo Álbumes
- *  Primario: MusicBrainz (CORS OK). Fallback: iTunes Search API (sin token).
- *  iOS-safe: sin headers custom; sin HEAD cross-origin.
- */
+/*! Album Autofill v6.4 — iOS-safe, MB + iTunes */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL = '#2a3140';
-  let LANG = (navigator.language||'en').startsWith('es') ? 'es' : 'en';
-
+  let LANG = (localStorage.getItem('albumrater_lang') || (navigator.language||'en')).startsWith('es') ? 'es' : 'en';
   const $ = s => document.querySelector(s);
-  const tracksEl = document.getElementById('tracks');
+  const tracksEl = () => document.getElementById('tracks');
 
-  // ------- Helpers UI
   function durationToSeconds(d){ if(!d)return 0; const m=d.match(/^(\d{1,2}):(\d{2})$/); if(!m)return 0; return parseInt(m[1],10)*60+parseInt(m[2],10); }
   function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
   function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
@@ -47,20 +42,19 @@
     row.value=()=>({n:Number(n.value||0), dur:dur.value.trim(), name:name.value.trim(), score:picker.get()});
     return row;
   }
-  function ensureRows(n){ const cur=tracksEl.children.length; if(cur<n){for(let i=cur;i<n;i++) tracksEl.appendChild(makeRow(i));} else if(cur>n){for(let i=cur-1;i>=n;i--) tracksEl.removeChild(tracksEl.children[i]);} render(); }
+  function ensureRows(n){ const el = tracksEl(); const cur=el.children.length; if(cur<n){for(let i=cur;i<n;i++) el.appendChild(makeRow(i));} else if(cur>n){for(let i=cur-1;i>=n;i--) el.removeChild(el.children[i]);} render(); }
 
-  // ------- State + render
   const KEY='albumrater_v6_state';
-  function getState(){ const tracks=[...tracksEl.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score)); return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks}; }
+  function getState(){ const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score)); return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks}; }
   function setState(s){
-    LANG=s.lang||LANG; $('#lang').value = LANG;
+    LANG=s.lang||LANG; const langSel=$('#lang'); if(langSel) langSel.value = LANG;
     $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
     if(s.cover) $('#coverOut').src=s.cover;
-    tracksEl.innerHTML=''; (s.tracks||[]).forEach((t,i)=> tracksEl.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
+    const el = tracksEl(); el.innerHTML=''; (s.tracks||[]).forEach((t,i)=> el.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
     if(!(s.tracks||[]).length) ensureRows(7);
     render();
   }
-  function save(){ localStorage.setItem(KEY, JSON.stringify(getState())); }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(getState())); }catch(e){} }
   function load(){
     try{
       const raw=localStorage.getItem(KEY);
@@ -70,11 +64,11 @@
   }
 
   function render(){
-    const info=document.getElementById('info'); info.innerHTML='';
+    const info=document.getElementById('info'); if(!info) return; info.innerHTML='';
     const pair=(L,V)=>{const l=document.createElement('div'); l.className='label'; l.textContent=L; const v=document.createElement('div'); v.innerHTML=V; info.append(l,v);};
     const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
     pair((LANG==='es'?'Álbum':'Album')+':','<strong><em>'+(album||'—')+'</em></strong>'); pair((LANG==='es'?'Artista':'Artist')+':','<strong>'+(artist||'—')+'</strong>'); pair((LANG==='es'?'Fecha de lanzamiento':'Release Date')+':',released||'—'); if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
-    const tracks=[...tracksEl.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
+    const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
     const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">'+(LANG==='es'?'Duración':'Duration')+'</th><th style="width:36px">#</th><th>'+(LANG==='es'?'Nombre':'Name')+'</th><th style="width:90px">Score</th></tr>'; table.appendChild(thead);
     const tbody=document.createElement('tbody'); table.appendChild(tbody);
     let totalSec=0, scores=[]; tracks.forEach(tr=>{ totalSec+=durationToSeconds(tr.dur); if(Number.isFinite(tr.score) && tr.score>=5&&tr.score<=10) scores.push(tr.score);
@@ -85,9 +79,8 @@
     const series = tracks.map(tr=>tr.score).filter(v=>Number.isFinite(v));
     drawChart('chart', series); save();
   }
-
   function drawChart(id,values){
-    const canvas=document.getElementById(id), ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
+    const canvas=document.getElementById(id); if(!canvas) return; const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
     const P={l:60,r:20,t:20,b:36}, W=canvas.width-P.l-P.r, H=canvas.height-P.t-P.b;
     ctx.strokeStyle='#2a3140'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(P.l,P.t); ctx.lineTo(P.l,P.t+H); ctx.lineTo(P.l+W,P.t+H); ctx.stroke();
     ctx.fillStyle='#aeb5c0'; ctx.font='12px system-ui';
@@ -98,18 +91,10 @@
     ctx.fillStyle='#aeb5c0'; for(let i=0;i<n;i++){ ctx.fillText(String(i+1), x(i)-3, P.t+H+16); }
   }
 
-  // ------- MB + iTunes (iOS friendly)
+  // MB + iTunes
   let lastFetchTs = 0;
-  async function safeFetch(url, opts = {}) {
-    const now = Date.now();
-    const wait = Math.max(0, 1000 - (now - lastFetchTs));
-    if (wait) await new Promise(r => setTimeout(r, wait));
-    lastFetchTs = Date.now();
-    // No custom headers for iOS
-    return fetch(url, opts);
-  }
+  async function safeFetch(url, opts = {}) { const now=Date.now(); const wait=Math.max(0,1000-(now-lastFetchTs)); if(wait) await new Promise(r=>setTimeout(r,wait)); lastFetchTs=Date.now(); return fetch(url, opts); }
   function mmss(ms){ if (!Number.isFinite(ms) || ms <= 0) return ''; const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const r = s % 60; return `${m}:${String(r).padStart(2,'0')}`; }
-  function query(obj){ return new URLSearchParams(obj).toString(); }
 
   async function searchReleasesMB(artist, album) {
     const queryStr = encodeURIComponent(`release:${album} AND artist:${artist}`);
@@ -153,7 +138,7 @@
   }
   function showCandidates(cands){
     const modal = ensureModal(); const list = modal.querySelector('#aam_list'); list.innerHTML='';
-    if(!cands.length){ list.innerHTML = `<div style="padding:18px">No se encontraron ediciones. Probaré con iTunes…</div>`; }
+    if(!cands.length){ list.innerHTML = `<div style="padding:18px">No se encontraron ediciones.</div>`; }
     else{
       cands.forEach(c=>{
         const row = document.createElement('div'); row.style.cssText='padding:14px 18px;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center;justify-content:space-between';
@@ -172,8 +157,6 @@
     const artist = $('#artist').value.trim();
     const album  = $('#album').value.trim();
     if(!artist || !album){ alert((LANG==='es'?'Escribe artista y álbum primero.':'Type artist and album first.')); return; }
-
-    // MusicBrainz primero
     try{
       const cands = await searchReleasesMB(artist, album);
       if(cands.length){
@@ -199,8 +182,6 @@
         return;
       }
     }catch(e){ console.warn('MB error', e); }
-
-    // iTunes fallback
     try{
       const term = `${artist} ${album}`;
       const searchUrl = `https://itunes.apple.com/search?${new URLSearchParams({term,entity:'album',limit:'5'}).toString()}`;
@@ -220,7 +201,6 @@
       window.dispatchEvent(new CustomEvent('album-autofilled', { detail: payload }));
       return;
     }catch(e){ console.warn('iTunes error', e); }
-
     alert('No encontré info automática. Puedes llenar manualmente.');
   }
 
@@ -232,34 +212,38 @@
     if(payload.coverUrl) $('#coverOut').src = payload.coverUrl;
   }
 
-  // ------- Wire events
+  function bindCore(){
+    const b = document.getElementById('btnBuscarAlbum');
+    if(b && !b._bound){ b.addEventListener('click', runAutofill); b._bound = true; }
+    const add = document.getElementById('addRow'); if(add && !add._bound){ add.addEventListener('click', ()=> ensureRows(tracksEl().children.length+1)); add._bound=true; }
+    const del = document.getElementById('delRow'); if(del && !del._bound){ del.addEventListener('click', ()=> ensureRows(Math.max(1, tracksEl().children.length-1))); del._bound=true; }
+    const app= document.getElementById('applyCount'); if(app && !app._bound){ app.addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10))); app._bound=true; }
+    const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{$('#coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); cov._bound=true; }
+  }
+
   window.addEventListener('album-autofilled', (e) => {
     const d = e.detail || {}; const list = d.tracks || [];
-    $('#trackcount').value = list.length || $('#trackcount').value;
-    ensureRows(list.length || tracksEl.children.length);
-    [...tracksEl.children].forEach((row, i) => {
+    document.getElementById('trackcount').value = list.length || document.getElementById('trackcount').value;
+    ensureRows(list.length || tracksEl().children.length);
+    [...tracksEl().children].forEach((row, i) => {
       const inputs = row.querySelectorAll('input'); // [num, dur, name]
       const t = list[i] || {};
       if (inputs[1]) inputs[1].value = t.duration || '';
       if (inputs[2]) inputs[2].value = t.title || '';
     });
-    if (d.year) $('#released').value = d.year;
+    if (d.year) document.getElementById('released').value = d.year;
     render();
   });
 
-  // Expose minimal API for UI module
-  const AlbumApp = {
-    getState, setState, save, load,
-    ensureRows,
-  };
-  window.AlbumApp = AlbumApp;
+  // Expose
+  window.AlbumApp = { getState, setState, save, load, ensureRows };
 
-  // Boot
-  document.getElementById('btnBuscarAlbum').addEventListener('click', runAutofill);
-  document.getElementById('addRow').onclick=()=> ensureRows(tracksEl.children.length+1);
-  document.getElementById('delRow').onclick=()=> ensureRows(Math.max(1, tracksEl.children.length-1));
-  document.getElementById('applyCount').onclick=()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10));
-  document.getElementById('cover').addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{$('#coverOut').src=e.target.result; save();}; r.readAsDataURL(f);});
-
-  load();
+  function boot(){
+    if(document.readyState==='complete' || document.readyState==='interactive'){
+      try{ bindCore(); load(); }catch(e){ console.error(e); }
+    }else{
+      document.addEventListener('DOMContentLoaded', ()=>{ try{ bindCore(); load(); }catch(e){ console.error(e); } });
+    }
+  }
+  boot();
 })();

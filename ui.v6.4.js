@@ -1,4 +1,4 @@
-// UI v6.3: idioma, export/import/clear conectados de forma robusta
+// UI v6.4 robust wiring
 (function(){
   const $=s=>document.querySelector(s);
   const I18N={
@@ -18,18 +18,21 @@
   const KEY_LANG='albumrater_lang';
 
   function applyI18N(lang){
-    const t=I18N[lang]; $('#subtitle').textContent=t.subtitle;
+    const t=I18N[lang]; const sub=$('#subtitle'); if(sub) sub.textContent=t.subtitle;
     document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t[el.dataset.i18n]||el.textContent;});
-    $('#applyCount').textContent=t.apply; $('#addRow').textContent=t.addRow; $('#delRow').textContent=t.delRow;
-    $('#clearAll').textContent=t.clearAll; $('#importLabel').textContent=t.import; $('#exportJSON').textContent=t.export; $('#lang').value=lang;
+    const ids=[['applyCount','apply'],['addRow','addRow'],['delRow','delRow'],['clearAll','clearAll'],['importLabel','import'],['exportJSON','export']];
+    ids.forEach(([id,key])=>{ const el=document.getElementById(id); if(el) el.textContent=t[key]; });
+    const langSel=$('#lang'); if(langSel) langSel.value=lang;
   }
 
   function exportJSON(){
-    const s=window.AlbumApp.getState();
-    const blob=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url; a.download='albumrater-data.json'; a.click();
-    URL.revokeObjectURL(url);
+    try{
+      const s=window.AlbumApp.getState();
+      const blob=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='albumrater-data.json'; a.click();
+      URL.revokeObjectURL(url);
+    }catch(e){ alert('No se pudo exportar.'); console.error(e); }
   }
   function importJSON(file){
     const r=new FileReader();
@@ -40,22 +43,28 @@
     r.readAsText(file);
   }
   function clearAll(){
-    const lang = localStorage.getItem(KEY_LANG)||($('#lang').value||'en');
-    const msg = I18N[lang].confirmClear;
+    const lang = localStorage.getItem(KEY_LANG)||($('#lang')?.value||'en');
+    const msg = (I18N[lang]||I18N.en).confirmClear;
     if(!confirm(msg)) return;
     localStorage.removeItem('albumrater_v6_state');
     window.AlbumApp.setState({lang, album:'', artist:'', released:'', rankedby:'', cover:'', tracks:[]});
   }
 
-  document.addEventListener('DOMContentLoaded', ()=>{
-    // idioma
+  function bindUI(){
     let LANG=localStorage.getItem(KEY_LANG)||(navigator.language.startsWith('es')?'es':'en');
-    $('#lang').value=LANG; applyI18N(LANG);
-    $('#lang').addEventListener('change',e=>{LANG=e.target.value; localStorage.setItem(KEY_LANG,LANG); applyI18N(LANG); const s=window.AlbumApp.getState(); s.lang=LANG; window.AlbumApp.setState(s); window.AlbumApp.save();});
+    applyI18N(LANG);
+    const langSel=$('#lang'); if(langSel && !langSel._bound){ langSel._bound=true; langSel.addEventListener('change',e=>{LANG=e.target.value; localStorage.setItem(KEY_LANG,LANG); applyI18N(LANG); const s=window.AlbumApp.getState(); s.lang=LANG; window.AlbumApp.setState(s); window.AlbumApp.save();}); }
+    const exp=$('#exportJSON'); if(exp && !exp._bound){ exp._bound=true; exp.addEventListener('click', exportJSON); }
+    const imp=$('#importJSON'); if(imp && !imp._bound){ imp._bound=true; imp.addEventListener('change', ev=>{ const f=ev.target.files[0]; if(f) importJSON(f); ev.target.value=''; }); }
+    const clr=$('#clearAll'); if(clr && !clr._bound){ clr._bound=true; clr.addEventListener('click', clearAll); }
+  }
 
-    // export/import/clear
-    $('#exportJSON').addEventListener('click', exportJSON);
-    $('#importJSON').addEventListener('change', ev=>{ const f=ev.target.files[0]; if(f) importJSON(f); ev.target.value=''; });
-    $('#clearAll').addEventListener('click', clearAll);
-  });
+  function boot(){
+    if(document.readyState==='complete' || document.readyState==='interactive'){
+      try{ bindUI(); }catch(e){ console.error(e); }
+    }else{
+      document.addEventListener('DOMContentLoaded', ()=>{ try{ bindUI(); }catch(e){ console.error(e); } });
+    }
+  }
+  boot();
 })();

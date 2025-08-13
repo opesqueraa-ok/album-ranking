@@ -1,4 +1,4 @@
-// Export images v6.3 (glass panel, fixed columns, supports '-')
+// Export images v6.4
 (function(){
   const COLORS={10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL='#2a3140';
@@ -102,6 +102,9 @@
     };
     bg.src = (getState().cover||'');
   }
-  document.getElementById('exportStory').onclick=()=> exportCanvas(1080,1920,'album-story.png');
-  document.getElementById('export45').onclick=()=> exportCanvas(1080,1350,'album-4x5.png');
+  function bindExport(){
+    const a=document.getElementById('exportStory'); if(a && !a._bound){ a._bound=true; a.addEventListener('click', ()=> exportCanvas(1080,1920,'album-story.png')); }
+    const b=document.getElementById('export45'); if(b && !b._bound){ b._bound=true; b.addEventListener('click', ()=> exportCanvas(1080,1350,'album-4x5.png')); }
+  }
+  if(document.readyState==='complete' || document.readyState==='interactive'){ bindExport(); } else { document.addEventListener('DOMContentLoaded', bindExport); }
 })();
