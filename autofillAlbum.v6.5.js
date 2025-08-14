@@ -5,7 +5,13 @@
   let LANG = (localStorage.getItem('albumrater_lang') || (navigator.language||'en')).startsWith('es') ? 'es' : 'en';
   const $ = s => document.querySelector(s);
   const tracksEl = () => document.getElementById('tracks');
+  const SORT_STATE = { active: false, snapshot: null };
 
+function setSortButton(active){
+  const btn = document.getElementById('sortTop10');
+  if (!btn) return;
+  btn.textContent = active ? 'Restore album order' : 'Sort Top 10';
+}
   function durationToSeconds(d){ if(!d)return 0; const m=d.match(/^(\d{1,2}):(\d{2})$/); if(!m)return 0; return parseInt(m[1],10)*60+parseInt(m[2],10); }
   function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
   function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
@@ -52,6 +58,9 @@
     if(s.cover) $('#coverOut').src=s.cover;
     const el = tracksEl(); el.innerHTML=''; (s.tracks||[]).forEach((t,i)=> el.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
     if(!(s.tracks||[]).length) ensureRows(7);
+    SORT_STATE.active = false;
+    SORT_STATE.snapshot = null;
+    setSortButton(false);
     render();
   }
   function save(){ try{ localStorage.setItem(KEY, JSON.stringify(getState())); }catch(e){} }
@@ -223,17 +232,51 @@
     const del = document.getElementById('delRow'); if(del && !del._bound){ del._bound=true; del.addEventListener('click', ()=> ensureRows(Math.max(1, document.getElementById('tracks').children.length-1))); }
     const app= document.getElementById('applyCount'); if(app && !app._bound){ app._bound=true; app.addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10))); }
     const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov._bound=true; cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{document.getElementById('coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); }
-    const sortBtn=document.getElementById('sortTop10'); if(sortBtn && !sortBtn._bound){ sortBtn._bound=true; sortBtn.addEventListener('click', ()=>{
-      const el=document.getElementById('tracks'); const arr=[...el.children].map(r=>r.value());
-      const scored=arr.filter(t=>Number.isFinite(t.score)); const un=arr.filter(t=>!Number.isFinite(t.score));
-      scored.sort((a,b)=>b.score-a.score);
-      const top = scored.slice(0,10);
+    const sortBtn = document.getElementById('sortTop10');
+
+const sortBtn = document.getElementById('sortTop10');
+if (sortBtn && !sortBtn._bound) {
+  sortBtn._bound = true;
+  sortBtn.addEventListener('click', () => {
+    const el = document.getElementById('tracks');
+
+    // Si NO está activo, guardamos snapshot y ordenamos Top10
+    if (!SORT_STATE.active) {
+      // Guarda snapshot del estado actual (orden y valores)
+      SORT_STATE.snapshot = [...el.children].map(r => r.value());
+      const arr = SORT_STATE.snapshot.map(x => ({ ...x })); // copia de trabajo
+
+      const scored = arr.filter(t => Number.isFinite(t.score));
+      const un     = arr.filter(t => !Number.isFinite(t.score));
+      scored.sort((a, b) => b.score - a.score);
+
+      const top  = scored.slice(0, 10);
       const rest = scored.slice(10).concat(un);
-      const merged = top.concat(rest).map((t,i)=>({...t, n:i+1}));
-      el.innerHTML=''; merged.forEach((t,i)=> el.appendChild(makeRow(i,t)));
+      const merged = top.concat(rest).map((t, i) => ({ ...t, n: i + 1 }));
+
+      el.innerHTML = '';
+      merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
+      SORT_STATE.active = true;
+      setSortButton(true);
       render();
-    }); }
-  }
+      return;
+    }
+
+    // Si SÍ está activo, restauramos snapshot
+    if (SORT_STATE.snapshot) {
+      const original = SORT_STATE.snapshot.map(x => ({ ...x }));
+      el.innerHTML = '';
+      original.forEach((t, i) => el.appendChild(makeRow(i, t)));
+    }
+    SORT_STATE.active = false;
+    SORT_STATE.snapshot = null;
+    setSortButton(false);
+    render();
+  });
+
+  // Texto inicial del botón
+  setSortButton(SORT_STATE.active);
+}
 
   window.addEventListener('album-autofilled', (e) => {
     const d = e.detail || {}; const list = d.tracks || [];
@@ -246,6 +289,9 @@
       if (inputs[2]) inputs[2].value = t.title || '';
     });
     if (d.year) document.getElementById('released').value = d.year;
+    SORT_STATE.active = false;
+SORT_STATE.snapshot = null;
+setSortButton(false);
     render();
   });
 
