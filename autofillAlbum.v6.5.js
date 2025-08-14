@@ -1,4 +1,4 @@
-/*! Album Autofill v6.4 — iOS-safe, MB + iTunes */
+/*! Album Autofill v6.5 — MB + iTunes, iOS-safe */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL = '#2a3140';
@@ -69,10 +69,10 @@
     const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
     pair((LANG==='es'?'Álbum':'Album')+':','<strong><em>'+(album||'—')+'</em></strong>'); pair((LANG==='es'?'Artista':'Artist')+':','<strong>'+(artist||'—')+'</strong>'); pair((LANG==='es'?'Fecha de lanzamiento':'Release Date')+':',released||'—'); if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
     const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
-    const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">'+(LANG==='es'?'Duración':'Duration')+'</th><th style="width:36px">#</th><th>'+(LANG==='es'?'Nombre':'Name')+'</th><th style="width:90px">Score</th></tr>'; table.appendChild(thead);
+    const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style=\"width:80px\">'+(LANG==='es'?'Duración':'Duration')+'</th><th style=\"width:36px\">#</th><th>'+(LANG==='es'?'Nombre':'Name')+'</th><th style=\"width:90px\">Score</th></tr>'; table.appendChild(thead);
     const tbody=document.createElement('tbody'); table.appendChild(tbody);
     let totalSec=0, scores=[]; tracks.forEach(tr=>{ totalSec+=durationToSeconds(tr.dur); if(Number.isFinite(tr.score) && tr.score>=5&&tr.score<=10) scores.push(tr.score);
-      const badge = Number.isFinite(tr.score) ? ('<span class="pill" style="background:'+colorFor(tr.score)+'">'+tr.score.toFixed(1).replace(/\.0$/,'')+'</span>') : ('<span class="pill" style="background:'+NEUTRAL+'">-</span>');
+      const badge = Number.isFinite(tr.score) ? ('<span class=\"pill\" style=\"background:'+colorFor(tr.score)+'\">'+tr.score.toFixed(1).replace(/\\.0$/,'')+'</span>') : ('<span class=\"pill\" style=\"background:'+NEUTRAL+'\">-</span>');
       const el=document.createElement('tr'); el.innerHTML='<td>'+(tr.dur||'—')+'</td><td>'+(tr.n||'')+'</td><td>'+(tr.name||'—')+'</td><td>'+badge+'</td>'; tbody.appendChild(el); });
     const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):NaN; document.getElementById('finalScore').textContent=Number.isFinite(avg)?avg.toFixed(1):'—';
     pair((LANG==='es'?'Duración total':'Duration'), secondsToMinutesText(totalSec));
@@ -108,9 +108,10 @@
     const url = `https://musicbrainz.org/ws/2/release/${id}?fmt=json&inc=recordings+media`;
     const res = await safeFetch(url); if(!res.ok) throw new Error('MB release failed');
     const data = await res.json();
-    const tracks=[]; (data.media||[]).forEach(m=> (m.tracks||[]).forEach(t=> tracks.push({title:t.title, duration: t.length? mmss(t.length): ''})));
+    const mm = (ms)=>{ if(!ms) return ''; const s = Math.floor(ms/1000); const m=Math.floor(s/60); const r=s%60; return `${m}:${String(r).padStart(2,'0')}`; };
+    const tracks=[]; (data.media||[]).forEach(m=> (m.tracks||[]).forEach(t=> tracks.push({title:t.title, duration: t.length? mm(t.length): ''})));
     const totalMs = (data.media||[]).reduce((acc,m)=> acc + (m.tracks||[]).reduce((a,t)=> a+(t.length||0),0), 0);
-    return { title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '), year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mmss(totalMs): '' , id:data.id };
+    return { title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '), year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mm(totalMs): '' , id:data.id };
   }
   async function fetchCoverMB(releaseId){
     const meta = await safeFetch(`https://coverartarchive.org/release/${releaseId}`);
@@ -193,7 +194,10 @@
       const res2 = await fetch(lookupUrl); if(!res2.ok) throw new Error('itunes lookup');
       const json2 = await res2.json(); if(!json2.results || json2.results.length<=1) throw new Error('no tracks');
       const albumInfo = json2.results[0];
-      const tracks = json2.results.slice(1).filter(x=>x.wrapperType==='track').map(t => ({ title: t.trackName, duration: t.trackTimeMillis ? mmss(t.trackTimeMillis) : '' }));
+      const tracks = json2.results.slice(1).filter(x=>x.wrapperType==='track').map(t => {
+        const secs = Math.floor((t.trackTimeMillis||0)/1000); const mm = Math.floor(secs/60); const ss = String(secs%60).padStart(2,'0');
+        return { title: t.trackName, duration: secs? `${mm}:${ss}`: '' };
+      });
       const cover = albumInfo.artworkUrl100 ? albumInfo.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
       const year = (albumInfo.releaseDate||'').slice(0,4);
       const payload = { title: albumInfo.collectionName, artist: albumInfo.artistName, year, trackCount: tracks.length, coverUrl: cover, totalTime: '', tracks };
@@ -215,17 +219,27 @@
   function bindCore(){
     const b = document.getElementById('btnBuscarAlbum');
     if(b && !b._bound){ b.addEventListener('click', runAutofill); b._bound = true; }
-    const add = document.getElementById('addRow'); if(add && !add._bound){ add.addEventListener('click', ()=> ensureRows(tracksEl().children.length+1)); add._bound=true; }
-    const del = document.getElementById('delRow'); if(del && !del._bound){ del.addEventListener('click', ()=> ensureRows(Math.max(1, tracksEl().children.length-1))); del._bound=true; }
-    const app= document.getElementById('applyCount'); if(app && !app._bound){ app.addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10))); app._bound=true; }
-    const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{$('#coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); cov._bound=true; }
+    const add = document.getElementById('addRow'); if(add && !add._bound){ add._bound=true; add.addEventListener('click', ()=> ensureRows(document.getElementById('tracks').children.length+1)); }
+    const del = document.getElementById('delRow'); if(del && !del._bound){ del._bound=true; del.addEventListener('click', ()=> ensureRows(Math.max(1, document.getElementById('tracks').children.length-1))); }
+    const app= document.getElementById('applyCount'); if(app && !app._bound){ app._bound=true; app.addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10))); }
+    const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov._bound=true; cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{document.getElementById('coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); }
+    const sortBtn=document.getElementById('sortTop10'); if(sortBtn && !sortBtn._bound){ sortBtn._bound=true; sortBtn.addEventListener('click', ()=>{
+      const el=document.getElementById('tracks'); const arr=[...el.children].map(r=>r.value());
+      const scored=arr.filter(t=>Number.isFinite(t.score)); const un=arr.filter(t=>!Number.isFinite(t.score));
+      scored.sort((a,b)=>b.score-a.score);
+      const top = scored.slice(0,10);
+      const rest = scored.slice(10).concat(un);
+      const merged = top.concat(rest).map((t,i)=>({...t, n:i+1}));
+      el.innerHTML=''; merged.forEach((t,i)=> el.appendChild(makeRow(i,t)));
+      render();
+    }); }
   }
 
   window.addEventListener('album-autofilled', (e) => {
     const d = e.detail || {}; const list = d.tracks || [];
     document.getElementById('trackcount').value = list.length || document.getElementById('trackcount').value;
-    ensureRows(list.length || tracksEl().children.length);
-    [...tracksEl().children].forEach((row, i) => {
+    ensureRows(list.length || document.getElementById('tracks').children.length);
+    [...document.getElementById('tracks').children].forEach((row, i) => {
       const inputs = row.querySelectorAll('input'); // [num, dur, name]
       const t = list[i] || {};
       if (inputs[1]) inputs[1].value = t.duration || '';
@@ -235,8 +249,7 @@
     render();
   });
 
-  // Expose
-  window.AlbumApp = { getState, setState, save, load, ensureRows };
+  window.AlbumApp = { ensureRows, getState, setState, save, load };
 
   function boot(){
     if(document.readyState==='complete' || document.readyState==='interactive'){

@@ -1,4 +1,4 @@
-// UI v6.4 robust wiring
+// UI v6.5 wiring (lang/export/import/clear)
 (function(){
   const $=s=>document.querySelector(s);
   const I18N={
