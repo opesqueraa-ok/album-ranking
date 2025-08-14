@@ -234,7 +234,7 @@ function setSortButton(active){
     const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov._bound=true; cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{document.getElementById('coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); }
     const sortBtn = document.getElementById('sortTop10');
 
-const sortBtn = document.getElementById('sortTop10');
+    const sortBtn = document.getElementById('sortTop10');
 if (sortBtn && !sortBtn._bound) {
   sortBtn._bound = true;
   sortBtn.addEventListener('click', () => {
@@ -242,7 +242,6 @@ if (sortBtn && !sortBtn._bound) {
 
     // Si NO está activo, guardamos snapshot y ordenamos Top10
     if (!SORT_STATE.active) {
-      // Guarda snapshot del estado actual (orden y valores)
       SORT_STATE.snapshot = [...el.children].map(r => r.value());
       const arr = SORT_STATE.snapshot.map(x => ({ ...x })); // copia de trabajo
 
@@ -276,6 +275,9 @@ if (sortBtn && !sortBtn._bound) {
 
   // Texto inicial del botón
   setSortButton(SORT_STATE.active);
+}
+
+// 👇 ¡IMPORTANTE! Cierra bindCore aquí:
 }
 
   window.addEventListener('album-autofilled', (e) => {
