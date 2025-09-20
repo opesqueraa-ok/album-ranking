@@ -1,4 +1,4 @@
-/*! Album Autofill v6.5 — MB + iTunes, iOS-safe */
+/*! Album Autofill v6.5 — MB + iTunes, iOS-safe (v6.5.1 build) */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL = '#2a3140';
@@ -6,7 +6,7 @@
   const $ = s => document.querySelector(s);
   const tracksEl = () => document.getElementById('tracks');
 
-  // --- Toggle Top10: guarda/restaura orden original ---
+  // --- Toggle Top10 ---
   const SORT_STATE = { active: false, snapshot: null };
   function setSortButton(active){
     const btn = document.getElementById('sortTop10');
@@ -18,7 +18,7 @@
   function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
   function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
 
-  // Picker con estado "—" (NaN)
+  // Picker con estado NaN ("-")
   function rankPicker(initial){
     const wrap=document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 1fr'; wrap.style.gap='6px';
     const iSel=document.createElement('select');
@@ -41,11 +41,7 @@
     function current(){ const ib=iSel.value; if(ib==='') return NaN; const dd=parseFloat(dSel.value||'0'); return parseFloat(ib)+dd; }
     function trigger(){ wrap.dispatchEvent(new CustomEvent('change-score',{detail:current()})); }
 
-    iSel.addEventListener('change', ()=>{
-      if(iSel.value===''){ dSel.disabled=true; dSel.value='0'; }
-      else { dSel.disabled=false; fillDec(Number(iSel.value)<10); }
-      trigger();
-    });
+    iSel.addEventListener('change', ()=>{ if(iSel.value===''){ dSel.disabled=true; dSel.value='0'; } else { dSel.disabled=false; fillDec(Number(iSel.value)<10); } trigger(); });
     dSel.addEventListener('change', trigger);
 
     setFromNumber(initial);
@@ -60,28 +56,9 @@
     const name=document.createElement('input'); name.placeholder=(LANG==='es'?'Nombre de la canción':'Track name'); name.value=data.name||'';
     const initScore = (typeof data.score==='number' && Number.isFinite(data.score)) ? data.score : NaN;
     const picker=rankPicker(initScore); const pill=document.createElement('div'); pill.className='pill'; pill.textContent='-'; pill.style.background=NEUTRAL;
+    row.append(n,dur,name,picker.el,pill);
 
-    // celdas principales
-    row.append(n, dur, name, picker.el, pill);
-
-    // --- Botón de nota (pluma) a la derecha ---
-    const noteBtn = document.createElement('button');
-    noteBtn.type = 'button';
-    noteBtn.className = 'noteBtn';
-    noteBtn.title = 'Add note';
-    noteBtn.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33h-.5v-.5l9.06-9.06.5.5L5.92 19.58zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
-    noteBtn.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('edit-track-note', {
-        detail: { index: i, name: name.value }
-      }));
-    });
-    row.appendChild(noteBtn);
-
-    function paint(v){
-      if(!Number.isFinite(v)){ pill.style.background=NEUTRAL; pill.textContent='-'; return; }
-      const c=colorFor(v); pill.style.background=c; pill.textContent=v.toFixed(1).replace(/\.0$/,'');
-    }
+    function paint(v){ if(!Number.isFinite(v)){ pill.style.background=NEUTRAL; pill.textContent='-'; return; } const c=colorFor(v); pill.style.background=c; pill.textContent=(v||0).toFixed(1).replace(/\.0$/,''); }
     picker.el.addEventListener('change-score', e=>{ paint(e.detail); render(); });
     [n,dur,name].forEach(el=> el.addEventListener('input', render));
     paint(picker.get());
@@ -90,84 +67,40 @@
     return row;
   }
 
-  function ensureRows(n){
-    const el = tracksEl(); const cur=el.children.length;
-    if(cur<n){for(let i=cur;i<n;i++) el.appendChild(makeRow(i));}
-    else if(cur>n){for(let i=cur-1;i>=n;i--) el.removeChild(el.children[i]);}
-    render();
-  }
+  function ensureRows(n){ const el = tracksEl(); const cur=el.children.length; if(cur<n){for(let i=cur;i<n;i++) el.appendChild(makeRow(i));} else if(cur>n){for(let i=cur-1;i>=n;i--) el.removeChild(el.children[i]);} render(); }
 
   // Estado
   const KEY='albumrater_v6_state';
-  function getState(){
-    const el = tracksEl();
-    const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score));
-    return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks};
-  }
+  function getState(){ const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score)); return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks}; }
   function setState(s){
     LANG=s.lang||LANG; const langSel=$('#lang'); if(langSel) langSel.value = LANG;
     $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
     if(s.cover) $('#coverOut').src=s.cover;
-    const el = tracksEl(); el.innerHTML='';
-    (s.tracks||[]).forEach((t,i)=> el.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
+    const el = tracksEl(); el.innerHTML=''; (s.tracks||[]).forEach((t,i)=> el.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
     if(!(s.tracks||[]).length) ensureRows(7);
-
-    // reset toggle
-    SORT_STATE.active = false;
-    SORT_STATE.snapshot = null;
-    setSortButton(false);
-
+    SORT_STATE.active = false; SORT_STATE.snapshot = null; setSortButton(false);
     render();
   }
   function save(){ try{ localStorage.setItem(KEY, JSON.stringify(getState())); }catch(e){} }
-  function load(){
-    try{
-      const raw=localStorage.getItem(KEY);
-      if(raw){ setState(JSON.parse(raw)); return; }
-    }catch(e){}
-    ensureRows(7); render();
-  }
+  function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ setState(JSON.parse(raw)); return; } }catch(e){} ensureRows(7); render(); }
 
-  // Render + chart
+  // Render + chart + tabla
   function render(){
     const info=document.getElementById('info'); if(!info) return; info.innerHTML='';
     const pair=(L,V)=>{const l=document.createElement('div'); l.className='label'; l.textContent=L; const v=document.createElement('div'); v.innerHTML=V; info.append(l,v);};
     const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
-    pair((LANG==='es'?'Álbum':'Album')+':','<strong><em>'+(album||'—')+'</em></strong>');
-    pair((LANG==='es'?'Artista':'Artist')+':','<strong>'+(artist||'—')+'</strong>');
-    pair((LANG==='es'?'Fecha de lanzamiento':'Release Date')+':',released||'—');
-    if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
+    pair((LANG==='es'?'Álbum':'Album')+':','<strong><em>'+(album||'—')+'</em></strong>'); pair((LANG==='es'?'Artista':'Artist')+':','<strong>'+(artist||'—')+'</strong>'); pair((LANG==='es'?'Fecha de lanzamiento':'Release Date')+':',released||'—'); if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
 
-    const el = tracksEl();
-    const tracks=[...el.children].map(r=>r.value())
-      .filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score))
-      .sort((a,b)=>a.n-b.n);
-
-    const table=document.getElementById('table'); table.innerHTML='';
-    const thead=document.createElement('thead');
-    thead.innerHTML='<tr><th style="width:80px">'+(LANG==='es'?'Duración':'Duration')+'</th><th style="width:36px">#</th><th>'+(LANG==='es'?'Nombre':'Name')+'</th><th style="width:90px">Score</th></tr>';
-    table.appendChild(thead);
+    const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
+    const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">'+(LANG==='es'?'Duración':'Duration')+'</th><th style="width:36px">#</th><th>'+(LANG==='es'?'Nombre':'Name')+'</th><th style="width:90px">Score</th></tr>'; table.appendChild(thead);
     const tbody=document.createElement('tbody'); table.appendChild(tbody);
-
-    let totalSec=0, scores=[];
-    tracks.forEach(tr=>{
-      totalSec+=durationToSeconds(tr.dur);
-      if(Number.isFinite(tr.score) && tr.score>=5&&tr.score<=10) scores.push(tr.score);
-      const badge = Number.isFinite(tr.score)
-        ? ('<span class="pill" style="background:'+colorFor(tr.score)+'">'+tr.score.toFixed(1).replace(/\.0$/,'')+'</span>')
-        : ('<span class="pill" style="background:'+NEUTRAL+'">-</span>');
-      const el=document.createElement('tr');
-      el.innerHTML='<td>'+(tr.dur||'—')+'</td><td>'+(tr.n||'')+'</td><td>'+(tr.name||'—')+'</td><td>'+badge+'</td>';
-      tbody.appendChild(el);
-    });
-
-    const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):NaN;
-    document.getElementById('finalScore').textContent=Number.isFinite(avg)?avg.toFixed(1):'—';
+    let totalSec=0, scores=[]; tracks.forEach(tr=>{ totalSec+=durationToSeconds(tr.dur); if(Number.isFinite(tr.score) && tr.score>=5&&tr.score<=10) scores.push(tr.score);
+      const badge = Number.isFinite(tr.score) ? ('<span class="pill" style="background:'+colorFor(tr.score)+'">'+tr.score.toFixed(1).replace(/\\.0$/,'')+'</span>') : ('<span class="pill" style="background:'+NEUTRAL+'">-</span>');
+      const el=document.createElement('tr'); el.innerHTML='<td>'+(tr.dur||'—')+'</td><td>'+(tr.n||'')+'</td><td>'+(tr.name||'—')+'</td><td>'+badge+'</td>'; tbody.appendChild(el); });
+    const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):NaN; document.getElementById('finalScore').textContent=Number.isFinite(avg)?avg.toFixed(1):'—';
     pair((LANG==='es'?'Duración total':'Duration'), secondsToMinutesText(totalSec));
-
     const series = tracks.map(tr=>tr.score).filter(v=>Number.isFinite(v));
-    drawChart('chart', series);
-    save();
+    drawChart('chart', series); save();
   }
 
   function drawChart(id,values){
@@ -184,16 +117,8 @@
 
   // --- MusicBrainz + iTunes fallback ---
   let lastFetchTs = 0;
-  async function safeFetch(url, opts = {}) {
-    const now=Date.now(); const wait=Math.max(0,1000-(now-lastFetchTs));
-    if(wait) await new Promise(r=>setTimeout(r,wait));
-    lastFetchTs=Date.now(); return fetch(url, opts);
-  }
-  function mmss(ms){
-    if (!Number.isFinite(ms) || ms <= 0) return '';
-    const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const r = s % 60;
-    return `${m}:${String(r).padStart(2,'0')}`;
-  }
+  async function safeFetch(url, opts = {}) { const now=Date.now(); const wait=Math.max(0,1000-(now-lastFetchTs)); if(wait) await new Promise(r=>setTimeout(r,wait)); lastFetchTs=Date.now(); return fetch(url, opts); }
+  function mmss(ms){ if (!Number.isFinite(ms) || ms <= 0) return ''; const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const r = s % 60; return `${m}:${String(r).padStart(2,'0')}`; }
 
   async function searchReleasesMB(artist, album) {
     const queryStr = encodeURIComponent(`release:${album} AND artist:${artist}`);
@@ -201,32 +126,18 @@
     const res = await safeFetch(url);
     if (!res.ok) throw new Error('MB search failed');
     const data = await res.json();
-    return (data.releases || []).map(r => ({
-      id:r.id, title:r.title||'', score:r.score||0, country:r.country||'', date:r.date||'',
-      trackCount:r['track-count']||'', artistCredit:(r['artist-credit']||[]).map(a=>a.name).join(', ')
-    })).sort((a,b)=>b.score-a.score);
+    return (data.releases || []).map(r => ({ id:r.id, title:r.title||'', score:r.score||0, country:r.country||'', date:r.date||'', trackCount:r['track-count']||'', artistCredit:(r['artist-credit']||[]).map(a=>a.name).join(', ') })).sort((a,b)=>b.score-a.score);
   }
-
   async function fetchReleaseMB(id){
     const url = `https://musicbrainz.org/ws/2/release/${id}?fmt=json&inc=recordings+media`;
     const res = await safeFetch(url); if(!res.ok) throw new Error('MB release failed');
     const data = await res.json();
     const tracks=[]; (data.media||[]).forEach(m=> (m.tracks||[]).forEach(t=> tracks.push({title:t.title, duration: t.length? mmss(t.length): ''})));
     const totalMs = (data.media||[]).reduce((acc,m)=> acc + (m.tracks||[]).reduce((a,t)=> a+(t.length||0),0), 0);
-    return {
-      title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '),
-      year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mmss(totalMs): '' , id:data.id
-    };
+    return { title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '), year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mmss(totalMs): '' , id:data.id };
   }
+  async function fetchCoverMB(releaseId){ const meta = await safeFetch(`https://coverartarchive.org/release/${releaseId}`); if (!meta.ok) return null; const json = await meta.json().catch(()=>null); const big = json?.images?.find(i => i.thumbnails?.large) || json?.images?.[0]; return big?.image || big?.thumbnails?.large || null; }
 
-  async function fetchCoverMB(releaseId){
-    const meta = await safeFetch(`https://coverartarchive.org/release/${releaseId}`);
-    if (!meta.ok) return null; const json = await meta.json().catch(()=>null);
-    const big = json?.images?.find(i => i.thumbnails?.large) || json?.images?.[0];
-    return big?.image || big?.thumbnails?.large || null;
-  }
-
-  // Modal selección
   function ensureModal() {
     let modal = document.getElementById('albumAutofillModal');
     if (modal) return modal;
@@ -244,7 +155,6 @@
     modal.querySelector('#aam_close').addEventListener('click', () => (modal.style.display = 'none'));
     return modal;
   }
-
   function showCandidates(cands){
     const modal = ensureModal(); const list = modal.querySelector('#aam_list'); list.innerHTML='';
     if(!cands.length){ list.innerHTML = `<div style="padding:18px">No se encontraron ediciones.</div>`; }
@@ -262,7 +172,6 @@
   }
   function closeModal(){ const modal=document.getElementById('albumAutofillModal'); if(modal) modal.style.display='none'; }
 
-  // Autofill (MB -> iTunes fallback)
   async function runAutofill(){
     const artist = $('#artist').value.trim();
     const album  = $('#album').value.trim();
@@ -295,12 +204,12 @@
     try{
       const term = `${artist} ${album}`;
       const searchUrl = `https://itunes.apple.com/search?${new URLSearchParams({term,entity:'album',limit:'5'}).toString()}`;
-      const res = await fetch(searchUrl); if(!res.ok) throw new Error('itunes search');
+      const res = await safeFetch(searchUrl); if(!res.ok) throw new Error('itunes search');
       const json = await res.json(); if(!json.resultCount) throw new Error('no results');
       const low = s => (s||'').toLowerCase();
       const best = json.results.find(r => low(r.collectionName).includes(low(album)) && low(r.artistName).includes(low(artist))) || json.results[0];
       const lookupUrl = `https://itunes.apple.com/lookup?${new URLSearchParams({id:String(best.collectionId),entity:'song'}).toString()}`;
-      const res2 = await fetch(lookupUrl); if(!res2.ok) throw new Error('itunes lookup');
+      const res2 = await safeFetch(lookupUrl); if(!res2.ok) throw new Error('itunes lookup');
       const json2 = await res2.json(); if(!json2.results || json2.results.length<=1) throw new Error('no tracks');
       const albumInfo = json2.results[0];
       const tracks = json2.results.slice(1).filter(x=>x.wrapperType==='track').map(t => {
@@ -325,7 +234,7 @@
     if(payload.coverUrl) $('#coverOut').src = payload.coverUrl;
   }
 
-  // Bind UI
+  // Bind básico
   function bindCore(){
     const b = document.getElementById('btnBuscarAlbum');
     if(b && !b._bound){ b.addEventListener('click', runAutofill); b._bound = true; }
@@ -334,50 +243,33 @@
     const app= document.getElementById('applyCount'); if(app && !app._bound){ app._bound=true; app.addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10))); }
     const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov._bound=true; cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{document.getElementById('coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); }
 
-    // Toggle Sort Top 10
     const sortBtn = document.getElementById('sortTop10');
     if (sortBtn && !sortBtn._bound) {
       sortBtn._bound = true;
       sortBtn.addEventListener('click', () => {
         const el = document.getElementById('tracks');
-
         if (!SORT_STATE.active) {
-          // Guardar snapshot y ordenar
           SORT_STATE.snapshot = [...el.children].map(r => r.value());
-          const arr = SORT_STATE.snapshot.map(x => ({ ...x })); // copia de trabajo
+          const arr = SORT_STATE.snapshot.map(x => ({ ...x }));
           const scored = arr.filter(t => Number.isFinite(t.score));
           const un     = arr.filter(t => !Number.isFinite(t.score));
           scored.sort((a, b) => b.score - a.score);
           const top  = scored.slice(0, 10);
           const rest = scored.slice(10).concat(un);
           const merged = top.concat(rest).map((t, i) => ({ ...t, n: i + 1 }));
-
-          el.innerHTML = '';
-          merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
-          SORT_STATE.active = true;
-          setSortButton(true);
-          render();
-          return;
+          el.innerHTML = ''; merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
+          SORT_STATE.active = true; setSortButton(true); render(); return;
         }
-
-        // Restaurar snapshot (y renumerar 1..N)
         if (SORT_STATE.snapshot) {
-          const original = SORT_STATE.snapshot.map((t, i) => ({ ...t, n: i + 1 }));
-          el.innerHTML = '';
-          original.forEach((t, i) => el.appendChild(makeRow(i, t)));
+          const original = SORT_STATE.snapshot.map(x => ({ ...x }));
+          el.innerHTML = ''; original.forEach((t, i) => el.appendChild(makeRow(i, t)));
         }
-        SORT_STATE.active = false;
-        SORT_STATE.snapshot = null;
-        setSortButton(false);
-        render();
+        SORT_STATE.active = false; SORT_STATE.snapshot = null; setSortButton(false); render();
       });
-
-      // Texto inicial del botón
       setSortButton(SORT_STATE.active);
     }
-  } // <- cierre bindCore()
+  }
 
-  // Al completar autofill: llenar filas + reset toggle
   window.addEventListener('album-autofilled', (e) => {
     const d = e.detail || {}; const list = d.tracks || [];
     document.getElementById('trackcount').value = list.length || document.getElementById('trackcount').value;
@@ -389,18 +281,12 @@
       if (inputs[2]) inputs[2].value = t.title || '';
     });
     if (d.year) document.getElementById('released').value = d.year;
-
-    SORT_STATE.active = false;
-    SORT_STATE.snapshot = null;
-    setSortButton(false);
-
+    SORT_STATE.active = false; SORT_STATE.snapshot = null; setSortButton(false);
     render();
   });
 
-  // API mínima
   window.AlbumApp = { ensureRows, getState, setState, save, load };
 
-  // Arranque
   function boot(){
     if(document.readyState==='complete' || document.readyState==='interactive'){
       try{ bindCore(); load(); }catch(e){ console.error(e); }
