@@ -1,3 +1,5 @@
+<!-- autofillAlbum.v6.5.js -->
+<script>
 /*! Album Autofill v6.5 — MB + iTunes, iOS-safe */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
@@ -60,7 +62,23 @@
     const name=document.createElement('input'); name.placeholder=(LANG==='es'?'Nombre de la canción':'Track name'); name.value=data.name||'';
     const initScore = (typeof data.score==='number' && Number.isFinite(data.score)) ? data.score : NaN;
     const picker=rankPicker(initScore); const pill=document.createElement('div'); pill.className='pill'; pill.textContent='-'; pill.style.background=NEUTRAL;
-    row.append(n,dur,name,picker.el,pill);
+
+    // celdas principales
+    row.append(n, dur, name, picker.el, pill);
+
+    // --- Botón de nota (pluma) a la derecha ---
+    const noteBtn = document.createElement('button');
+    noteBtn.type = 'button';
+    noteBtn.className = 'noteBtn';
+    noteBtn.title = 'Add note';
+    noteBtn.innerHTML =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33h-.5v-.5l9.06-9.06.5.5L5.92 19.58zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
+    noteBtn.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('edit-track-note', {
+        detail: { index: i, name: name.value }
+      }));
+    });
+    row.appendChild(noteBtn);
 
     function paint(v){
       if(!Number.isFinite(v)){ pill.style.background=NEUTRAL; pill.textContent='-'; return; }
@@ -86,15 +104,7 @@
   function getState(){
     const el = tracksEl();
     const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score));
-    return {
-      lang:LANG,
-      album:$('#album').value.trim(),
-      artist:$('#artist').value.trim(),
-      released:$('#released').value.trim(),   // <- FIX
-      rankedby:$('#rankedby').value.trim(),
-      cover:$('#coverOut').src||'',
-      tracks
-    };
+    return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks};
   }
   function setState(s){
     LANG=s.lang||LANG; const langSel=$('#lang'); if(langSel) langSel.value = LANG;
@@ -163,14 +173,12 @@
   }
 
   function drawChart(id,values){
-    const canvas=document.getElementById(id); if(!canvas) return;
-    const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
+    const canvas=document.getElementById(id); if(!canvas) return; const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
     const P={l:60,r:20,t:20,b:36}, W=canvas.width-P.l-P.r, H=canvas.height-P.t-P.b;
     ctx.strokeStyle='#2a3140'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(P.l,P.t); ctx.lineTo(P.l,P.t+H); ctx.lineTo(P.l+W,P.t+H); ctx.stroke();
     ctx.fillStyle='#aeb5c0'; ctx.font='12px system-ui';
     for(let y=5;y<=10;y++){ const yy=P.t+H-((y-5)/5)*H; ctx.strokeStyle='#1a2130'; ctx.beginPath(); ctx.moveTo(P.l,yy); ctx.lineTo(P.l+W,yy); ctx.stroke(); ctx.fillText(String(y),18,yy+4); }
-    if(!values.length) return;
-    const n=values.length, x=i=>P.l+(i/(Math.max(1,n-1)))*W, y=v=>P.t+H-((v-5)/5)*H;
+    if(!values.length) return; const n=values.length, x=i=>P.l+(i/(Math.max(1,n-1)))*W, y=v=>P.t+H-((v-5)/5)*H;
     ctx.strokeStyle='rgba(122,162,255,0.95)'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(x(0),y(values[0])); for(let i=1;i<n;i++) ctx.lineTo(x(i), y(values[i])); ctx.stroke();
     ctx.fillStyle='#cfd9ff'; for(let i=0;i<n;i++){ ctx.beginPath(); ctx.arc(x(i), y(values[i]), 5, 0, 2*Math.PI); ctx.fill(); }
     ctx.fillStyle='#aeb5c0'; for(let i=0;i<n;i++){ ctx.fillText(String(i+1), x(i)-3, P.t+H+16); }
@@ -354,9 +362,9 @@
           return;
         }
 
-        // Restaurar snapshot
+        // Restaurar snapshot (y renumerar 1..N)
         if (SORT_STATE.snapshot) {
-          const original = SORT_STATE.snapshot.map(x => ({ ...x }));
+          const original = SORT_STATE.snapshot.map((t, i) => ({ ...t, n: i + 1 }));
           el.innerHTML = '';
           original.forEach((t, i) => el.appendChild(makeRow(i, t)));
         }
@@ -391,7 +399,7 @@
     render();
   });
 
-  // API mínima para depurar desde consola
+  // API mínima
   window.AlbumApp = { ensureRows, getState, setState, save, load };
 
   // Arranque
@@ -404,3 +412,4 @@
   }
   boot();
 })();
+</script>
