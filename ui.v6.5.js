@@ -1,24 +1,111 @@
+<!-- ui.v6.5.js -->
+<script>
 // UI v6.5 wiring (lang/export/import/clear + notes + better export name)
 (function () {
   const $ = s => document.querySelector(s);
 
-  // ... (I18N tal cual lo tienes)
+  const I18N = {
+    en: {
+      subtitle:
+        "Quick form to score albums. Choose track count, pick scores with two taps (integer + decimal), and everything updates live.",
+      album: "Album",
+      artist: "Artist",
+      released: "Release Date",
+      rankedby: "Ranked by",
+      cover: "Cover",
+      trackcount: "Tracks",
+      num: "#",
+      duration: "Duration",
+      name: "Name",
+      score: "Score (int + decimal)",
+      color: "Color",
+      apply: "Apply Track Count",
+      addRow: "+ Add Row",
+      delRow: "– Remove Last",
+      clearAll: "Clear All Data",
+      clearScores: "Clear Score",
+      import: "Import Data",
+      export: "Export Data",
+      total: "Duration",
+      avg: "Average",
+      confirmClear: "Are you sure you want to clear all fields?",
+      notePrompt: "Write a note for this track:",
+      imported: "Imported.",
+      invalidFile: "Invalid file.",
+      exportFail: "Could not export.",
+    },
+    es: {
+      subtitle:
+        "Formulario rápido para puntuar álbumes. Elige número de canciones, selecciona puntaje en dos toques (entero + decimal) y todo se actualiza al instante.",
+      album: "Álbum",
+      artist: "Artista",
+      released: "Fecha de lanzamiento",
+      rankedby: "Rankeado por",
+      cover: "Cover",
+      trackcount: "Canciones",
+      num: "#",
+      duration: "Duración",
+      name: "Nombre",
+      score: "Puntaje (entero + decimal)",
+      color: "Color",
+      apply: "Aplicar cantidad",
+      addRow: "+ Añadir fila",
+      delRow: "– Quitar última",
+      clearAll: "Borrar todos los datos",
+      clearScores: "Limpiar puntajes",
+      import: "Importar datos",
+      export: "Exportar datos",
+      total: "Duración total",
+      avg: "Promedio",
+      confirmClear: "¿Seguro que deseas borrar todos los campos?",
+      notePrompt: "Escribe una nota para esta canción:",
+      imported: "Importado.",
+      invalidFile: "Archivo inválido.",
+      exportFail: "No se pudo exportar.",
+    },
+  };
 
   const KEY_LANG = "albumrater_lang";
   const NOTES_KEY = "albumrater_v6_notes";
 
   // ---------- I18N ----------
-  // (igual que tu versión)
+  function applyI18N(lang) {
+    const t = I18N[lang] || I18N.en;
+    const sub = $("#subtitle");
+    if (sub) sub.textContent = t.subtitle;
+    document
+      .querySelectorAll("[data-i18n]")
+      .forEach(
+        (el) => (el.textContent = t[el.dataset.i18n] || el.textContent)
+      );
+    const ids = [
+      ["applyCount", "apply"],
+      ["addRow", "addRow"],
+      ["delRow", "delRow"],
+      ["clearAll", "clearAll"],
+      ["importLabel", "import"],
+      ["exportJSON", "export"],
+      ["clearScores", "clearScores"],
+    ];
+    ids.forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = t[key];
+    });
+    const langSel = $("#lang");
+    if (langSel) langSel.value = lang;
+  }
 
   // ---------- Helpers ----------
   const safeName = (s) =>
-    (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
+    (s || "")
+      .replace(/[\\/:*?"<>|]+/g, "")
+      .trim()
+      .replace(/\s+/g, " ");
 
-  // FIX: precedencia correcta
   function currentLang() {
     const stored = localStorage.getItem(KEY_LANG);
     if (stored) return stored;
-    return ((navigator.language || "en").startsWith("es")) ? "es" : "en";
+    return (navigator.language || "en").startsWith("es") ? "es" : "en";
   }
 
   function stateKeyForNotes() {
@@ -26,6 +113,267 @@
     return `${safeName(s.album || "Album")}__${safeName(s.artist || "Artist")}`;
   }
 
-  // ... (resto del archivo SIN cambios)
-  // pega aquí el resto de tu ui.v6.5.js tal cual lo enviaste
+  function loadAllNotes() {
+    try {
+      return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function saveAllNotes(obj) {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(obj));
+  }
+
+  function getNotesForCurrent() {
+    const all = loadAllNotes();
+    return all[stateKeyForNotes()] || { trackNotes: {}, final: "" };
+  }
+
+  function setNotesForCurrent(n) {
+    const all = loadAllNotes();
+    all[stateKeyForNotes()] = n;
+    saveAllNotes(all);
+  }
+
+  // ---------- Export / Import / Clear ----------
+  function exportJSON() {
+    try {
+      const s = window.AlbumApp.getState();
+      const notes = getNotesForCurrent();
+      const payload = { ...s, notes };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+
+      const album = safeName(s.album || "Album");
+      const artist = safeName(s.artist || "");
+      const fname = artist ? `${album} - ${artist}.json` : `${album}.json`;
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fname;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert((I18N[currentLang()] || I18N.en).exportFail);
+      console.error(e);
+    }
+  }
+
+  function importJSON(file) {
+    const r = new FileReader();
+    r.onload = (e) => {
+      try {
+        const obj = JSON.parse(e.target.result);
+        // 1) Cargar estado visual
+        window.AlbumApp.setState(obj);
+        window.AlbumApp.save();
+        // 2) Restaurar notas si existen
+        if (obj && obj.notes) {
+          setNotesForCurrent({
+            trackNotes: obj.notes.trackNotes || {},
+            final: obj.notes.final || "",
+          });
+          // pintar UI de notas
+          renderNotesOutput();
+          const final = $("#finalNotes");
+          if (final) final.value = obj.notes.final || "";
+        }
+        alert((I18N[currentLang()] || I18N.en).imported);
+      } catch (err) {
+        alert((I18N[currentLang()] || I18N.en).invalidFile);
+      }
+    };
+    r.readAsText(file);
+  }
+
+  function clearAll() {
+    const lang = localStorage.getItem(KEY_LANG) || $("#lang")?.value || "en";
+    const msg = (I18N[lang] || I18N.en).confirmClear;
+    if (!confirm(msg)) return;
+    localStorage.removeItem("albumrater_v6_state");
+    // Mantener las notas del álbum en almacenamiento; solo vaciamos pantalla
+    window.AlbumApp.setState({
+      lang,
+      album: "",
+      artist: "",
+      released: "",
+      rankedby: "",
+      cover: "",
+      tracks: [],
+    });
+  }
+
+  // Limpia SOLO los puntajes (los deja en “-”)
+  function clearScores() {
+    const s = window.AlbumApp.getState();
+    s.tracks = (s.tracks || []).map((t) => ({ ...t, score: NaN }));
+    window.AlbumApp.setState(s);
+    window.AlbumApp.save();
+  }
+
+  // ---------- Notas por canción ----------
+  // Botón de pluma: manejado desde autofillAlbum -> aquí pedimos la nota y persistimos
+  window.addEventListener('edit-track-note', (ev) => {
+    const lang = currentLang();
+    const t = I18N[lang] || I18N.en;
+    const idx = (ev.detail && Number.isInteger(ev.detail.index)) ? ev.detail.index : 0;
+
+    const notes = getNotesForCurrent();
+    const prev = notes.trackNotes[idx] || '';
+    const text = prompt(t.notePrompt, prev == null ? '' : String(prev));
+    if (text == null) return; // cancel
+
+    notes.trackNotes[idx] = text.trim();
+    setNotesForCurrent(notes);
+    renderNotesOutput();
+
+    // Encender/apagar “active” en el botón correspondiente
+    const rows = document.getElementById('tracks')?.children || [];
+    const btn = rows[idx]?.querySelector('.noteBtn');
+    if (btn) btn.classList.toggle('active', !!notes.trackNotes[idx]);
+  });
+
+  function refreshNoteButtonsActiveState() {
+    const notes = getNotesForCurrent();
+    const rows = document.getElementById('tracks')?.children || [];
+    [...rows].forEach((row, i) => {
+      const btn = row.querySelector('.noteBtn');
+      if (btn) btn.classList.toggle('active', !!notes.trackNotes[i]);
+    });
+  }
+
+  function renderNotesOutput() {
+    const out = $("#notesOutput");
+    if (!out) return;
+
+    const s = window.AlbumApp.getState();
+    const notes = getNotesForCurrent();
+
+    // construir listado: "1. Track Name: note"
+    const lines = [];
+    const tracks = s.tracks || [];
+    tracks.forEach((t, i) => {
+      const note = notes.trackNotes[i];
+      if (note && note.trim()) {
+        const name = t?.name || `Track ${i + 1}`;
+        lines.push(`${i + 1}. ${name}: ${note.trim()}`);
+      }
+    });
+
+    const albumTitle = s.album ? `${s.album} by ${s.artist || ""}`.trim() : "";
+    const header = albumTitle ? albumTitle + "\n" : "";
+
+    const final = notes.final || "";
+    const finalBlock = final.trim()
+      ? `\nFinal Album Thoughts: ${final.trim()}`
+      : "";
+
+    out.textContent = header + lines.join("\n") + finalBlock;
+  }
+
+  function bindFinalNotes() {
+    const ta = $("#finalNotes");
+    if (!ta || ta._bound) return;
+    ta._bound = true;
+    ta.addEventListener("input", () => {
+      const n = getNotesForCurrent();
+      n.final = ta.value || "";
+      setNotesForCurrent(n);
+      renderNotesOutput();
+    });
+  }
+
+  // ---------- Bind UI ----------
+  function bindUI() {
+    let LANG =
+      localStorage.getItem(KEY_LANG) ||
+      ((navigator.language || "en").startsWith("es") ? "es" : "en");
+    applyI18N(LANG);
+
+    const langSel = $("#lang");
+    if (langSel && !langSel._bound) {
+      langSel._bound = true;
+      langSel.addEventListener("change", (e) => {
+        LANG = e.target.value;
+        localStorage.setItem(KEY_LANG, LANG);
+        applyI18N(LANG);
+        const s = window.AlbumApp.getState();
+        s.lang = LANG;
+        window.AlbumApp.setState(s);
+        window.AlbumApp.save();
+        renderNotesOutput();
+        refreshNoteButtonsActiveState();
+      });
+    }
+
+    const exp = $("#exportJSON");
+    if (exp && !exp._bound) {
+      exp._bound = true;
+      exp.addEventListener("click", exportJSON);
+    }
+
+    const imp = $("#importJSON");
+    if (imp && !imp._bound) {
+      imp._bound = true;
+      imp.addEventListener("change", (ev) => {
+        const f = ev.target.files[0];
+        if (f) importJSON(f);
+        ev.target.value = "";
+      });
+    }
+
+    const clr = $("#clearAll");
+    if (clr && !clr._bound) {
+      clr._bound = true;
+      clr.addEventListener("click", clearAll);
+    }
+
+    const clrScores = $("#clearScores");
+    if (clrScores && !clrScores._bound) {
+      clrScores._bound = true;
+      clrScores.addEventListener("click", clearScores);
+    }
+
+    // Notas
+    bindFinalNotes();
+    renderNotesOutput();
+    refreshNoteButtonsActiveState();
+
+    // Re-pintar notas cuando cambie el álbum/artist (por ejemplo tras autofill)
+    window.addEventListener("album-autofilled", () => {
+      bindFinalNotes();
+      const notes = getNotesForCurrent();
+      const ta = $("#finalNotes");
+      if (ta) ta.value = notes.final || "";
+      renderNotesOutput();
+      refreshNoteButtonsActiveState();
+    });
+  }
+
+  function boot() {
+    if (
+      document.readyState === "complete" ||
+      document.readyState === "interactive"
+    ) {
+      try {
+        bindUI();
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      document.addEventListener("DOMContentLoaded", () => {
+        try {
+          bindUI();
+        } catch (e) {
+          console.error(e);
+        }
+      });
+    }
+  }
+  boot();
 })();
+</script>
