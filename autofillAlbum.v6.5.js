@@ -1,5 +1,3 @@
-<!-- autofillAlbum.v6.5.js -->
-<script>
 /*! Album Autofill v6.5 — MB + iTunes, iOS-safe */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
@@ -412,4 +410,3 @@
   }
   boot();
 })();
-</script>
