@@ -86,8 +86,15 @@
   function getState(){
     const el = tracksEl();
     const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score));
-    return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$(
-      '#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks};
+    return {
+      lang:LANG,
+      album:$('#album').value.trim(),
+      artist:$('#artist').value.trim(),
+      released:$('#released').value.trim(),   // <- FIX
+      rankedby:$('#rankedby').value.trim(),
+      cover:$('#coverOut').src||'',
+      tracks
+    };
   }
   function setState(s){
     LANG=s.lang||LANG; const langSel=$('#lang'); if(langSel) langSel.value = LANG;
