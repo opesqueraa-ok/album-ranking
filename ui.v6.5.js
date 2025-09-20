@@ -1,5 +1,3 @@
-<!-- ui.v6.5.js -->
-<script>
 // UI v6.5 wiring (lang/export/import/clear + notes + better export name)
 (function () {
   const $ = s => document.querySelector(s);
@@ -216,7 +214,7 @@
   }
 
   // ---------- Notas por canción ----------
-  // Botón de pluma: manejado desde autofillAlbum -> aquí pedimos la nota y persistimos
+  // Botón de pluma: lo lanza autofillAlbum con 'edit-track-note'
   window.addEventListener('edit-track-note', (ev) => {
     const lang = currentLang();
     const t = I18N[lang] || I18N.en;
@@ -376,4 +374,3 @@
   }
   boot();
 })();
-</script>
