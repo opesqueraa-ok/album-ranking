@@ -1,4 +1,4 @@
-/*! Album Autofill v6.5 — MB + iTunes, iOS-safe (v6.5.1 build) */
+/*! Album Autofill v6.6 — MB + iTunes, iOS-safe */
 (() => {
   const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
   const NEUTRAL = '#2a3140';
@@ -6,19 +6,14 @@
   const $ = s => document.querySelector(s);
   const tracksEl = () => document.getElementById('tracks');
 
-  // --- Toggle Top10 ---
-  const SORT_STATE = { active: false, snapshot: null };
-  function setSortButton(active){
-    const btn = document.getElementById('sortTop10');
-    if (!btn) return;
-    btn.textContent = active ? 'Restore album order' : 'Sort Top 10';
-  }
+  const SORT_STATE = { active:false, snapshot:null };
+  function setSortButton(active){ const b=document.getElementById('sortTop10'); if(b) b.textContent = active ? 'Restore album order' : 'Sort Top 10'; }
 
   function durationToSeconds(d){ if(!d)return 0; const m=d.match(/^(\d{1,2}):(\d{2})$/); if(!m)return 0; return parseInt(m[1],10)*60+parseInt(m[2],10); }
   function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
   function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
 
-  // Picker con estado NaN ("-")
+  // picker con estado "-"
   function rankPicker(initial){
     const wrap=document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 1fr'; wrap.style.gap='6px';
     const iSel=document.createElement('select');
@@ -26,18 +21,10 @@
     for(let i=5;i<=10;i++){ o=document.createElement('option'); o.value=i; o.textContent=i; iSel.appendChild(o); }
     const dSel=document.createElement('select'); dSel.disabled=true;
 
-    function fillDec(max){
-      dSel.innerHTML='';
-      let o2=document.createElement('option'); o2.value='0'; o2.textContent='0.0'; dSel.appendChild(o2);
-      if(max){ for(let t=1;t<=9;t++){ const val=(t/10).toFixed(1); o2=document.createElement('option'); o2.value=val; o2.textContent=val; dSel.appendChild(o2);} }
-    }
+    function fillDec(max){ dSel.innerHTML=''; let o2=document.createElement('option'); o2.value='0'; o2.textContent='0.0'; dSel.appendChild(o2); if(max){ for(let t=1;t<=9;t++){ const val=(t/10).toFixed(1); o2=document.createElement('option'); o2.value=val; o2.textContent=val; dSel.appendChild(o2);} } }
     fillDec(false);
 
-    function setFromNumber(v){
-      if(!Number.isFinite(v)){ iSel.value=''; dSel.disabled=true; dSel.value='0'; return; }
-      const b=Math.floor(v); const dec=Math.round((v-b)*10)/10;
-      iSel.value=String(b); dSel.disabled=false; fillDec(b<10); dSel.value=dec.toFixed(1);
-    }
+    function setFromNumber(v){ if(!Number.isFinite(v)){ iSel.value=''; dSel.disabled=true; dSel.value='0'; return; } const b=Math.floor(v); const dec=Math.round((v-b)*10)/10; iSel.value=String(b); dSel.disabled=false; fillDec(b<10); dSel.value=dec.toFixed(1); }
     function current(){ const ib=iSel.value; if(ib==='') return NaN; const dd=parseFloat(dSel.value||'0'); return parseFloat(ib)+dd; }
     function trigger(){ wrap.dispatchEvent(new CustomEvent('change-score',{detail:current()})); }
 
@@ -63,16 +50,19 @@
     [n,dur,name].forEach(el=> el.addEventListener('input', render));
     paint(picker.get());
 
+    // botón de notas por pista (se inyecta desde UI pero dejamos un hook)
     row.value=()=>({n:Number(n.value||0), dur:dur.value.trim(), name:name.value.trim(), score:picker.get()});
     return row;
   }
 
   function ensureRows(n){ const el = tracksEl(); const cur=el.children.length; if(cur<n){for(let i=cur;i<n;i++) el.appendChild(makeRow(i));} else if(cur>n){for(let i=cur-1;i>=n;i--) el.removeChild(el.children[i]);} render(); }
 
-  // Estado
   const KEY='albumrater_v6_state';
-  function getState(){ const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score)); return {lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks}; }
+  function getState(){ const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score));
+    return {id:window.__album_id||null, lang:LANG, album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks};
+  }
   function setState(s){
+    window.__album_id = s.id || null;
     LANG=s.lang||LANG; const langSel=$('#lang'); if(langSel) langSel.value = LANG;
     $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
     if(s.cover) $('#coverOut').src=s.cover;
@@ -84,13 +74,11 @@
   function save(){ try{ localStorage.setItem(KEY, JSON.stringify(getState())); }catch(e){} }
   function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ setState(JSON.parse(raw)); return; } }catch(e){} ensureRows(7); render(); }
 
-  // Render + chart + tabla
   function render(){
     const info=document.getElementById('info'); if(!info) return; info.innerHTML='';
     const pair=(L,V)=>{const l=document.createElement('div'); l.className='label'; l.textContent=L; const v=document.createElement('div'); v.innerHTML=V; info.append(l,v);};
     const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
     pair((LANG==='es'?'Álbum':'Album')+':','<strong><em>'+(album||'—')+'</em></strong>'); pair((LANG==='es'?'Artista':'Artist')+':','<strong>'+(artist||'—')+'</strong>'); pair((LANG==='es'?'Fecha de lanzamiento':'Release Date')+':',released||'—'); if(rankedby) pair((LANG==='es'?'Rankeado por':'Ranked by')+':', rankedby);
-
     const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
     const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">'+(LANG==='es'?'Duración':'Duration')+'</th><th style="width:36px">#</th><th>'+(LANG==='es'?'Nombre':'Name')+'</th><th style="width:90px">Score</th></tr>'; table.appendChild(thead);
     const tbody=document.createElement('tbody'); table.appendChild(tbody);
@@ -99,10 +87,8 @@
       const el=document.createElement('tr'); el.innerHTML='<td>'+(tr.dur||'—')+'</td><td>'+(tr.n||'')+'</td><td>'+(tr.name||'—')+'</td><td>'+badge+'</td>'; tbody.appendChild(el); });
     const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):NaN; document.getElementById('finalScore').textContent=Number.isFinite(avg)?avg.toFixed(1):'—';
     pair((LANG==='es'?'Duración total':'Duration'), secondsToMinutesText(totalSec));
-    const series = tracks.map(tr=>tr.score).filter(v=>Number.isFinite(v));
-    drawChart('chart', series); save();
+    const series = tracks.map(tr=>tr.score).filter(v=>Number.isFinite(v)); drawChart('chart', series); save();
   }
-
   function drawChart(id,values){
     const canvas=document.getElementById(id); if(!canvas) return; const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
     const P={l:60,r:20,t:20,b:36}, W=canvas.width-P.l-P.r, H=canvas.height-P.t-P.b;
@@ -115,7 +101,7 @@
     ctx.fillStyle='#aeb5c0'; for(let i=0;i<n;i++){ ctx.fillText(String(i+1), x(i)-3, P.t+H+16); }
   }
 
-  // --- MusicBrainz + iTunes fallback ---
+  // --- MusicBrainz + iTunes ---
   let lastFetchTs = 0;
   async function safeFetch(url, opts = {}) { const now=Date.now(); const wait=Math.max(0,1000-(now-lastFetchTs)); if(wait) await new Promise(r=>setTimeout(r,wait)); lastFetchTs=Date.now(); return fetch(url, opts); }
   function mmss(ms){ if (!Number.isFinite(ms) || ms <= 0) return ''; const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const r = s % 60; return `${m}:${String(r).padStart(2,'0')}`; }
@@ -136,7 +122,12 @@
     const totalMs = (data.media||[]).reduce((acc,m)=> acc + (m.tracks||[]).reduce((a,t)=> a+(t.length||0),0), 0);
     return { title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '), year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mmss(totalMs): '' , id:data.id };
   }
-  async function fetchCoverMB(releaseId){ const meta = await safeFetch(`https://coverartarchive.org/release/${releaseId}`); if (!meta.ok) return null; const json = await meta.json().catch(()=>null); const big = json?.images?.find(i => i.thumbnails?.large) || json?.images?.[0]; return big?.image || big?.thumbnails?.large || null; }
+  async function fetchCoverMB(releaseId){
+    const meta = await safeFetch(`https://coverartarchive.org/release/${releaseId}`);
+    if (!meta.ok) return null; const json = await meta.json().catch(()=>null);
+    const big = json?.images?.find(i => i.thumbnails?.large) || json?.images?.[0];
+    return big?.image || big?.thumbnails?.large || null;
+  }
 
   function ensureModal() {
     let modal = document.getElementById('albumAutofillModal');
@@ -204,12 +195,12 @@
     try{
       const term = `${artist} ${album}`;
       const searchUrl = `https://itunes.apple.com/search?${new URLSearchParams({term,entity:'album',limit:'5'}).toString()}`;
-      const res = await safeFetch(searchUrl); if(!res.ok) throw new Error('itunes search');
+      const res = await fetch(searchUrl); if(!res.ok) throw new Error('itunes search');
       const json = await res.json(); if(!json.resultCount) throw new Error('no results');
       const low = s => (s||'').toLowerCase();
       const best = json.results.find(r => low(r.collectionName).includes(low(album)) && low(r.artistName).includes(low(artist))) || json.results[0];
       const lookupUrl = `https://itunes.apple.com/lookup?${new URLSearchParams({id:String(best.collectionId),entity:'song'}).toString()}`;
-      const res2 = await safeFetch(lookupUrl); if(!res2.ok) throw new Error('itunes lookup');
+      const res2 = await fetch(lookupUrl); if(!res2.ok) throw new Error('itunes lookup');
       const json2 = await res2.json(); if(!json2.results || json2.results.length<=1) throw new Error('no tracks');
       const albumInfo = json2.results[0];
       const tracks = json2.results.slice(1).filter(x=>x.wrapperType==='track').map(t => {
@@ -234,7 +225,6 @@
     if(payload.coverUrl) $('#coverOut').src = payload.coverUrl;
   }
 
-  // Bind básico
   function bindCore(){
     const b = document.getElementById('btnBuscarAlbum');
     if(b && !b._bound){ b.addEventListener('click', runAutofill); b._bound = true; }
@@ -243,11 +233,13 @@
     const app= document.getElementById('applyCount'); if(app && !app._bound){ app._bound=true; app.addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10))); }
     const cov= document.getElementById('cover'); if(cov && !cov._bound){ cov._bound=true; cov.addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{document.getElementById('coverOut').src=e.target.result; save();}; r.readAsDataURL(f);}); }
 
+    // Toggle Sort Top 10
     const sortBtn = document.getElementById('sortTop10');
     if (sortBtn && !sortBtn._bound) {
       sortBtn._bound = true;
       sortBtn.addEventListener('click', () => {
         const el = document.getElementById('tracks');
+
         if (!SORT_STATE.active) {
           SORT_STATE.snapshot = [...el.children].map(r => r.value());
           const arr = SORT_STATE.snapshot.map(x => ({ ...x }));
@@ -260,6 +252,7 @@
           el.innerHTML = ''; merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
           SORT_STATE.active = true; setSortButton(true); render(); return;
         }
+
         if (SORT_STATE.snapshot) {
           const original = SORT_STATE.snapshot.map(x => ({ ...x }));
           el.innerHTML = ''; original.forEach((t, i) => el.appendChild(makeRow(i, t)));
