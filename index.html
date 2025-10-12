@@ -1,18 +1,18 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="manifest.webmanifest?v=7.0">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7.0">
-<link rel="icon" href="favicon.png?v=7.0">
-<meta name="theme-color" content="#0f1115">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0f1115" />
 <title>Album Rater</title>
 <style>
-:root{--c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;--bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140}
+:root{
+  --c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;
+  --bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140
+}
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:0}
-.wrap{max-width:1100px;margin:18px auto;padding:0 16px 80px}
+.wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
 h1{font-size:20px;margin:0 0 6px}
 .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
@@ -38,20 +38,19 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
 .footer{margin-top:10px;font-size:12px;color:#93a0b6}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#c9d3e3}
 .badge-dot{width:8px;height:8px;border-radius:999px;background:var(--neutral);display:inline-block}
+.small{font-size:12px;color:#9fb0c9}
 
 /* Library modal */
-#libModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:9999}
-#libBox{width:min(980px,94vw);max-height:90vh;overflow:auto;background:#0f1115;border:1px solid var(--line);border-radius:14px}
-#libHead{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
-#libGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px}
-@media (max-width:900px){#libGrid{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:600px){#libGrid{grid-template-columns:1fr}}
-.libCard{background:#161a22;border:1px solid #2a3140;border-radius:12px;padding:10px;display:grid;grid-template-columns:84px 1fr;gap:10px;align-items:center}
-.libCard img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#0d1117}
+#libModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:9999}
+#libCard{width:min(900px,92vw);max-height:80vh;overflow:auto;background:#10141c;color:#e9edf1;border:1px solid var(--line);border-radius:12px;padding:14px}
+.libToolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.libGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (max-width:720px){.libGrid{grid-template-columns:1fr}}
+.libItem{display:grid;grid-template-columns:72px 1fr auto;gap:10px;align-items:center;background:#0d1218;border:1px solid var(--line);border-radius:10px;padding:8px}
+.libCover{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#0d1117}
 .libTitle{font-weight:700}
 .libMeta{font-size:12px;color:#aeb5c0}
-.libRow{display:flex;gap:6px;flex-wrap:wrap}
-.libBtn{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#0e1218;color:#e9edf1;cursor:pointer}
+.libScore{font-weight:800}
 </style>
 </head>
 <body>
@@ -59,13 +58,16 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
   <div class="toolbar">
     <h1 style="margin-right:auto">Album Rater</h1>
 
-    <button id="btnSaveCloud" title="Save album to your library (cloud)">Save to Library</button>
-    <button id="btnOpenLibrary" title="Browse your saved albums">My Library</button>
+    <!-- Auth -->
+    <button id="btnLogin">Sign in with GitHub</button>
+    <button id="btnLogout" style="display:none">Sign out</button>
 
-    <select id="lang" class="select">
-      <option value="en">English</option>
-      <option value="es">Español</option>
-    </select>
+    <!-- Library -->
+    <button id="btnSaveLib" title="Save this album in your library">Save to Library</button>
+    <button id="btnShowLib">My Library</button>
+
+    <!-- Lang & data -->
+    <select id="lang" class="select"><option value="en">English</option><option value="es">Español</option></select>
     <button id="exportJSON">Export Data</button>
     <label style="position:relative">
       <span id="importLabel" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;display:inline-block">Import Data</span>
@@ -73,14 +75,7 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
     </label>
     <button id="clearAll">Clear All Data</button>
     <button id="sortTop10">Sort Top 10</button>
-
-    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center">
-      <span id="authStatus" style="font-size:12px;color:#aeb5c0">Not signed in</span>
-      <button id="btnSignIn">Sign in</button>
-      <button id="btnSignOut" style="display:none">Sign out</button>
-    </span>
   </div>
-
   <div class="sub" id="subtitle"></div>
 
   <div class="grid">
@@ -115,8 +110,11 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
         <div data-i18n="name">Name</div>
         <div data-i18n="score">Score (int + decimal)</div>
         <div data-i18n="color">Color</div>
+        <div class="small">✎</div>
       </div>
+
       <div id="tracks"></div>
+      <div class="small" style="margin-top:6px">Tip: use the pen button to add a note for each track.</div>
     </div>
 
     <div class="card pad">
@@ -151,254 +149,402 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
   </div>
 </div>
 
-<!-- Library Modal -->
+<!-- Library modal -->
 <div id="libModal">
-  <div id="libBox">
-    <div id="libHead">
+  <div id="libCard">
+    <div class="libToolbar">
+      <strong>My Library</strong>
       <div style="display:flex;gap:8px;align-items:center">
-        <strong>My Library</strong>
-        <select id="libSort" class="select" style="padding:6px 10px">
-          <option value="top">Top rated</option>
-          <option value="low">Lowest rated</option>
-          <option value="new">Newest</option>
-          <option value="az">A–Z</option>
+        <select id="libSort">
+          <option value="desc">Higher score first</option>
+          <option value="asc">Lower score first</option>
+          <option value="new">Newest first</option>
+          <option value="old">Oldest first</option>
         </select>
+        <button id="libClose">Close</button>
       </div>
-      <button id="libClose" class="libBtn">Close</button>
     </div>
-    <div id="libGrid"></div>
+    <div id="libGrid" class="libGrid"></div>
   </div>
 </div>
 
-<!-- Supabase client -->
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- App scripts (ya existentes en tu repo) -->
-<script defer src="autofillAlbum.v6.5.js?v=7.0"></script>
-<script defer src="ui.v6.5.js?v=7.0"></script>
-<script defer src="sw-register.v6.5.js"></script>
-
-<!-- Supabase wiring -->
 <script>
-  // === CONFIG proporcionada por ti ===
-  window.SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
-  window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
+/* ========= CONFIG ========= */
+const SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+/* ========================= */
 
-  const supa = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const COLORS = {10:'#2e47ee',9:'#0285c6',8:'#02aec6',7:'#23be32',6:'#f0ca15',5:'#e12928'};
+const NEUTRAL = '#2a3140';
+const $ = s => document.querySelector(s);
+const tracksEl = () => document.getElementById('tracks');
 
-  const $ = (s) => document.querySelector(s);
-  const NOTES_KEY = "albumrater_v6_notes";
+/* ===== Top10 toggle ===== */
+const SORT_STATE = { active:false, snapshot:null };
+function setSortButton(active){
+  const btn = document.getElementById('sortTop10');
+  if(btn) btn.textContent = active ? 'Restore album order' : 'Sort Top 10';
+}
 
-  function safeName(s){return (s||"").replace(/[\\/:*?"<>|]+/g,"").trim().replace(/\s+/g," ");}
+/* ===== Helpers ===== */
+function durationToSeconds(d){ if(!d) return 0; const m=d.match(/^(\d{1,2}):(\d{2})$/); if(!m) return 0; return parseInt(m[1],10)*60+parseInt(m[2],10); }
+function secondsToMinutesText(s){ const m=Math.round(s/60); return m? m+' min':'—'; }
+function colorFor(score){ if(!Number.isFinite(score)) return NEUTRAL; const k=Math.max(5,Math.min(10,Math.floor(Number(score)||0))); return COLORS[k]; }
+function avgScore(tracks){ const v=(tracks||[]).map(t=>t.score).filter(Number.isFinite); return v.length?(v.reduce((a,b)=>a+b,0)/v.length):NaN; }
+function safeName(s){ return (s||'').replace(/[\\/:*?"<>|]+/g,'').trim().replace(/\s+/g,' '); }
 
-  function getNotesForCurrent(){
+/* ===== Score picker with “-” ===== */
+function rankPicker(initial){
+  const wrap=document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 1fr'; wrap.style.gap='6px';
+  const iSel=document.createElement('select'); let o=document.createElement('option'); o.value=''; o.textContent='-'; iSel.appendChild(o);
+  for(let i=5;i<=10;i++){ o=document.createElement('option'); o.value=i; o.textContent=i; iSel.appendChild(o); }
+  const dSel=document.createElement('select'); dSel.disabled=true;
+  function fillDec(max){ dSel.innerHTML=''; let o2=document.createElement('option'); o2.value='0'; o2.textContent='0.0'; dSel.appendChild(o2); if(max){ for(let t=1;t<=9;t++){ const val=(t/10).toFixed(1); o2=document.createElement('option'); o2.value=val; o2.textContent=val; dSel.appendChild(o2);} } }
+  fillDec(false);
+  function setFromNumber(v){ if(!Number.isFinite(v)){ iSel.value=''; dSel.disabled=true; dSel.value='0'; return; } const b=Math.floor(v); const dec=Math.round((v-b)*10)/10; iSel.value=String(b); dSel.disabled=false; fillDec(b<10); dSel.value=dec.toFixed(1); }
+  function current(){ const ib=iSel.value; if(ib==='') return NaN; const dd=parseFloat(dSel.value||'0'); return parseFloat(ib)+dd; }
+  function trigger(){ wrap.dispatchEvent(new CustomEvent('change-score',{detail:current()})); }
+  iSel.addEventListener('change', ()=>{ if(iSel.value===''){ dSel.disabled=true; dSel.value='0'; } else { dSel.disabled=false; fillDec(Number(iSel.value)<10); } trigger(); });
+  dSel.addEventListener('change', trigger);
+  setFromNumber(initial);
+  wrap.append(iSel,dSel);
+  return {el:wrap,get:current,set:setFromNumber};
+}
+
+/* ===== Row + notes button ===== */
+const NOTES_KEY = "albumrater_v6_notes";
+function getNotesBucketKey(){ const s=getState(); return `${safeName(s.album||'Album')}__${safeName(s.artist||'Artist')}`; }
+function loadAllNotes(){ try{ return JSON.parse(localStorage.getItem(NOTES_KEY)||"{}"); }catch{ return {}; } }
+function saveAllNotes(n){ localStorage.setItem(NOTES_KEY, JSON.stringify(n)); }
+function getNotes(){ const all=loadAllNotes(); return all[getNotesBucketKey()] || { trackNotes:{}, final:"" }; }
+function setNotes(obj){ const all=loadAllNotes(); all[getNotesBucketKey()]=obj; saveAllNotes(all); renderNotesOutput(); }
+
+function makeRow(i,data={}){
+  const row=document.createElement('div'); row.className='row';
+  const n=document.createElement('input'); n.type='number'; n.min=1; n.value=(data.n ?? (i+1));
+  const dur=document.createElement('input'); dur.placeholder='mm:ss'; dur.value=data.dur||'';
+  const name=document.createElement('input'); name.placeholder='Track name'; name.value=data.name||'';
+  const initScore = (typeof data.score==='number' && Number.isFinite(data.score)) ? data.score : NaN;
+  const picker=rankPicker(initScore); const pill=document.createElement('div'); pill.className='pill'; pill.textContent='-'; pill.style.background=NEUTRAL;
+
+  const noteBtn=document.createElement('button');
+  noteBtn.type='button'; noteBtn.className='noteBtn'; noteBtn.title='Add note';
+  noteBtn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33h-.5v-.5l9.06-9.06.5.5L5.92 19.58zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
+
+  row.append(n,dur,name,picker.el,pill,noteBtn);
+
+  function paint(v){ if(!Number.isFinite(v)){ pill.style.background=NEUTRAL; pill.textContent='-'; return; } const c=colorFor(v); pill.style.background=c; pill.textContent=(v||0).toFixed(1).replace(/\.0$/,''); }
+  picker.el.addEventListener('change-score', e=>{ paint(e.detail); render(); });
+  [n,dur,name].forEach(el=> el.addEventListener('input', render));
+  paint(picker.get());
+
+  // note button
+  const bucket=getNotes(); const existing=bucket.trackNotes[i]||"";
+  noteBtn.classList.toggle('active', !!existing);
+  noteBtn.addEventListener('click', ()=>{
+    const prev=(getNotes().trackNotes[i]||"");
+    const text=prompt('Write a note for this track:', prev == null ? "" : String(prev));
+    if(text==null) return;
+    const nb=getNotes(); nb.trackNotes[i]=text.trim(); setNotes(nb);
+    noteBtn.classList.toggle('active', !!nb.trackNotes[i]);
+  });
+
+  row.value=()=>({n:Number(n.value||0), dur:dur.value.trim(), name:name.value.trim(), score:picker.get()});
+  return row;
+}
+
+function ensureRows(n){
+  const el = tracksEl(); const cur=el.children.length;
+  if(cur<n){for(let i=cur;i<n;i++) el.appendChild(makeRow(i));}
+  else if(cur>n){for(let i=cur-1;i>=n;i--) el.removeChild(el.children[i]);}
+  render();
+}
+
+/* ===== State ===== */
+const KEY='albumrater_v6_state';
+function getState(){
+  const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(t=>t.name||t.dur||Number.isFinite(t.score));
+  return { album:$('#album').value.trim(), artist:$('#artist').value.trim(), released:$('#released').value.trim(), rankedby:$('#rankedby').value.trim(), cover:$('#coverOut').src||'', tracks };
+}
+function setState(s){
+  $('#album').value=s.album||''; $('#artist').value=s.artist||''; $('#released').value=s.released||''; $('#rankedby').value=s.rankedby||'';
+  if(s.cover) $('#coverOut').src=s.cover;
+  const el = tracksEl(); el.innerHTML=''; (s.tracks||[]).forEach((t,i)=> el.appendChild(makeRow(i,{n:t.n,dur:t.dur,name:t.name,score:(typeof t.score==='number'?t.score:NaN)})));
+  if(!(s.tracks||[]).length) ensureRows(7);
+  // reset sort toggle
+  SORT_STATE.active=false; SORT_STATE.snapshot=null; setSortButton(false);
+  render();
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(getState())); }catch(e){} }
+function load(){
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(raw){ setState(JSON.parse(raw)); return; }
+  }catch(e){}
+  ensureRows(7); render();
+}
+
+/* ===== Render + chart ===== */
+function render(){
+  const info=document.getElementById('info'); if(!info) return; info.innerHTML='';
+  const pair=(L,V)=>{const l=document.createElement('div'); l.className='label'; l.textContent=L; const v=document.createElement('div'); v.innerHTML=V; info.append(l,v);};
+  const album=$('#album').value.trim(), artist=$('#artist').value.trim(), released=$('#released').value.trim(), rankedby=$('#rankedby').value.trim();
+  pair('Album:','<strong><em>'+(album||'—')+'</em></strong>'); pair('Artist:','<strong>'+(artist||'—')+'</strong>'); pair('Release Date:',released||'—'); if(rankedby) pair('Ranked by:', rankedby);
+
+  const el = tracksEl(); const tracks=[...el.children].map(r=>r.value()).filter(tr=>tr.name||tr.dur||Number.isFinite(tr.score)).sort((a,b)=>a.n-b.n);
+  const table=document.getElementById('table'); table.innerHTML=''; const thead=document.createElement('thead'); thead.innerHTML='<tr><th style="width:80px">Duration</th><th style="width:36px">#</th><th>Name</th><th style="width:90px">Score</th></tr>'; table.appendChild(thead);
+  const tbody=document.createElement('tbody'); table.appendChild(tbody);
+  let totalSec=0, scores=[]; tracks.forEach(tr=>{ totalSec+=durationToSeconds(tr.dur); if(Number.isFinite(tr.score) && tr.score>=5&&tr.score<=10) scores.push(tr.score);
+    const badge = Number.isFinite(tr.score) ? ('<span class="pill" style="background:'+colorFor(tr.score)+'">'+tr.score.toFixed(1).replace(/\.0$/,'')+'</span>') : ('<span class="pill" style="background:'+NEUTRAL+'">-</span>');
+    const el=document.createElement('tr'); el.innerHTML='<td>'+(tr.dur||'—')+'</td><td>'+(tr.n||'')+'</td><td>'+(tr.name||'—')+'</td><td>'+badge+'</td>'; tbody.appendChild(el); });
+  const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length):NaN; document.getElementById('finalScore').textContent=Number.isFinite(avg)?avg.toFixed(1):'—';
+  pair('Duration', secondsToMinutesText(totalSec));
+  const series = tracks.map(tr=>tr.score).filter(v=>Number.isFinite(v));
+  drawChart('chart', series);
+  renderNotesOutput();
+  save();
+}
+function drawChart(id,values){
+  const canvas=document.getElementById(id); if(!canvas) return; const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
+  const P={l:60,r:20,t:20,b:36}, W=canvas.width-P.l-P.r, H=canvas.height-P.t-P.b;
+  ctx.strokeStyle='#2a3140'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(P.l,P.t); ctx.lineTo(P.l,P.t+H); ctx.lineTo(P.l+W,P.t+H); ctx.stroke();
+  ctx.fillStyle='#aeb5c0'; ctx.font='12px system-ui';
+  for(let y=5;y<=10;y++){ const yy=P.t+H-((y-5)/5)*H; ctx.strokeStyle='#1a2130'; ctx.beginPath(); ctx.moveTo(P.l,yy); ctx.lineTo(P.l+W,yy); ctx.stroke(); ctx.fillText(String(y),18,yy+4); }
+  if(!values.length) return; const n=values.length, x=i=>P.l+(i/(Math.max(1,n-1)))*W, y=v=>P.t+H-((v-5)/5)*H;
+  ctx.strokeStyle='rgba(122,162,255,0.95)'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(x(0),y(values[0])); for(let i=1;i<n;i++) ctx.lineTo(x(i), y(values[i])); ctx.stroke();
+  ctx.fillStyle='#cfd9ff'; for(let i=0;i<n;i++){ ctx.beginPath(); ctx.arc(x(i), y(values[i]), 5, 0, 2*Math.PI); ctx.fill(); }
+  ctx.fillStyle='#aeb5c0'; for(let i=0;i<n;i++){ ctx.fillText(String(i+1), x(i)-3, P.t+H+16); }
+}
+
+/* ===== Notes output ===== */
+function renderNotesOutput(){
+  const out = $('#notesOutput'); if(!out) return;
+  const s = getState(); const notes = getNotes();
+  const lines=[]; const tracks=s.tracks||[];
+  tracks.forEach((t,i)=>{ const note=notes.trackNotes[i]; if(note && note.trim()){ const name=t?.name||`Track ${i+1}`; lines.push(`${i+1}. ${name}: ${note.trim()}`);} });
+  const albumTitle = s.album ? `${s.album} by ${s.artist||""}`.trim() : "";
+  const header = albumTitle ? albumTitle+"\n" : "";
+  const final = notes.final||"";
+  const finalBlock = final.trim()? `\nFinal Album Thoughts: ${final.trim()}` : "";
+  out.textContent = header + lines.join("\n") + finalBlock;
+}
+$('#finalNotes')?.addEventListener('input', ()=>{
+  const n=getNotes(); n.final=$('#finalNotes').value||""; setNotes(n);
+});
+
+/* ===== Autofill (MB + iTunes cover fallback-lite) ===== */
+let lastFetchTs=0;
+async function safeFetch(url,opts={}){ const now=Date.now(); const wait=Math.max(0,800-(now-lastFetchTs)); if(wait) await new Promise(r=>setTimeout(r,wait)); lastFetchTs=Date.now(); return fetch(url,opts); }
+function mmss(ms){ if(!Number.isFinite(ms)||ms<=0) return ''; const s=Math.floor(ms/1000); const m=Math.floor(s/60); const r=s%60; return `${m}:${String(r).padStart(2,'0')}`; }
+
+async function searchReleasesMB(artist, album){
+  const queryStr=encodeURIComponent(`release:${album} AND artist:${artist}`);
+  const url=`https://musicbrainz.org/ws/2/release/?query=${queryStr}&fmt=json&limit=7`;
+  const res=await safeFetch(url); if(!res.ok) throw new Error('MB search failed');
+  const data=await res.json();
+  return (data.releases||[]).map(r=>({ id:r.id,title:r.title||'',score:r.score||0,country:r.country||'',date:r.date||'',trackCount:r['track-count']||'', artistCredit:(r['artist-credit']||[]).map(a=>a.name).join(', ') })).sort((a,b)=>b.score-a.score);
+}
+async function fetchReleaseMB(id){
+  const url=`https://musicbrainz.org/ws/2/release/${id}?fmt=json&inc=recordings+media`;
+  const res=await safeFetch(url); if(!res.ok) throw new Error('MB release failed');
+  const data=await res.json();
+  const tracks=[]; (data.media||[]).forEach(m=> (m.tracks||[]).forEach(t=> tracks.push({title:t.title, duration:t.length? mmss(t.length): ''})));
+  const totalMs=(data.media||[]).reduce((acc,m)=> acc+(m.tracks||[]).reduce((a,t)=> a+(t.length||0),0),0);
+  return { title:data.title||'', artist:(data['artist-credit']||[]).map(a=>a.name).join(', '), year:(data.date||'').slice(0,4), trackCount:tracks.length, tracks, totalTime: totalMs? mmss(totalMs): '' , id:data.id };
+}
+async function fetchCoverMB(releaseId){
+  const meta=await safeFetch(`https://coverartarchive.org/release/${releaseId}`); if(!meta.ok) return null;
+  const json=await meta.json().catch(()=>null);
+  const big=json?.images?.find(i=>i.thumbnails?.large)||json?.images?.[0];
+  return big?.image || big?.thumbnails?.large || null;
+}
+function fillDOM(payload){
+  if(payload.title) $('#album').value=payload.title;
+  if(payload.artist) $('#artist').value=payload.artist;
+  if(payload.year) $('#released').value=payload.year;
+  if(payload.trackCount) $('#trackcount').value=String(payload.trackCount);
+  if(payload.coverUrl) $('#coverOut').src=payload.coverUrl;
+}
+async function runAutofill(){
+  const artist=$('#artist').value.trim(); const album=$('#album').value.trim();
+  if(!artist||!album){ alert('Type artist and album first.'); return; }
+  try{
+    const cands=await searchReleasesMB(artist, album);
+    if(!cands.length) throw new Error('no results');
+    // take best match (first)
+    const pick=cands[0];
+    const base=await fetchReleaseMB(pick.id);
+    const coverUrl=await fetchCoverMB(pick.id);
+    const payload={ title: base.title, artist: base.artist, year: base.year, trackCount: base.trackCount, totalTime: base.totalTime, coverUrl, tracks: base.tracks };
+    fillDOM(payload);
+    window.dispatchEvent(new CustomEvent('album-autofilled',{detail:payload}));
+  }catch(e){
+    alert('No automatic results. Fill manually.');
+  }
+}
+document.getElementById('btnBuscarAlbum').addEventListener('click', runAutofill);
+
+/* ===== Wire core controls ===== */
+document.getElementById('addRow').addEventListener('click', ()=> ensureRows(tracksEl().children.length+1));
+document.getElementById('delRow').addEventListener('click', ()=> ensureRows(Math.max(1, tracksEl().children.length-1)));
+document.getElementById('applyCount').addEventListener('click', ()=> ensureRows(parseInt(document.getElementById('trackcount').value||'1',10)));
+document.getElementById('cover').addEventListener('change',ev=>{const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{$('#coverOut').src=e.target.result; save();}; r.readAsDataURL(f);});
+document.getElementById('clearScores').addEventListener('click', ()=>{ const s=getState(); s.tracks=(s.tracks||[]).map(t=>({...t,score:NaN})); setState(s); save(); });
+
+/* ===== Sort Top 10 toggle (with restore) ===== */
+document.getElementById('sortTop10').addEventListener('click', ()=>{
+  const el=tracksEl();
+  if(!SORT_STATE.active){
+    SORT_STATE.snapshot=[...el.children].map(r=>r.value());
+    const arr=SORT_STATE.snapshot.map(x=>({...x}));
+    const scored=arr.filter(t=>Number.isFinite(t.score));
+    const un=arr.filter(t=>!Number.isFinite(t.score));
+    scored.sort((a,b)=>b.score-a.score);
+    const top=scored.slice(0,10); const rest=scored.slice(10).concat(un);
+    const merged=top.concat(rest).map((t,i)=>({...t,n:i+1}));
+    el.innerHTML=''; merged.forEach((t,i)=> el.appendChild(makeRow(i,t)));
+    SORT_STATE.active=true; setSortButton(true); render(); return;
+  }
+  if(SORT_STATE.snapshot){
+    const original=SORT_STATE.snapshot.map(x=>({...x}));
+    el.innerHTML=''; original.forEach((t,i)=> el.appendChild(makeRow(i,t)));
+  }
+  SORT_STATE.active=false; SORT_STATE.snapshot=null; setSortButton(false); render();
+});
+setSortButton(SORT_STATE.active);
+
+/* ===== Export / Import / Clear ===== */
+document.getElementById('exportJSON').addEventListener('click', ()=>{
+  try{
+    const s=getState(), notes=getNotes(), payload={...s, notes};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const album=safeName(s.album||'Album'), artist=safeName(s.artist||'');
+    const fname= artist ? `${album} - ${artist}.json` : `${album}.json`;
+    const a=document.createElement('a'); a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);
+  }catch(e){ alert('Could not export.'); }
+});
+document.getElementById('importJSON').addEventListener('change', ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
     try{
-      const all = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}");
-      const s = window.AlbumApp.getState();
-      const key = `${safeName(s.album||"Album")}__${safeName(s.artist||"Artist")}`;
-      return all[key] || { trackNotes:{}, final:"" };
-    }catch{ return { trackNotes:{}, final:"" }; }
-  }
+      const obj=JSON.parse(e.target.result);
+      setState(obj); save();
+      if(obj && obj.notes){ setNotes({ trackNotes: obj.notes.trackNotes||{}, final: obj.notes.final||"" }); const ta=$('#finalNotes'); if(ta) ta.value=obj.notes.final||""; }
+      alert('Imported.');
+    }catch{ alert('Invalid file.'); }
+  };
+  r.readAsText(f); ev.target.value='';
+});
+document.getElementById('clearAll').addEventListener('click', ()=>{
+  if(!confirm('Are you sure you want to clear all fields?')) return;
+  localStorage.removeItem(KEY);
+  setState({ album:'', artist:'', released:'', rankedby:'', cover:'', tracks:[] });
+});
 
-  function computeAvgScore(tracks){
-    const vals = (tracks||[]).map(t=>t.score).filter(v=>Number.isFinite(v));
-    if(!vals.length) return null;
-    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
-    return Math.round(avg*10)/10;
-  }
-
-  async function ensureSignedIn(){
-    const { data: { user } } = await supa.auth.getUser();
-    if(user) return user;
-    const email = prompt("Enter your email to sign in (magic link)");
-    if(!email) throw new Error("Email required");
-    const redirectTo = location.origin + location.pathname; // tu GitHub Pages URL actual
-    const { error } = await supa.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo }});
-    if(error) throw error;
-    alert("We sent you a magic link. Open it to finish sign-in, then come back here.");
-    throw new Error("Pending email verification");
-  }
-
-  function setAuthUI(user){
-    const authStatus = $("#authStatus");
-    const btnIn = $("#btnSignIn");
-    const btnOut = $("#btnSignOut");
-    if(user){
-      authStatus.textContent = user.email || "Signed in";
-      btnIn.style.display = "none";
-      btnOut.style.display = "inline-block";
-    }else{
-      authStatus.textContent = "Not signed in";
-      btnIn.style.display = "inline-block";
-      btnOut.style.display = "none";
-    }
-  }
-
-  async function refreshAuthUI(){
-    const { data: { user } } = await supa.auth.getUser();
-    setAuthUI(user);
-  }
-
-  async function uploadCoverIfNeeded(userId, coverSrc, album, artist){
-    if(!coverSrc) return null;
-    if(!coverSrc.startsWith("data:")) return coverSrc; // URL ya pública
-
-    // subir a storage público
-    const path = `${userId}/${Date.now()}_${safeName(album||"")}-${safeName(artist||"")}.png`;
-    const base64 = coverSrc.split(",")[1];
-    const blob = await (await fetch(coverSrc)).blob(); // convierte dataURL a blob
-
-    const { error: upErr } = await supa.storage.from("covers").upload(path, blob, {
-      contentType: blob.type || "image/png",
-      upsert: false
+/* ===== Library (Supabase) ===== */
+async function currentUser(){
+  const { data } = await supabase.auth.getUser();
+  return data.user || null;
+}
+function requireAuthHint(){
+  alert('Please sign in first (GitHub).'); 
+}
+async function saveToLibrary(){
+  const user=await currentUser(); if(!user) return requireAuthHint();
+  const s=getState();
+  const average = avgScore(s.tracks);
+  const row={
+    user_id: user.id,
+    album: s.album||'',
+    artist: s.artist||'',
+    released: s.released||'',
+    cover: s.cover||'',
+    avg: Number.isFinite(average) ? average : null,
+    tracks: s.tracks||[],
+  };
+  const { error } = await supabase.from('albums').insert(row);
+  if(error){ console.error(error); alert('Could not save. Check database permissions.'); }
+  else { alert('Saved to library!'); }
+}
+async function openLibrary(){
+  const user=await currentUser(); if(!user) return requireAuthHint();
+  $('#libModal').style.display='flex';
+  await loadLibrary('desc');
+}
+async function loadLibrary(order='desc'){
+  const user=await currentUser(); if(!user) return;
+  let query=supabase.from('albums').select('*').eq('user_id', user.id);
+  if(order==='desc') query=query.order('avg', { ascending:false, nullsFirst:false }).order('created_at',{ascending:false});
+  if(order==='asc')  query=query.order('avg', { ascending:true, nullsLast:true }).order('created_at',{ascending:false});
+  if(order==='new')  query=query.order('created_at',{ascending:false});
+  if(order==='old')  query=query.order('created_at',{ascending:true});
+  const { data, error } = await query.limit(200);
+  if(error){ console.error(error); alert('Could not load library.'); return; }
+  const grid=$('#libGrid'); grid.innerHTML='';
+  (data||[]).forEach(row=>{
+    const div=document.createElement('div'); div.className='libItem';
+    const img=document.createElement('img'); img.className='libCover'; img.src=row.cover||''; img.alt='';
+    const meta=document.createElement('div');
+    const title=document.createElement('div'); title.className='libTitle'; title.textContent=row.album||'—';
+    const sub=document.createElement('div'); sub.className='libMeta'; sub.textContent=(row.artist||'') + (row.released? ` · ${row.released}`:'');
+    meta.append(title, sub);
+    const score=document.createElement('div'); score.className='libScore'; score.textContent= row.avg!=null ? (Math.round(row.avg*10)/10).toFixed(1) : '—';
+    div.append(img,meta,score);
+    div.addEventListener('click', ()=>{
+      const state={ album:row.album, artist:row.artist, released:row.released, rankedby:$('#rankedby').value||'', cover:row.cover, tracks:row.tracks||[] };
+      setState(state); save(); $('#libModal').style.display='none';
     });
-    if(upErr){ console.warn(upErr); return null; }
+    grid.appendChild(div);
+  });
+}
+document.getElementById('btnSaveLib').addEventListener('click', saveToLibrary);
+document.getElementById('btnShowLib').addEventListener('click', openLibrary);
+document.getElementById('libClose').addEventListener('click', ()=> $('#libModal').style.display='none');
+document.getElementById('libSort').addEventListener('change', (e)=> loadLibrary(e.target.value));
 
-    const { data } = supa.storage.from("covers").getPublicUrl(path);
-    return data?.publicUrl || null;
-  }
+/* ===== Auth UI ===== */
+async function refreshAuthUI(){
+  const user=await currentUser();
+  $('#btnLogin').style.display = user ? 'none' : 'inline-block';
+  $('#btnLogout').style.display = user ? 'inline-block' : 'none';
+}
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: location.href }});
+  if(error) alert('Sign-in failed.');
+});
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  await supabase.auth.signOut(); await refreshAuthUI();
+});
+supabase.auth.onAuthStateChange((_event, _session)=>{ refreshAuthUI(); });
 
-  async function saveToLibrary(){
-    try{
-      const user = await ensureSignedIn();
-      const s = window.AlbumApp.getState();
-      const notes = getNotesForCurrent();
-      const avg = computeAvgScore(s.tracks);
+/* ===== Boot ===== */
+function boot(){
+  // base wiring
+  load();
 
-      const coverUrl = await uploadCoverIfNeeded(user.id, s.cover, s.album, s.artist) || s.cover || null;
-
-      const payload = {
-        user_id: user.id,
-        album: s.album || "",
-        artist: s.artist || "",
-        released: s.released || "",
-        rankedby: s.rankedby || "",
-        cover_url: coverUrl,
-        avg_score: avg,
-        tracks: s.tracks || [],
-        notes: notes
-      };
-
-      const { error } = await supa.from("albums").insert(payload);
-      if(error) throw error;
-      alert("Saved to your library ✅");
-      if($("#libModal").style.display === "flex") await loadLibrary(); // si está abierto, refrescar
-    }catch(e){
-      console.error(e);
-      alert("Could not save. " + (e?.message || ""));
-    }
-  }
-
-  function cardHTML(row){
-    const img = row.cover_url || "";
-    const title = row.album || "—";
-    const artist = row.artist || "—";
-    const avg = (row.avg_score==null) ? "—" : Number(row.avg_score).toFixed(1);
-    return `
-      <div class="libCard">
-        <img src="${img}" alt="">
-        <div>
-          <div class="libTitle">${title}</div>
-          <div class="libMeta">${artist}</div>
-          <div class="libRow" style="margin-top:6px">
-            <span class="libMeta">Avg: <strong>${avg}</strong></span>
-          </div>
-          <div class="libRow" style="margin-top:8px">
-            <button class="libBtn libOpen" data-id="${row.id}">Open</button>
-            <button class="libBtn libDelete" data-id="${row.id}">Delete</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  async function loadLibrary(){
-    const { data: { user } } = await supa.auth.getUser();
-    if(!user){ alert("Sign in to view your library."); return; }
-    const sort = $("#libSort").value;
-
-    let query = supa.from("albums").select("*").eq("user_id", user.id);
-    if(sort === "top") query = query.order("avg_score", { ascending:false, nullsFirst:false });
-    if(sort === "low") query = query.order("avg_score", { ascending:true, nullsFirst:true });
-    if(sort === "new") query = query.order("created_at", { ascending:false });
-    if(sort === "az")  query = query.order("album", { ascending:true });
-
-    const { data, error } = await query;
-    if(error){ console.error(error); alert("Could not load library."); return; }
-
-    const grid = $("#libGrid");
-    grid.innerHTML = (data||[]).map(cardHTML).join("") || `<div style="padding:14px">No albums yet.</div>`;
-
-    // bind botones de cada card
-    grid.querySelectorAll(".libOpen").forEach(btn=>{
-      btn.addEventListener("click", async ()=>{
-        const id = btn.getAttribute("data-id");
-        const { data:rows } = await supa.from("albums").select("*").eq("id", id).limit(1);
-        const row = rows?.[0];
-        if(!row) return;
-        // cargar en la UI actual
-        window.AlbumApp.setState({
-          lang: localStorage.getItem("albumrater_lang") || "en",
-          album: row.album, artist: row.artist, released: row.released,
-          rankedby: row.rankedby, cover: row.cover_url, tracks: row.tracks||[]
-        });
-        // restaurar notas en local para que aparezcan en Notes & Review
-        try{
-          const all = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}");
-          const key = `${safeName(row.album||"Album")}__${safeName(row.artist||"Artist")}`;
-          all[key] = row.notes || { trackNotes:{}, final:"" };
-          localStorage.setItem(NOTES_KEY, JSON.stringify(all));
-          window.dispatchEvent(new Event("album-autofilled")); // reutiliza hooks para repintar notas
-        }catch{}
-        // cerrar modal
-        $("#libModal").style.display = "none";
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
+  // autofill filled callback: write rows + reset sort
+  window.addEventListener('album-autofilled',(e)=>{
+    const d=e.detail||{}; const list=d.tracks||[];
+    document.getElementById('trackcount').value = list.length || document.getElementById('trackcount').value;
+    ensureRows(list.length || document.getElementById('tracks').children.length);
+    [...document.getElementById('tracks').children].forEach((row,i)=>{
+      const inputs=row.querySelectorAll('input'); const t=list[i]||{};
+      if(inputs[1]) inputs[1].value=t.duration||''; if(inputs[2]) inputs[2].value=t.title||'';
     });
+    if(d.year) document.getElementById('released').value=d.year;
+    SORT_STATE.active=false; SORT_STATE.snapshot=null; setSortButton(false);
+    render();
+  });
 
-    grid.querySelectorAll(".libDelete").forEach(btn=>{
-      btn.addEventListener("click", async ()=>{
-        if(!confirm("Delete this album from your library?")) return;
-        const id = btn.getAttribute("data-id");
-        const { error } = await supa.from("albums").delete().eq("id", id);
-        if(error){ alert("Could not delete."); return; }
-        await loadLibrary();
-      });
-    });
-  }
-
-  // UI bindings (auth + cloud actions)
-  (function bindCloudUI(){
-    $("#btnSignIn").addEventListener("click", async ()=>{
-      try{
-        await ensureSignedIn();
-        await refreshAuthUI();
-        alert("Signed in.");
-      }catch(e){ console.warn(e.message||e); }
-    });
-    $("#btnSignOut").addEventListener("click", async ()=>{
-      await supa.auth.signOut();
-      await refreshAuthUI();
-      alert("Signed out.");
-    });
-    $("#btnSaveCloud").addEventListener("click", saveToLibrary);
-    $("#btnOpenLibrary").addEventListener("click", async ()=>{
-      try{
-        const user = await ensureSignedIn();
-        if(user){
-          $("#libModal").style.display = "flex";
-          await loadLibrary();
-        }
-      }catch(e){ console.warn(e.message||e); }
-    });
-    $("#libClose").addEventListener("click", ()=> $("#libModal").style.display = "none");
-    $("#libSort").addEventListener("change", loadLibrary);
-
-    // auth listener
-    supa.auth.onAuthStateChange((_event, _session)=> refreshAuthUI());
-    // primera pintura
-    refreshAuthUI();
-  })();
+  refreshAuthUI();
+}
+boot();
 </script>
 </body>
 </html>
