@@ -3,22 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="manifest.webmanifest?v=6.6">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=6.6">
-<link rel="icon" href="favicon.png?v=6.6">
+<link rel="manifest" href="manifest.webmanifest?v=7.0">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7.0">
+<link rel="icon" href="favicon.png?v=7.0">
 <meta name="theme-color" content="#0f1115">
 <title>Album Rater</title>
 <style>
-:root{
-  --c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;
-  --bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140
-}
+:root{--c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;--bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140}
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:0}
 .wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
 h1{font-size:20px;margin:0 0 6px}
 .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
-.toolbar, .lib-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .select,input,select,button{background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px}
 button{cursor:pointer;font-weight:600}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
@@ -42,38 +39,36 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#c9d3e3}
 .badge-dot{width:8px;height:8px;border-radius:999px;background:var(--neutral);display:inline-block}
 
-/* Tabs */
-.tabs{display:flex;gap:6px;margin-bottom:10px}
-.tab{background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer}
-.tab.active{outline:2px solid #3b82f6}
-
-/* Library */
-#libraryView{display:none}
-.lib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media (max-width:1000px){.lib-grid{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:700px){.lib-grid{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:480px){.lib-grid{grid-template-columns:1fr}}
-.lib-card{background:#0e1218;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.lib-card img{width:100%;aspect-ratio:1/1;object-fit:cover;border-bottom:1px solid var(--line)}
-.lib-card .meta{padding:10px}
-.lib-title{font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lib-artist{font-size:12px;color:#aeb5c0;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lib-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c9d3e3}
-.lib-actions{display:flex;gap:8px;margin-top:10px}
-.small{font-size:12px}
+/* Library modal */
+#libraryModal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9999}
+#libraryPanel{width:min(980px,95vw);max-height:85vh;overflow:auto;background:#111;border:1px solid #222;border-radius:12px}
+#libraryPanel header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #222}
+#libGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;padding:12px}
+.libCard{background:#0e1218;border:1px solid #1f2633;border-radius:10px;padding:10px;display:grid;gap:8px}
+.libCard img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;border:1px solid #1f2633;background:#0d1117}
+.libTitle{font-weight:700}
+.libMeta{color:#aeb5c0;font-size:12px}
+.libRow{display:flex;gap:10px;align-items:center}
+.libBtn{background:#1b2330;border:1px solid #2b3444;color:#e9edf1;padding:6px 10px;border-radius:8px;cursor:pointer}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="toolbar">
     <h1 style="margin-right:auto">Album Rater</h1>
-    <div class="tabs">
-      <button id="tabEditor" class="tab active">Editor</button>
-      <button id="tabLibrary" class="tab">My Library</button>
-    </div>
+
+    <!-- Auth -->
+    <span id="authStatus" style="font-size:12px;color:#aeb5c0;display:none"></span>
+    <button id="btnSignIn">Sign in</button>
+    <button id="btnSignOut" style="display:none">Sign out</button>
+
+    <!-- Cloud actions -->
+    <button id="btnSaveCloud" title="Save current album to your library">Save to Library</button>
+    <button id="btnOpenLibrary" title="Open your library">My Library</button>
+
+    <!-- Existing local actions -->
     <select id="lang" class="select">
-      <option value="en">English</option>
-      <option value="es">Español</option>
+      <option value="en">English</option><option value="es">Español</option>
     </select>
     <button id="exportJSON">Export Data</button>
     <label style="position:relative">
@@ -82,112 +77,109 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
     </label>
     <button id="clearAll">Clear All Data</button>
     <button id="sortTop10">Sort Top 10</button>
-    <button id="saveToLib">Save to Library</button>
   </div>
   <div class="sub" id="subtitle"></div>
 
-  <!-- EDITOR VIEW -->
-  <div id="editorView">
-    <div class="grid">
-      <div class="card pad">
-        <div class="pair">
-          <div class="label" data-i18n="album">Album</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="album" placeholder="Album name">
-            <button id="btnBuscarAlbum" type="button">Buscar info</button>
-          </div>
+  <div class="grid">
+    <div class="card pad">
+      <div class="pair">
+        <div class="label" data-i18n="album">Album</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="album" placeholder="Album name">
+          <button id="btnBuscarAlbum" type="button">Buscar info</button>
         </div>
-        <div class="pair"><div class="label" data-i18n="artist">Artist</div><input id="artist" placeholder="Artist"></div>
-        <div class="pair"><div class="label" data-i18n="released">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
-        <div class="pair"><div class="label" data-i18n="rankedby">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
-        <div class="pair"><div class="label" data-i18n="cover">Cover</div><input id="cover" type="file" accept="image/*"></div>
-        <div class="pair"><div class="label" data-i18n="trackcount">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
+      </div>
+      <div class="pair"><div class="label" data-i18n="artist">Artist</div><input id="artist" placeholder="Artist"></div>
+      <div class="pair"><div class="label" data-i18n="released">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
+      <div class="pair"><div class="label" data-i18n="rankedby">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
+      <div class="pair"><div class="label" data-i18n="cover">Cover</div><input id="cover" type="file" accept="image/*"></div>
+      <div class="pair"><div class="label" data-i18n="trackcount">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
 
-        <div class="controls">
-          <button id="applyCount">Apply Track Count</button>
-          <button id="addRow">+ Add Row</button>
-          <button id="delRow">– Remove Last</button>
-          <button id="clearScores">Clear Score</button>
-          <span class="badge" title="Unscored tracks are '-'">
-            <span class="badge-dot"></span>
-            Unscored = '-'
-          </span>
-        </div>
-
-        <div class="row" style="font-size:12px;color:#aeb5c0">
-          <div data-i18n="num">#</div>
-          <div data-i18n="duration">Duration</div>
-          <div data-i18n="name">Name</div>
-          <div data-i18n="score">Score (int + decimal)</div>
-          <div data-i18n="color">Color</div>
-        </div>
-        <div id="tracks"></div>
+      <div class="controls">
+        <button id="applyCount">Apply Track Count</button>
+        <button id="addRow">+ Add Row</button>
+        <button id="delRow">– Remove Last</button>
+        <button id="clearScores">Clear Score</button>
+        <span class="badge" title="Unscored tracks are '-'"><span class="badge-dot"></span>Unscored = '-'</span>
       </div>
 
-      <div class="card pad">
-        <div style="display:grid;grid-template-columns:1fr 360px;gap:16px">
-          <div>
-            <div id="info" style="display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:center"></div>
-            <table id="table"></table>
-          </div>
-          <div>
-            <img id="coverOut" class="cover" alt="Cover">
-            <div class="final" id="finalScore">—</div>
-          </div>
-        </div>
-
-        <div style="margin-top:12px">
-          <div style="font-size:12px;color:#aeb5c0;margin:6px 0">Enjoyment Timeline</div>
-          <canvas id="chart" width="900" height="360"></canvas>
-        </div>
-
-        <!-- Notes & Review -->
-        <div id="notesSection" class="card pad" style="margin-top:12px">
-          <div style="font-size:12px;color:#aeb5c0;margin-bottom:6px">Notes & Review</div>
-          <div id="notesOutput" style="white-space:pre-wrap; line-height:1.5; font-size:14px"></div>
-          <div style="margin-top:10px">
-            <div class="label">Final Album Thoughts</div>
-            <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px"></textarea>
-          </div>
-        </div>
-
-        <div class="footer">Created by Ok Pretty Boy with help from ChatGPT</div>
+      <div class="row" style="font-size:12px;color:#aeb5c0">
+        <div data-i18n="num">#</div>
+        <div data-i18n="duration">Duration</div>
+        <div data-i18n="name">Name</div>
+        <div data-i18n="score">Score (int + decimal)</div>
+        <div data-i18n="color">Color</div>
       </div>
+      <div id="tracks"></div>
+    </div>
+
+    <div class="card pad">
+      <div style="display:grid;grid-template-columns:1fr 360px;gap:16px">
+        <div>
+          <div id="info" style="display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:center"></div>
+          <table id="table"></table>
+        </div>
+        <div>
+          <img id="coverOut" class="cover" alt="Cover">
+          <div class="final" id="finalScore">—</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-size:12px;color:#aeb5c0;margin:6px 0">Enjoyment Timeline</div>
+        <canvas id="chart" width="900" height="360"></canvas>
+      </div>
+
+      <!-- Notes & Review -->
+      <div id="notesSection" class="card pad" style="margin-top:12px">
+        <div style="font-size:12px;color:#aeb5c0;margin-bottom:6px">Notes & Review</div>
+        <div id="notesOutput" style="white-space:pre-wrap; line-height:1.5; font-size:14px"></div>
+        <div style="margin-top:10px">
+          <div class="label">Final Album Thoughts</div>
+          <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:#ink;padding:10px;border-radius:10px"></textarea>
+        </div>
+      </div>
+
+      <div class="footer">Created by Ok Pretty Boy with help from ChatGPT</div>
     </div>
   </div>
-
-  <!-- LIBRARY VIEW -->
-  <div id="libraryView">
-    <div class="card pad" style="margin-bottom:12px">
-      <div class="lib-toolbar">
-        <input id="libSearch" placeholder="Search albums or artists" style="min-width:220px">
-        <select id="libSort">
-          <option value="avgDesc">Avg score (high → low)</option>
-          <option value="avgAsc">Avg score (low → high)</option>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="az">A → Z</option>
-          <option value="za">Z → A</option>
-        </select>
-        <input id="libMin" type="number" min="0" max="10" step="0.1" placeholder="Min avg">
-        <input id="libMax" type="number" min="0" max="10" step="0.1" placeholder="Max avg">
-        <button id="libApply">Apply</button>
-        <button id="libExport">Export Library</button>
-        <label class="small" style="position:relative">
-          <span class="small" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;display:inline-block">Import Library</span>
-          <input id="libImport" type="file" accept="application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer">
-        </label>
-      </div>
-      <div id="libCount" class="small" style="color:#aeb5c0;margin-bottom:8px"></div>
-      <div id="libGrid" class="lib-grid"></div>
-    </div>
-  </div>
-
 </div>
 
-<script defer src="db.v6.6.js?v=6.6"></script>
-<script defer src="autofillAlbum.v6.6.js?v=6.6"></script>
-<script defer src="ui.v6.6.js?v=6.6"></script>
-<script defer src="sw-register.v6.6.js"></script>
+<!-- Library modal -->
+<div id="libraryModal" aria-hidden="true">
+  <div id="libraryPanel">
+    <header>
+      <strong style="letter-spacing:.2px">My Library</strong>
+      <div class="libRow">
+        <select id="libSort" class="select">
+          <option value="new">Newest</option>
+          <option value="score_desc">Top rated</option>
+          <option value="score_asc">Lowest rated</option>
+          <option value="alpha">A–Z</option>
+        </select>
+        <button class="libBtn" id="libClose">Close</button>
+      </div>
+    </header>
+    <div id="libGrid"></div>
+  </div>
+</div>
+
+<!-- Supabase SDK -->
+<script src="https://unpkg.com/@supabase/supabase-js@2.47.10/dist/umd/supabase.js"></script>
+
+<!-- Your public keys (rellena estos dos) -->
+<script>
+  window.SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+  window.SUPABASE_ANON_KEY = "TU-ANON-KEY";
+</script>
+
+<script defer src="supabaseClient.v7.0.js?v=7.0"></script>
+<script defer src="auth.v7.0.js?v=7.0"></script>
+<script defer src="cloud.v7.0.js?v=7.0"></script>
+
+<!-- Re-usa tu autofill existente (puedes mantener v6.5 si ya funciona) -->
+<script defer src="autofillAlbum.v6.5.js?v=7.0"></script>
+<script defer src="ui.v7.0.js?v=7.0"></script>
+<script defer src="sw-register.v6.5.js"></script>
 </body>
 </html>
