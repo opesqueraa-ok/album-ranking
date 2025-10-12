@@ -12,7 +12,7 @@
 :root{--c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;--bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140}
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:0}
-.wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
+.wrap{max-width:1100px;margin:18px auto;padding:0 16px 80px}
 h1{font-size:20px;margin:0 0 6px}
 .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
@@ -40,16 +40,18 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
 .badge-dot{width:8px;height:8px;border-radius:999px;background:var(--neutral);display:inline-block}
 
 /* Library modal */
-#libraryModal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9999}
-#libraryPanel{width:min(980px,95vw);max-height:85vh;overflow:auto;background:#111;border:1px solid #222;border-radius:12px}
-#libraryPanel header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #222}
-#libGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;padding:12px}
-.libCard{background:#0e1218;border:1px solid #1f2633;border-radius:10px;padding:10px;display:grid;gap:8px}
-.libCard img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;border:1px solid #1f2633;background:#0d1117}
+#libModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:9999}
+#libBox{width:min(980px,94vw);max-height:90vh;overflow:auto;background:#0f1115;border:1px solid var(--line);border-radius:14px}
+#libHead{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+#libGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px}
+@media (max-width:900px){#libGrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:600px){#libGrid{grid-template-columns:1fr}}
+.libCard{background:#161a22;border:1px solid #2a3140;border-radius:12px;padding:10px;display:grid;grid-template-columns:84px 1fr;gap:10px;align-items:center}
+.libCard img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#0d1117}
 .libTitle{font-weight:700}
-.libMeta{color:#aeb5c0;font-size:12px}
-.libRow{display:flex;gap:10px;align-items:center}
-.libBtn{background:#1b2330;border:1px solid #2b3444;color:#e9edf1;padding:6px 10px;border-radius:8px;cursor:pointer}
+.libMeta{font-size:12px;color:#aeb5c0}
+.libRow{display:flex;gap:6px;flex-wrap:wrap}
+.libBtn{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#0e1218;color:#e9edf1;cursor:pointer}
 </style>
 </head>
 <body>
@@ -57,18 +59,12 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
   <div class="toolbar">
     <h1 style="margin-right:auto">Album Rater</h1>
 
-    <!-- Auth -->
-    <span id="authStatus" style="font-size:12px;color:#aeb5c0;display:none"></span>
-    <button id="btnSignIn">Sign in</button>
-    <button id="btnSignOut" style="display:none">Sign out</button>
+    <button id="btnSaveCloud" title="Save album to your library (cloud)">Save to Library</button>
+    <button id="btnOpenLibrary" title="Browse your saved albums">My Library</button>
 
-    <!-- Cloud actions -->
-    <button id="btnSaveCloud" title="Save current album to your library">Save to Library</button>
-    <button id="btnOpenLibrary" title="Open your library">My Library</button>
-
-    <!-- Existing local actions -->
     <select id="lang" class="select">
-      <option value="en">English</option><option value="es">Español</option>
+      <option value="en">English</option>
+      <option value="es">Español</option>
     </select>
     <button id="exportJSON">Export Data</button>
     <label style="position:relative">
@@ -77,7 +73,14 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
     </label>
     <button id="clearAll">Clear All Data</button>
     <button id="sortTop10">Sort Top 10</button>
+
+    <span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center">
+      <span id="authStatus" style="font-size:12px;color:#aeb5c0">Not signed in</span>
+      <button id="btnSignIn">Sign in</button>
+      <button id="btnSignOut" style="display:none">Sign out</button>
+    </span>
   </div>
+
   <div class="sub" id="subtitle"></div>
 
   <div class="grid">
@@ -100,7 +103,10 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
         <button id="addRow">+ Add Row</button>
         <button id="delRow">– Remove Last</button>
         <button id="clearScores">Clear Score</button>
-        <span class="badge" title="Unscored tracks are '-'"><span class="badge-dot"></span>Unscored = '-'</span>
+        <span class="badge" title="Unscored tracks are '-'">
+          <span class="badge-dot"></span>
+          Unscored = '-'
+        </span>
       </div>
 
       <div class="row" style="font-size:12px;color:#aeb5c0">
@@ -136,7 +142,7 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
         <div id="notesOutput" style="white-space:pre-wrap; line-height:1.5; font-size:14px"></div>
         <div style="margin-top:10px">
           <div class="label">Final Album Thoughts</div>
-          <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:#ink;padding:10px;border-radius:10px"></textarea>
+          <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px"></textarea>
         </div>
       </div>
 
@@ -145,41 +151,254 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
   </div>
 </div>
 
-<!-- Library modal -->
-<div id="libraryModal" aria-hidden="true">
-  <div id="libraryPanel">
-    <header>
-      <strong style="letter-spacing:.2px">My Library</strong>
-      <div class="libRow">
-        <select id="libSort" class="select">
+<!-- Library Modal -->
+<div id="libModal">
+  <div id="libBox">
+    <div id="libHead">
+      <div style="display:flex;gap:8px;align-items:center">
+        <strong>My Library</strong>
+        <select id="libSort" class="select" style="padding:6px 10px">
+          <option value="top">Top rated</option>
+          <option value="low">Lowest rated</option>
           <option value="new">Newest</option>
-          <option value="score_desc">Top rated</option>
-          <option value="score_asc">Lowest rated</option>
-          <option value="alpha">A–Z</option>
+          <option value="az">A–Z</option>
         </select>
-        <button class="libBtn" id="libClose">Close</button>
       </div>
-    </header>
+      <button id="libClose" class="libBtn">Close</button>
+    </div>
     <div id="libGrid"></div>
   </div>
 </div>
 
-<!-- Supabase SDK -->
-<script src="https://unpkg.com/@supabase/supabase-js@2.47.10/dist/umd/supabase.js"></script>
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Your public keys (rellena estos dos) -->
-<script>
-  window.SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
-  window.SUPABASE_ANON_KEY = "TU-ANON-KEY";
-</script>
-
-<script defer src="supabaseClient.v7.0.js?v=7.0"></script>
-<script defer src="auth.v7.0.js?v=7.0"></script>
-<script defer src="cloud.v7.0.js?v=7.0"></script>
-
-<!-- Re-usa tu autofill existente (puedes mantener v6.5 si ya funciona) -->
+<!-- App scripts (ya existentes en tu repo) -->
 <script defer src="autofillAlbum.v6.5.js?v=7.0"></script>
-<script defer src="ui.v7.0.js?v=7.0"></script>
+<script defer src="ui.v6.5.js?v=7.0"></script>
 <script defer src="sw-register.v6.5.js"></script>
+
+<!-- Supabase wiring -->
+<script>
+  // === CONFIG proporcionada por ti ===
+  window.SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
+  window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
+
+  const supa = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+  const $ = (s) => document.querySelector(s);
+  const NOTES_KEY = "albumrater_v6_notes";
+
+  function safeName(s){return (s||"").replace(/[\\/:*?"<>|]+/g,"").trim().replace(/\s+/g," ");}
+
+  function getNotesForCurrent(){
+    try{
+      const all = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}");
+      const s = window.AlbumApp.getState();
+      const key = `${safeName(s.album||"Album")}__${safeName(s.artist||"Artist")}`;
+      return all[key] || { trackNotes:{}, final:"" };
+    }catch{ return { trackNotes:{}, final:"" }; }
+  }
+
+  function computeAvgScore(tracks){
+    const vals = (tracks||[]).map(t=>t.score).filter(v=>Number.isFinite(v));
+    if(!vals.length) return null;
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    return Math.round(avg*10)/10;
+  }
+
+  async function ensureSignedIn(){
+    const { data: { user } } = await supa.auth.getUser();
+    if(user) return user;
+    const email = prompt("Enter your email to sign in (magic link)");
+    if(!email) throw new Error("Email required");
+    const redirectTo = location.origin + location.pathname; // tu GitHub Pages URL actual
+    const { error } = await supa.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo }});
+    if(error) throw error;
+    alert("We sent you a magic link. Open it to finish sign-in, then come back here.");
+    throw new Error("Pending email verification");
+  }
+
+  function setAuthUI(user){
+    const authStatus = $("#authStatus");
+    const btnIn = $("#btnSignIn");
+    const btnOut = $("#btnSignOut");
+    if(user){
+      authStatus.textContent = user.email || "Signed in";
+      btnIn.style.display = "none";
+      btnOut.style.display = "inline-block";
+    }else{
+      authStatus.textContent = "Not signed in";
+      btnIn.style.display = "inline-block";
+      btnOut.style.display = "none";
+    }
+  }
+
+  async function refreshAuthUI(){
+    const { data: { user } } = await supa.auth.getUser();
+    setAuthUI(user);
+  }
+
+  async function uploadCoverIfNeeded(userId, coverSrc, album, artist){
+    if(!coverSrc) return null;
+    if(!coverSrc.startsWith("data:")) return coverSrc; // URL ya pública
+
+    // subir a storage público
+    const path = `${userId}/${Date.now()}_${safeName(album||"")}-${safeName(artist||"")}.png`;
+    const base64 = coverSrc.split(",")[1];
+    const blob = await (await fetch(coverSrc)).blob(); // convierte dataURL a blob
+
+    const { error: upErr } = await supa.storage.from("covers").upload(path, blob, {
+      contentType: blob.type || "image/png",
+      upsert: false
+    });
+    if(upErr){ console.warn(upErr); return null; }
+
+    const { data } = supa.storage.from("covers").getPublicUrl(path);
+    return data?.publicUrl || null;
+  }
+
+  async function saveToLibrary(){
+    try{
+      const user = await ensureSignedIn();
+      const s = window.AlbumApp.getState();
+      const notes = getNotesForCurrent();
+      const avg = computeAvgScore(s.tracks);
+
+      const coverUrl = await uploadCoverIfNeeded(user.id, s.cover, s.album, s.artist) || s.cover || null;
+
+      const payload = {
+        user_id: user.id,
+        album: s.album || "",
+        artist: s.artist || "",
+        released: s.released || "",
+        rankedby: s.rankedby || "",
+        cover_url: coverUrl,
+        avg_score: avg,
+        tracks: s.tracks || [],
+        notes: notes
+      };
+
+      const { error } = await supa.from("albums").insert(payload);
+      if(error) throw error;
+      alert("Saved to your library ✅");
+      if($("#libModal").style.display === "flex") await loadLibrary(); // si está abierto, refrescar
+    }catch(e){
+      console.error(e);
+      alert("Could not save. " + (e?.message || ""));
+    }
+  }
+
+  function cardHTML(row){
+    const img = row.cover_url || "";
+    const title = row.album || "—";
+    const artist = row.artist || "—";
+    const avg = (row.avg_score==null) ? "—" : Number(row.avg_score).toFixed(1);
+    return `
+      <div class="libCard">
+        <img src="${img}" alt="">
+        <div>
+          <div class="libTitle">${title}</div>
+          <div class="libMeta">${artist}</div>
+          <div class="libRow" style="margin-top:6px">
+            <span class="libMeta">Avg: <strong>${avg}</strong></span>
+          </div>
+          <div class="libRow" style="margin-top:8px">
+            <button class="libBtn libOpen" data-id="${row.id}">Open</button>
+            <button class="libBtn libDelete" data-id="${row.id}">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function loadLibrary(){
+    const { data: { user } } = await supa.auth.getUser();
+    if(!user){ alert("Sign in to view your library."); return; }
+    const sort = $("#libSort").value;
+
+    let query = supa.from("albums").select("*").eq("user_id", user.id);
+    if(sort === "top") query = query.order("avg_score", { ascending:false, nullsFirst:false });
+    if(sort === "low") query = query.order("avg_score", { ascending:true, nullsFirst:true });
+    if(sort === "new") query = query.order("created_at", { ascending:false });
+    if(sort === "az")  query = query.order("album", { ascending:true });
+
+    const { data, error } = await query;
+    if(error){ console.error(error); alert("Could not load library."); return; }
+
+    const grid = $("#libGrid");
+    grid.innerHTML = (data||[]).map(cardHTML).join("") || `<div style="padding:14px">No albums yet.</div>`;
+
+    // bind botones de cada card
+    grid.querySelectorAll(".libOpen").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const id = btn.getAttribute("data-id");
+        const { data:rows } = await supa.from("albums").select("*").eq("id", id).limit(1);
+        const row = rows?.[0];
+        if(!row) return;
+        // cargar en la UI actual
+        window.AlbumApp.setState({
+          lang: localStorage.getItem("albumrater_lang") || "en",
+          album: row.album, artist: row.artist, released: row.released,
+          rankedby: row.rankedby, cover: row.cover_url, tracks: row.tracks||[]
+        });
+        // restaurar notas en local para que aparezcan en Notes & Review
+        try{
+          const all = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}");
+          const key = `${safeName(row.album||"Album")}__${safeName(row.artist||"Artist")}`;
+          all[key] = row.notes || { trackNotes:{}, final:"" };
+          localStorage.setItem(NOTES_KEY, JSON.stringify(all));
+          window.dispatchEvent(new Event("album-autofilled")); // reutiliza hooks para repintar notas
+        }catch{}
+        // cerrar modal
+        $("#libModal").style.display = "none";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    });
+
+    grid.querySelectorAll(".libDelete").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        if(!confirm("Delete this album from your library?")) return;
+        const id = btn.getAttribute("data-id");
+        const { error } = await supa.from("albums").delete().eq("id", id);
+        if(error){ alert("Could not delete."); return; }
+        await loadLibrary();
+      });
+    });
+  }
+
+  // UI bindings (auth + cloud actions)
+  (function bindCloudUI(){
+    $("#btnSignIn").addEventListener("click", async ()=>{
+      try{
+        await ensureSignedIn();
+        await refreshAuthUI();
+        alert("Signed in.");
+      }catch(e){ console.warn(e.message||e); }
+    });
+    $("#btnSignOut").addEventListener("click", async ()=>{
+      await supa.auth.signOut();
+      await refreshAuthUI();
+      alert("Signed out.");
+    });
+    $("#btnSaveCloud").addEventListener("click", saveToLibrary);
+    $("#btnOpenLibrary").addEventListener("click", async ()=>{
+      try{
+        const user = await ensureSignedIn();
+        if(user){
+          $("#libModal").style.display = "flex";
+          await loadLibrary();
+        }
+      }catch(e){ console.warn(e.message||e); }
+    });
+    $("#libClose").addEventListener("click", ()=> $("#libModal").style.display = "none");
+    $("#libSort").addEventListener("change", loadLibrary);
+
+    // auth listener
+    supa.auth.onAuthStateChange((_event, _session)=> refreshAuthUI());
+    // primera pintura
+    refreshAuthUI();
+  })();
+</script>
 </body>
 </html>
