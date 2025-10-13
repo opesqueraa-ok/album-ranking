@@ -1,12 +1,12 @@
-// ui.v7.0.js — v7.0 (Google Auth + Library + Export/Import + Sort/Notes)
-// Requiere que en index.html existan window.SUPABASE_URL y window.SUPABASE_ANON_KEY
-// y que el script UMD de supabase esté cargado (cdn js v2).
+// ui.v7.1.js — Google Auth (robusto) + Library + Export/Import + Sort/Notes
+// Requiere: supabase UMD v2 cargado en index.html y las variables
+// window.SUPABASE_URL / window.SUPABASE_ANON_KEY definidas.
 
 (function () {
   // ------------------ helpers ------------------
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const SITE_RETURN_URL = location.origin + location.pathname; // sin hashes/queries
+  const SITE_RETURN_URL = location.origin + location.pathname; // debe coincidir con Site URL (Supabase)
   const safe = (s) =>
     (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
 
@@ -15,7 +15,7 @@
   function sb() {
     if (!supabaseClient) {
       if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        console.error("Faltan supabase.min.js o credenciales en index.html");
+        console.error("[ui.v7.1] Faltan supabase.min.js o credenciales en index.html");
         throw new Error("Supabase client not configured");
       }
       supabaseClient = window.supabase.createClient(
@@ -25,7 +25,7 @@
           auth: {
             persistSession: true,
             autoRefreshToken: true,
-            detectSessionInUrl: true, // captura la sesión al volver del login
+            detectSessionInUrl: true, // procesa el callback de OAuth
           },
         }
       );
@@ -45,9 +45,10 @@
   }
 
   // ------------------ Auth UI ------------------
-  async function refreshAuthUI() {
+  async function refreshAuthUI(from = "manual") {
     try {
-      const { data } = await sb().auth.getSession();
+      const { data, error } = await sb().auth.getSession();
+      if (error) console.warn("[ui.v7.1] getSession error:", error?.message);
       const session = data?.session || null;
       const signed = !!session;
 
@@ -61,7 +62,6 @@
       if (saveBtn) saveBtn.style.display = signed ? "" : "none";
       if (myLibBtn) myLibBtn.style.display = signed ? "" : "none";
 
-      // Si existe un badge para mostrar el email, actualízalo (opcional).
       const emailBadge = $("#userEmailBadge");
       if (emailBadge) {
         const email =
@@ -71,20 +71,77 @@
         emailBadge.textContent = signed ? email : "";
         emailBadge.style.display = signed ? "inline-flex" : "none";
       }
+
+      console.log(`[ui.v7.1] refreshAuthUI (${from}) → signed:`, signed);
+      return signed;
     } catch (e) {
-      console.warn("refreshAuthUI:", e);
+      console.warn("[ui.v7.1] refreshAuthUI fail:", e);
+      return false;
     }
+  }
+
+  // Espera la sesión tras volver del OAuth; limpia la URL (?code=...&state=...)
+  async function waitForOAuthSession() {
+    const hasOAuthParams =
+      location.search.includes("code=") || location.hash.includes("access_token");
+    if (!hasOAuthParams) return;
+
+    console.log("[ui.v7.1] Detectado retorno de OAuth, esperando sesión…");
+
+    // Espera evento de cambio o hace polling corto
+    const maxMs = 8000;
+    const start = Date.now();
+    let resolved = false;
+
+    await new Promise((resolve) => {
+      const unsub = sb().auth.onAuthStateChange((_evt, session) => {
+        if (session && !resolved) {
+          resolved = true;
+          unsub?.data?.subscription?.unsubscribe?.();
+          resolve();
+        }
+      });
+
+      const poll = () => {
+        sb()
+          .auth.getSession()
+          .then(({ data }) => {
+            if (data?.session && !resolved) {
+              resolved = true;
+              unsub?.data?.subscription?.unsubscribe?.();
+              resolve();
+            } else if (Date.now() - start < maxMs) {
+              setTimeout(poll, 300);
+            } else {
+              unsub?.data?.subscription?.unsubscribe?.();
+              resolve();
+            }
+          })
+          .catch(() => resolve());
+      };
+      setTimeout(poll, 200);
+    });
+
+    // Limpia la URL para evitar repetir el flujo
+    if (window.history.replaceState) {
+      window.history.replaceState({}, document.title, SITE_RETURN_URL + location.hash.replace(/^#\/?/, "#"));
+    }
+    await refreshAuthUI("oauth-callback");
   }
 
   async function signInGoogle() {
     try {
+      console.log("[ui.v7.1] signInWithOAuth → redirectTo:", SITE_RETURN_URL);
       await sb().auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: SITE_RETURN_URL, // debe coincidir con Site URL de Supabase
+          redirectTo: SITE_RETURN_URL, // Debe estar en la lista de Redirect URLs del proveedor Google
+          queryParams: {
+            prompt: "select_account", // UX mejor
+          },
         },
       });
-      // La redirección la maneja Supabase → Google → de vuelta a SITE_RETURN_URL
+      // Redirección manejada por Google/Supabase
     } catch (e) {
       alert("No se pudo iniciar sesión con Google.");
       console.error(e);
@@ -95,7 +152,7 @@
     try {
       await sb().auth.signOut();
     } finally {
-      await refreshAuthUI();
+      await refreshAuthUI("signout");
     }
   }
 
@@ -275,7 +332,7 @@
       if (!el) return;
 
       if (!SORT_STATE.active) {
-        // snapshot del estado actual
+        // snapshot
         SORT_STATE.snapshot = [...el.children].map((r) => r.value());
         const arr = SORT_STATE.snapshot.map((x) => ({ ...x }));
         const scored = arr.filter((t) => Number.isFinite(t.score));
@@ -294,7 +351,7 @@
         return;
       }
 
-      // restaurar snapshot
+      // restore
       const original = SORT_STATE.snapshot?.map((x) => ({ ...x })) || [];
       el.innerHTML = "";
       original.forEach((t, i) => el.appendChild(makeRow(i, t)));
@@ -434,7 +491,7 @@
     openLibraryModal(true);
   }
 
-  // ------------------ Bind UI ------------------
+  // ------------------ Bind + Boot ------------------
   function bindUI() {
     // Auth buttons
     const bi = $("#btnSigninGoogle");
@@ -517,33 +574,28 @@
       renderNotesOutput();
     });
 
-    // Auth changes (escucha y pinta)
-    sb().auth.onAuthStateChange(() => refreshAuthUI());
-    refreshAuthUI();
+    // Suscribirse a cambios de sesión
+    sb().auth.onAuthStateChange((_evt, session) => {
+      console.log("[ui.v7.1] onAuthStateChange →", !!session);
+      refreshAuthUI("auth-listener");
+    });
   }
 
-  // ------------------ boot ------------------
+  async function boot() {
+    bindUI();
+    await waitForOAuthSession();     // maneja retorno de Google
+    await refreshAuthUI("boot");     // pinta estado actual
+  }
+
   if (document.readyState === "complete" || document.readyState === "interactive") {
-    try {
-      bindUI();
-    } catch (e) {
-      console.error(e);
-    }
+    boot().catch((e) => console.error(e));
   } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      try {
-        bindUI();
-      } catch (e) {
-        console.error(e);
-      }
-    });
+    document.addEventListener("DOMContentLoaded", () => boot().catch((e) => console.error(e)));
   }
 
   // ------------------ makeRow fallback ------------------
   function makeRow(i, data) {
-    // si el autofill ya definió makeRow, úsalo
     if (window.makeRow) return window.makeRow(i, data);
-    // fallback mínimo para evitar errores si se carga antes
     const row = document.createElement("div");
     row.className = "row";
     ["n", "dur", "name"].forEach(() => {
