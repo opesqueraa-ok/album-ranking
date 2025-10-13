@@ -3,8 +3,6 @@ const CACHE_NAME = 'albumrater-v7.1';
 const CORE_ASSETS = [
   './',
   './index.html?v=7.1',
-  // Si aún no renombraste autofill a 7.1, dejamos el 7.0:
-  './autofillAlbum.v7.0.js?v=7.0',
   './ui.v7.1.js?v=7.1',
   './sw-register.v7.1.js',
   './manifest.webmanifest?v=7.1',
