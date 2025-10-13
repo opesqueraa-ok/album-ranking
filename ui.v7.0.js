@@ -1,15 +1,17 @@
 // ui.v7.0.js — Auth (Google) + Library + Export/Import + Sort/Notes wiring
 (function () {
   // ---------- helpers ----------
-  const $ = (s) => document.querySelector(s);
+  const $  = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const safe = (s) =>
-    (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
+  const safe = (s) => (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
+  const SITE_RETURN_URL = (window.SITE_URL || (location.origin + location.pathname));
 
-  // URL de retorno tras OAuth (ajústala si cambias el dominio o ruta)
-  const SITE_RETURN_URL =
-    window.SITE_URL ||
-    "https://opesqueraa-ok.github.io/album-ranking/".replace(/(?<!:)\/{2,}/g, "/");
+  // Small toast
+  function toast(msg, ms=2200){
+    const el = $('#toast'); if(!el) return;
+    el.textContent = msg; el.style.display='block';
+    clearTimeout(el._t); el._t = setTimeout(()=> (el.style.display='none'), ms);
+  }
 
   // ---------- Supabase client ----------
   let supabaseClient = null;
@@ -34,12 +36,12 @@
       const session = data?.session || null;
       const signed = !!session;
 
-      const inBtn = $("#btnSigninGoogle");
-      const outBtn = $("#btnSignout");
+      const inBtn   = $("#btnSigninGoogle");
+      const outBtn  = $("#btnSignout");
       const saveBtn = $("#btnSaveToLibrary");
-      const myLibBtn = $("#btnMyLibrary");
+      const myLibBtn= $("#btnMyLibrary");
 
-      if (inBtn) inBtn.style.display = signed ? "none" : "";
+      if (inBtn) inBtn.style.display   = signed ? "none" : "";
       if (outBtn) outBtn.style.display = signed ? "" : "none";
       if (saveBtn) saveBtn.style.display = signed ? "" : "none";
       if (myLibBtn) myLibBtn.style.display = signed ? "" : "none";
@@ -50,13 +52,12 @@
 
   async function signInGoogle() {
     try {
-      await sb().auth.signInWithOAuth({
+      const { error } = await sb().auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: SITE_RETURN_URL,
-        },
+        options: { redirectTo: SITE_RETURN_URL }
       });
-      // Nota: la redirección la maneja Supabase/Google
+      if (error) throw error;
+      // La redirección la maneja Supabase/Google
     } catch (e) {
       alert("No se pudo iniciar sesión con Google.");
       console.error(e);
@@ -66,9 +67,21 @@
   async function signOut() {
     try {
       await sb().auth.signOut();
+      toast('Signed out');
     } finally {
       await refreshAuthUI();
     }
+  }
+
+  // Al volver del OAuth, forzamos un refresh visual rápido
+  async function initAuthOnLoad(){
+    // Escucha cambios de sesión
+    sb().auth.onAuthStateChange((_ev, session) => {
+      if (session) toast('Signed in ✅');
+      refreshAuthUI();
+    });
+    // Chequeo inicial (incluye hash parsing interno)
+    await refreshAuthUI();
   }
 
   // ---------- App state helpers ----------
@@ -135,7 +148,9 @@
 
   function clearAll() {
     if (!confirm("Are you sure you want to clear all fields?")) return;
+    // Limpia v6 y v7
     localStorage.removeItem("albumrater_v6_state");
+    localStorage.removeItem("albumrater_v7_state");
     setAppState({
       lang: $("#lang")?.value || "en",
       album: "",
@@ -157,7 +172,6 @@
   }
 
   // ---------- Notas por pista ----------
-  // Inserta botón de lapicito en cada fila (última columna)
   function ensureNoteButtons() {
     const container = $("#tracks");
     if (!container) return;
@@ -316,7 +330,7 @@
       artist: s.artist || "",
       released: s.released || "",
       rankedby: s.rankedby || "",
-      cover: s.cover || $("#coverOut")?.src || "",
+      cover_url: s.cover || $("#coverOut")?.src || "",
       tracks: s.tracks || [],
       avg: avg,
       final_notes: s.finalNotes || "",
@@ -328,7 +342,7 @@
       alert("Error saving album.");
       return;
     }
-    alert("Saved to your library.");
+    toast("Saved to your library ✅");
   }
 
   function openLibraryModal(show) {
@@ -344,7 +358,6 @@
       alert("Please sign in first.");
       return;
     }
-
     const sortSel = $("#librarySort");
     const order = sortSel?.value || "desc";
 
@@ -381,7 +394,7 @@
 
       const cover = document.createElement("img");
       cover.className = "lib-cover";
-      cover.src = row.cover || "";
+      cover.src = row.cover_url || row.cover || "";
 
       const title = document.createElement("div");
       title.innerHTML = `<div style="font-weight:700">${row.album || "—"}</div><div style="opacity:.8">${row.artist || ""}</div>`;
@@ -405,7 +418,7 @@
           artist: row.artist,
           released: row.released,
           rankedby: row.rankedby,
-          cover: row.cover,
+          cover: row.cover_url || row.cover || "",
           tracks: row.tracks || [],
           finalNotes: row.final_notes || "",
         };
@@ -508,32 +521,16 @@
       renderNotesOutput();
     });
 
-    // Auth changes
-    try {
-      sb().auth.onAuthStateChange(() => refreshAuthUI());
-    } catch (e) {
-      console.warn("onAuthStateChange no disponible todavía:", e);
-    }
-    refreshAuthUI();
+    // Auth init
+    initAuthOnLoad();
   }
 
   // ---------- boot ----------
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
-    try {
-      bindUI();
-    } catch (e) {
-      console.error(e);
-    }
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    try { bindUI(); } catch (e) { console.error(e); }
   } else {
     document.addEventListener("DOMContentLoaded", () => {
-      try {
-        bindUI();
-      } catch (e) {
-        console.error(e);
-      }
+      try { bindUI(); } catch (e) { console.error(e); }
     });
   }
 
@@ -559,4 +556,3 @@
     return row;
   }
 })();
-```0
