@@ -1,16 +1,17 @@
 const CACHE_NAME = 'albumrater-v7.0';
 
+// Lista SOLO los archivos reales que sirves en v7.0
 const ASSETS = [
   './',
   './index.html?v=7.0',
-  './autofillAlbum.v6.5.js?v=7.0',
-  './ui.v6.5.js?v=7.0',
+  './autofillAlbum.v7.0.js?v=7.0',
+  './ui.v7.0.js?v=7.0',
+  './auth.v7.0.js?v=7.0',
+  './supabaseClient.v7.0.js?v=7.0',
   './sw-register.v7.0.js',
   './manifest.webmanifest?v=7.0',
-  './favicon.png?v=7.0',
-  './icons/apple-touch-icon.png?v=7.0'
-  // Si aún usas exportGlass:
-  // './exportGlass.v6.5.js?v=7.0'
+  './icons/apple-touch-icon.png',
+  './favicon.png'
 ];
 
 self.addEventListener('install', (e) => {
