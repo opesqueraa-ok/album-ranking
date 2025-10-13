@@ -188,6 +188,31 @@ canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;b
   console.log("Album Rater index loaded v7.0");
 </script>
 
+  <script>
+  (async () => {
+    if (!('serviceWorker' in navigator)) return;
+
+    // Si vienes de una versión < 7, limpia todo y recarga una vez
+    const hasMigrated = localStorage.getItem('sw_migrated_to_7') === '1';
+    if (!hasMigrated) {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          const url = String(reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '');
+          if (!url.includes('sw.v7.0.js')) {
+            await reg.unregister().catch(() => {});
+          }
+        }
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+        localStorage.setItem('sw_migrated_to_7', '1');
+        // Evita bucle: solo recarga una vez
+        location.replace(location.pathname + '?v=7.0');
+      } catch (e) {}
+    }
+  })();
+  </script>
+
 <!-- App scripts -->
 <script defer src="autofillAlbum.v7.0.js?v=7.0"></script>
 <script defer src="ui.v7.0.js?v=7.0"></script>
