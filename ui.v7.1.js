@@ -1,56 +1,52 @@
-// ui.v7.1.js — Google Auth (robusto) + Library + Export/Import + Sort/Notes
-// Requiere: supabase UMD v2 cargado en index.html y las variables
-// window.SUPABASE_URL / window.SUPABASE_ANON_KEY definidas.
-
+// ui.v7.1.js — Auth (Google) + Library + Export/Import + Sort/Notes
 (function () {
-  // ------------------ helpers ------------------
+  // ---------- helpers ----------
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const SITE_RETURN_URL = location.origin + location.pathname; // debe coincidir con Site URL (Supabase)
   const safe = (s) =>
     (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
 
-  // ------------------ Supabase client ------------------
+  const SITE_RETURN_URL =
+    (window.SITE_URL || (location.origin + location.pathname)).replace(/(?<!:)\/{2,}/g, "/");
+
+  // ---------- Supabase client ----------
   let supabaseClient = null;
   function sb() {
     if (!supabaseClient) {
       if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        console.error("[ui.v7.1] Faltan supabase.min.js o credenciales en index.html");
-        throw new Error("Supabase client not configured");
+        console.error("Supabase no está listo (CDN o credenciales faltan).");
+        return null;
       }
-      supabaseClient = window.supabase.createClient(
-        window.SUPABASE_URL,
-        window.SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true, // procesa el callback de OAuth
-          },
-        }
-      );
+      try {
+        supabaseClient = window.supabase.createClient(
+          window.SUPABASE_URL,
+          window.SUPABASE_ANON_KEY
+        );
+      } catch (e) {
+        console.error("No se pudo crear el cliente de Supabase:", e);
+        return null;
+      }
     }
     return supabaseClient;
   }
 
-  // ------------------ App state bridge ------------------
-  function getAppState() {
-    return window.AlbumApp?.getState ? window.AlbumApp.getState() : null;
-  }
-  function setAppState(s) {
-    if (window.AlbumApp?.setState) window.AlbumApp.setState(s);
-  }
-  function saveLocal() {
-    if (window.AlbumApp?.save) window.AlbumApp.save();
+  // ---------- Toast ----------
+  function toast(msg, ms = 2000) {
+    const t = $("#toast");
+    if (!t) return alert(msg);
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t._h);
+    t._h = setTimeout(() => (t.style.display = "none"), ms);
   }
 
-  // ------------------ Auth UI ------------------
-  async function refreshAuthUI(from = "manual") {
+  // ---------- Auth UI ----------
+  async function refreshAuthUI() {
     try {
-      const { data, error } = await sb().auth.getSession();
-      if (error) console.warn("[ui.v7.1] getSession error:", error?.message);
-      const session = data?.session || null;
-      const signed = !!session;
+      const client = sb();
+      if (!client) return;
+      const { data } = await client.auth.getSession();
+      const signed = !!data?.session;
 
       const inBtn = $("#btnSigninGoogle");
       const outBtn = $("#btnSignout");
@@ -61,102 +57,53 @@
       if (outBtn) outBtn.style.display = signed ? "" : "none";
       if (saveBtn) saveBtn.style.display = signed ? "" : "none";
       if (myLibBtn) myLibBtn.style.display = signed ? "" : "none";
-
-      const emailBadge = $("#userEmailBadge");
-      if (emailBadge) {
-        const email =
-          session?.user?.email ||
-          session?.user?.user_metadata?.email ||
-          "";
-        emailBadge.textContent = signed ? email : "";
-        emailBadge.style.display = signed ? "inline-flex" : "none";
-      }
-
-      console.log(`[ui.v7.1] refreshAuthUI (${from}) → signed:`, signed);
-      return signed;
     } catch (e) {
-      console.warn("[ui.v7.1] refreshAuthUI fail:", e);
-      return false;
+      console.warn("refreshAuthUI:", e);
     }
-  }
-
-  // Espera la sesión tras volver del OAuth; limpia la URL (?code=...&state=...)
-  async function waitForOAuthSession() {
-    const hasOAuthParams =
-      location.search.includes("code=") || location.hash.includes("access_token");
-    if (!hasOAuthParams) return;
-
-    console.log("[ui.v7.1] Detectado retorno de OAuth, esperando sesión…");
-
-    // Espera evento de cambio o hace polling corto
-    const maxMs = 8000;
-    const start = Date.now();
-    let resolved = false;
-
-    await new Promise((resolve) => {
-      const unsub = sb().auth.onAuthStateChange((_evt, session) => {
-        if (session && !resolved) {
-          resolved = true;
-          unsub?.data?.subscription?.unsubscribe?.();
-          resolve();
-        }
-      });
-
-      const poll = () => {
-        sb()
-          .auth.getSession()
-          .then(({ data }) => {
-            if (data?.session && !resolved) {
-              resolved = true;
-              unsub?.data?.subscription?.unsubscribe?.();
-              resolve();
-            } else if (Date.now() - start < maxMs) {
-              setTimeout(poll, 300);
-            } else {
-              unsub?.data?.subscription?.unsubscribe?.();
-              resolve();
-            }
-          })
-          .catch(() => resolve());
-      };
-      setTimeout(poll, 200);
-    });
-
-    // Limpia la URL para evitar repetir el flujo
-    if (window.history.replaceState) {
-      window.history.replaceState({}, document.title, SITE_RETURN_URL + location.hash.replace(/^#\/?/, "#"));
-    }
-    await refreshAuthUI("oauth-callback");
   }
 
   async function signInGoogle() {
     try {
-      console.log("[ui.v7.1] signInWithOAuth → redirectTo:", SITE_RETURN_URL);
-      await sb().auth.signInWithOAuth({
+      const client = sb();
+      if (!client) return toast("Supabase no está listo.");
+      const { error } = await client.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: SITE_RETURN_URL, // Debe estar en la lista de Redirect URLs del proveedor Google
-          queryParams: {
-            prompt: "select_account", // UX mejor
-          },
-        },
+        options: { redirectTo: SITE_RETURN_URL }
       });
-      // Redirección manejada por Google/Supabase
+      if (error) {
+        console.error(error);
+        toast("No se pudo iniciar sesión con Google.");
+      }
+      // Redirección la hace Google→Supabase→SITE_RETURN_URL
     } catch (e) {
-      alert("No se pudo iniciar sesión con Google.");
       console.error(e);
+      toast("No se pudo iniciar sesión con Google.");
     }
   }
 
   async function signOut() {
     try {
-      await sb().auth.signOut();
+      const client = sb();
+      if (!client) return;
+      await client.auth.signOut();
+      toast("Signed out.");
     } finally {
-      await refreshAuthUI("signout");
+      await refreshAuthUI();
     }
   }
 
-  // ------------------ Utilidades de datos ------------------
+  // ---------- App state helpers ----------
+  function getAppState() {
+    return window.AlbumApp?.getState ? window.AlbumApp.getState() : null;
+  }
+  function setAppState(s) {
+    if (window.AlbumApp?.setState) window.AlbumApp.setState(s);
+  }
+  function saveLocal() {
+    if (window.AlbumApp?.save) window.AlbumApp.save();
+  }
+
+  // Average from scores
   function computeAverage(tracks) {
     const valid = (tracks || [])
       .map((t) => Number(t.score))
@@ -166,11 +113,11 @@
     return Number(avg.toFixed(2));
   }
 
+  // ---------- Export / Import / Clear ----------
   function exportJSON() {
     try {
       const s = getAppState();
       const payload = { ...s };
-
       const blob = new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
       });
@@ -186,7 +133,7 @@
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("Could not export.");
+      toast("Could not export.");
       console.error(e);
     }
   }
@@ -198,9 +145,9 @@
         const obj = JSON.parse(e.target.result);
         setAppState(obj);
         saveLocal();
-        alert("Imported.");
+        toast("Imported.");
       } catch (err) {
-        alert("Invalid file.");
+        toast("Invalid file.");
       }
     };
     r.readAsText(file);
@@ -209,6 +156,7 @@
   function clearAll() {
     if (!confirm("Are you sure you want to clear all fields?")) return;
     localStorage.removeItem("albumrater_v6_state");
+    localStorage.removeItem("albumrater_v7_state");
     setAppState({
       lang: $("#lang")?.value || "en",
       album: "",
@@ -218,21 +166,23 @@
       cover: "",
       tracks: [],
     });
+    toast("Cleared.");
   }
 
+  // Limpia SOLO puntuaciones (las deja en “-”)
   function clearScores() {
     const s = getAppState();
     if (!s) return;
     s.tracks = (s.tracks || []).map((t) => ({ ...t, score: NaN }));
     setAppState(s);
     saveLocal();
+    toast("Scores cleared.");
   }
 
-  // ------------------ Notas por pista ------------------
+  // ---------- Notas por pista ----------
   function ensureNoteButtons() {
     const container = $("#tracks");
     if (!container) return;
-
     [...container.children].forEach((row, idx) => {
       if (row.querySelector(".noteBtn")) return;
 
@@ -242,7 +192,6 @@
       btn.title = "Add note";
       btn.innerHTML =
         '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33h-.5v-.5l9.06-9.06.5.5L5.92 19.58zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
-
       row.appendChild(btn);
 
       btn.addEventListener("click", () => {
@@ -270,7 +219,6 @@
   function renderNotesOutput() {
     const out = $("#notesOutput");
     if (!out) return;
-
     const s = getAppState() || {};
     const lines = [];
     (s.tracks || []).forEach((t, i) => {
@@ -279,12 +227,10 @@
         lines.push(`${i + 1}. ${name}: ${t.note}`);
       }
     });
-
     const albumTitle = s.album ? `${s.album} by ${s.artist || ""}`.trim() : "";
     const header = albumTitle ? albumTitle + "\n" : "";
     const final = s.finalNotes || "";
     const tail = final.trim() ? `\nFinal Album Thoughts: ${final.trim()}` : "";
-
     out.textContent = header + lines.join("\n") + tail;
   }
 
@@ -316,7 +262,7 @@
     renderNotesOutput();
   }
 
-  // ------------------ Sort Top 10 reversible ------------------
+  // ---------- Sort Top 10 reversible ----------
   const SORT_STATE = { active: false, snapshot: null };
   function setSortButtonLabel() {
     const b = $("#sortTop10");
@@ -332,7 +278,6 @@
       if (!el) return;
 
       if (!SORT_STATE.active) {
-        // snapshot
         SORT_STATE.snapshot = [...el.children].map((r) => r.value());
         const arr = SORT_STATE.snapshot.map((x) => ({ ...x }));
         const scored = arr.filter((t) => Number.isFinite(t.score));
@@ -343,7 +288,7 @@
         const merged = top.concat(rest).map((t, i) => ({ ...t, n: i + 1 }));
 
         el.innerHTML = "";
-        merged.forEach((t, i) => el.appendChild(makeRow(i, t))); // makeRow lo aporta autofill
+        merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
         SORT_STATE.active = true;
         setSortButtonLabel();
         ensureNoteButtons();
@@ -351,7 +296,6 @@
         return;
       }
 
-      // restore
       const original = SORT_STATE.snapshot?.map((x) => ({ ...x })) || [];
       el.innerHTML = "";
       original.forEach((t, i) => el.appendChild(makeRow(i, t)));
@@ -364,12 +308,14 @@
     setSortButtonLabel();
   }
 
-  // ------------------ Library (Supabase) ------------------
+  // ---------- Library (Supabase) ----------
   async function saveToLibrary() {
-    const { data: sData } = await sb().auth.getSession();
+    const client = sb();
+    if (!client) return;
+    const { data: sData } = await client.auth.getSession();
     const user = sData?.session?.user;
     if (!user) {
-      alert("Please sign in first.");
+      toast("Please sign in first.");
       return;
     }
     const s = getAppState();
@@ -388,13 +334,13 @@
       final_notes: s.finalNotes || "",
     };
 
-    const { error } = await sb().from("albums").insert(payload);
+    const { error } = await client.from("albums").insert(payload);
     if (error) {
       console.error(error);
-      alert("Error saving album.");
+      toast("Error saving album.");
       return;
     }
-    alert("Saved to your library.");
+    toast("Saved to your library.");
   }
 
   function openLibraryModal(show) {
@@ -404,17 +350,19 @@
   }
 
   async function openLibrary() {
-    const { data: sData } = await sb().auth.getSession();
+    const client = sb();
+    if (!client) return;
+    const { data: sData } = await client.auth.getSession();
     const user = sData?.session?.user;
     if (!user) {
-      alert("Please sign in first.");
+      toast("Please sign in first.");
       return;
     }
 
     const sortSel = $("#librarySort");
     const order = sortSel?.value || "desc";
 
-    let q = sb().from("albums").select("*").eq("user_id", user.id);
+    let q = client.from("albums").select("*").eq("user_id", user.id);
     if (order === "desc") q = q.order("avg", { ascending: false, nullsFirst: false });
     else if (order === "asc") q = q.order("avg", { ascending: true, nullsFirst: true });
     else q = q.order("created_at", { ascending: false });
@@ -422,15 +370,15 @@
     const { data, error } = await q;
     if (error) {
       console.error(error);
-      alert("Error loading library.");
+      toast("Error loading library.");
       return;
     }
 
     const list = $("#libraryList");
     const empty = $("#libraryEmpty");
     list.innerHTML = `
-      <div style="grid-column:1/-1;display:grid;grid-template-columns:88px 1fr 96px 96px 96px;gap:10px;color:#9fb0c6;padding:6px 0 10px;position:sticky;top:0;background:#0f1218;">
-        <div>Cover</div><div>Album — Artist</div><div style="text-align:center">Avg</div><div style="text-align:center">Tracks</div><div style="text-align:center">Opened</div>
+      <div style="grid-column:1/-1;display:grid;grid-template-columns:88px 1fr 96px 96px 96px;gap:10px;color:#9fb0c6;padding:6px 0 10px;position:sticky;top:0;background:#0f1218;"> 
+        <div>Cover</div><div>Album — Artist</div><div style="text-align:center">Avg</div><div style="text-align:center">Tracks</div><div style="text-align:center">Open</div>
       </div>
     `;
 
@@ -491,7 +439,7 @@
     openLibraryModal(true);
   }
 
-  // ------------------ Bind + Boot ------------------
+  // ---------- Bind UI ----------
   function bindUI() {
     // Auth buttons
     const bi = $("#btnSigninGoogle");
@@ -574,26 +522,22 @@
       renderNotesOutput();
     });
 
-    // Suscribirse a cambios de sesión
-    sb().auth.onAuthStateChange((_evt, session) => {
-      console.log("[ui.v7.1] onAuthStateChange →", !!session);
-      refreshAuthUI("auth-listener");
+    // Auth changes
+    const client = sb();
+    if (client) client.auth.onAuthStateChange(() => refreshAuthUI());
+    refreshAuthUI();
+  }
+
+  // ---------- boot ----------
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    try { bindUI(); } catch (e) { console.error(e); }
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      try { bindUI(); } catch (e) { console.error(e); }
     });
   }
 
-  async function boot() {
-    bindUI();
-    await waitForOAuthSession();     // maneja retorno de Google
-    await refreshAuthUI("boot");     // pinta estado actual
-  }
-
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    boot().catch((e) => console.error(e));
-  } else {
-    document.addEventListener("DOMContentLoaded", () => boot().catch((e) => console.error(e)));
-  }
-
-  // ------------------ makeRow fallback ------------------
+  // Fallback makeRow si autofill aún no cargó
   function makeRow(i, data) {
     if (window.makeRow) return window.makeRow(i, data);
     const row = document.createElement("div");
@@ -615,4 +559,3 @@
     return row;
   }
 })();
-```0
