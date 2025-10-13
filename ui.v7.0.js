@@ -1,90 +1,39 @@
-// ui.v7.0.js — Auth (Google) + Library + Export/Import + Sort/Notes wiring
+// ui.v7.0.js — v7.0 (Google Auth + Library + Export/Import + Sort/Notes)
+// Requiere que en index.html existan window.SUPABASE_URL y window.SUPABASE_ANON_KEY
+// y que el script UMD de supabase esté cargado (cdn js v2).
+
 (function () {
-  // ---------- helpers ----------
-  const $  = (s) => document.querySelector(s);
+  // ------------------ helpers ------------------
+  const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const safe = (s) => (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
-  const SITE_RETURN_URL = (window.SITE_URL || (location.origin + location.pathname));
+  const SITE_RETURN_URL = location.origin + location.pathname; // sin hashes/queries
+  const safe = (s) =>
+    (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
 
-  // Small toast
-  function toast(msg, ms=2200){
-    const el = $('#toast'); if(!el) return;
-    el.textContent = msg; el.style.display='block';
-    clearTimeout(el._t); el._t = setTimeout(()=> (el.style.display='none'), ms);
-  }
-
-  // ---------- Supabase client ----------
+  // ------------------ Supabase client ------------------
   let supabaseClient = null;
   function sb() {
     if (!supabaseClient) {
       if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        console.error("Supabase CDN o credenciales no están disponibles en index.html.");
+        console.error("Faltan supabase.min.js o credenciales en index.html");
         throw new Error("Supabase client not configured");
       }
       supabaseClient = window.supabase.createClient(
         window.SUPABASE_URL,
-        window.SUPABASE_ANON_KEY
+        window.SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true, // captura la sesión al volver del login
+          },
+        }
       );
     }
     return supabaseClient;
   }
 
-  // ---------- Auth UI ----------
-  async function refreshAuthUI() {
-    try {
-      const { data } = await sb().auth.getSession();
-      const session = data?.session || null;
-      const signed = !!session;
-
-      const inBtn   = $("#btnSigninGoogle");
-      const outBtn  = $("#btnSignout");
-      const saveBtn = $("#btnSaveToLibrary");
-      const myLibBtn= $("#btnMyLibrary");
-
-      if (inBtn) inBtn.style.display   = signed ? "none" : "";
-      if (outBtn) outBtn.style.display = signed ? "" : "none";
-      if (saveBtn) saveBtn.style.display = signed ? "" : "none";
-      if (myLibBtn) myLibBtn.style.display = signed ? "" : "none";
-    } catch (e) {
-      console.warn("refreshAuthUI:", e);
-    }
-  }
-
-  async function signInGoogle() {
-    try {
-      const { error } = await sb().auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: SITE_RETURN_URL }
-      });
-      if (error) throw error;
-      // La redirección la maneja Supabase/Google
-    } catch (e) {
-      alert("No se pudo iniciar sesión con Google.");
-      console.error(e);
-    }
-  }
-
-  async function signOut() {
-    try {
-      await sb().auth.signOut();
-      toast('Signed out');
-    } finally {
-      await refreshAuthUI();
-    }
-  }
-
-  // Al volver del OAuth, forzamos un refresh visual rápido
-  async function initAuthOnLoad(){
-    // Escucha cambios de sesión
-    sb().auth.onAuthStateChange((_ev, session) => {
-      if (session) toast('Signed in ✅');
-      refreshAuthUI();
-    });
-    // Chequeo inicial (incluye hash parsing interno)
-    await refreshAuthUI();
-  }
-
-  // ---------- App state helpers ----------
+  // ------------------ App state bridge ------------------
   function getAppState() {
     return window.AlbumApp?.getState ? window.AlbumApp.getState() : null;
   }
@@ -95,7 +44,62 @@
     if (window.AlbumApp?.save) window.AlbumApp.save();
   }
 
-  // Average from scores
+  // ------------------ Auth UI ------------------
+  async function refreshAuthUI() {
+    try {
+      const { data } = await sb().auth.getSession();
+      const session = data?.session || null;
+      const signed = !!session;
+
+      const inBtn = $("#btnSigninGoogle");
+      const outBtn = $("#btnSignout");
+      const saveBtn = $("#btnSaveToLibrary");
+      const myLibBtn = $("#btnMyLibrary");
+
+      if (inBtn) inBtn.style.display = signed ? "none" : "";
+      if (outBtn) outBtn.style.display = signed ? "" : "none";
+      if (saveBtn) saveBtn.style.display = signed ? "" : "none";
+      if (myLibBtn) myLibBtn.style.display = signed ? "" : "none";
+
+      // Si existe un badge para mostrar el email, actualízalo (opcional).
+      const emailBadge = $("#userEmailBadge");
+      if (emailBadge) {
+        const email =
+          session?.user?.email ||
+          session?.user?.user_metadata?.email ||
+          "";
+        emailBadge.textContent = signed ? email : "";
+        emailBadge.style.display = signed ? "inline-flex" : "none";
+      }
+    } catch (e) {
+      console.warn("refreshAuthUI:", e);
+    }
+  }
+
+  async function signInGoogle() {
+    try {
+      await sb().auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: SITE_RETURN_URL, // debe coincidir con Site URL de Supabase
+        },
+      });
+      // La redirección la maneja Supabase → Google → de vuelta a SITE_RETURN_URL
+    } catch (e) {
+      alert("No se pudo iniciar sesión con Google.");
+      console.error(e);
+    }
+  }
+
+  async function signOut() {
+    try {
+      await sb().auth.signOut();
+    } finally {
+      await refreshAuthUI();
+    }
+  }
+
+  // ------------------ Utilidades de datos ------------------
   function computeAverage(tracks) {
     const valid = (tracks || [])
       .map((t) => Number(t.score))
@@ -105,7 +109,6 @@
     return Number(avg.toFixed(2));
   }
 
-  // ---------- Export / Import / Clear ----------
   function exportJSON() {
     try {
       const s = getAppState();
@@ -148,9 +151,7 @@
 
   function clearAll() {
     if (!confirm("Are you sure you want to clear all fields?")) return;
-    // Limpia v6 y v7
     localStorage.removeItem("albumrater_v6_state");
-    localStorage.removeItem("albumrater_v7_state");
     setAppState({
       lang: $("#lang")?.value || "en",
       album: "",
@@ -162,7 +163,6 @@
     });
   }
 
-  // Limpia SOLO puntuaciones (las deja en “-”)
   function clearScores() {
     const s = getAppState();
     if (!s) return;
@@ -171,7 +171,7 @@
     saveLocal();
   }
 
-  // ---------- Notas por pista ----------
+  // ------------------ Notas por pista ------------------
   function ensureNoteButtons() {
     const container = $("#tracks");
     if (!container) return;
@@ -204,7 +204,6 @@
         btn.classList.toggle("active", !!current.note);
       });
 
-      // activar si ya existe nota
       const s = getAppState() || {};
       const note = s?.tracks?.[idx]?.note;
       btn.classList.toggle("active", !!note);
@@ -245,7 +244,6 @@
     });
   }
 
-  // Observa cambios en #tracks para agregar los botones de notas
   function observeTrackList() {
     const target = $("#tracks");
     if (!target || target._observerAttached) return;
@@ -257,12 +255,11 @@
     });
     mo.observe(target, { childList: true });
 
-    // primera pasada
     ensureNoteButtons();
     renderNotesOutput();
   }
 
-  // ---------- Sort Top 10 reversible ----------
+  // ------------------ Sort Top 10 reversible ------------------
   const SORT_STATE = { active: false, snapshot: null };
   function setSortButtonLabel() {
     const b = $("#sortTop10");
@@ -278,7 +275,7 @@
       if (!el) return;
 
       if (!SORT_STATE.active) {
-        // guardar snapshot
+        // snapshot del estado actual
         SORT_STATE.snapshot = [...el.children].map((r) => r.value());
         const arr = SORT_STATE.snapshot.map((x) => ({ ...x }));
         const scored = arr.filter((t) => Number.isFinite(t.score));
@@ -289,10 +286,9 @@
         const merged = top.concat(rest).map((t, i) => ({ ...t, n: i + 1 }));
 
         el.innerHTML = "";
-        merged.forEach((t, i) => el.appendChild(makeRow(i, t))); // makeRow proviene de autofill js
+        merged.forEach((t, i) => el.appendChild(makeRow(i, t))); // makeRow lo aporta autofill
         SORT_STATE.active = true;
         setSortButtonLabel();
-
         ensureNoteButtons();
         renderNotesOutput();
         return;
@@ -305,14 +301,13 @@
       SORT_STATE.active = false;
       SORT_STATE.snapshot = null;
       setSortButtonLabel();
-
       ensureNoteButtons();
       renderNotesOutput();
     });
     setSortButtonLabel();
   }
 
-  // ---------- Library (Supabase) ----------
+  // ------------------ Library (Supabase) ------------------
   async function saveToLibrary() {
     const { data: sData } = await sb().auth.getSession();
     const user = sData?.session?.user;
@@ -330,7 +325,7 @@
       artist: s.artist || "",
       released: s.released || "",
       rankedby: s.rankedby || "",
-      cover_url: s.cover || $("#coverOut")?.src || "",
+      cover: s.cover || $("#coverOut")?.src || "",
       tracks: s.tracks || [],
       avg: avg,
       final_notes: s.finalNotes || "",
@@ -342,7 +337,7 @@
       alert("Error saving album.");
       return;
     }
-    toast("Saved to your library ✅");
+    alert("Saved to your library.");
   }
 
   function openLibraryModal(show) {
@@ -358,6 +353,7 @@
       alert("Please sign in first.");
       return;
     }
+
     const sortSel = $("#librarySort");
     const order = sortSel?.value || "desc";
 
@@ -394,7 +390,7 @@
 
       const cover = document.createElement("img");
       cover.className = "lib-cover";
-      cover.src = row.cover_url || row.cover || "";
+      cover.src = row.cover || "";
 
       const title = document.createElement("div");
       title.innerHTML = `<div style="font-weight:700">${row.album || "—"}</div><div style="opacity:.8">${row.artist || ""}</div>`;
@@ -418,7 +414,7 @@
           artist: row.artist,
           released: row.released,
           rankedby: row.rankedby,
-          cover: row.cover_url || row.cover || "",
+          cover: row.cover,
           tracks: row.tracks || [],
           finalNotes: row.final_notes || "",
         };
@@ -438,7 +434,7 @@
     openLibraryModal(true);
   }
 
-  // ---------- Bind UI ----------
+  // ------------------ Bind UI ------------------
   function bindUI() {
     // Auth buttons
     const bi = $("#btnSigninGoogle");
@@ -521,22 +517,33 @@
       renderNotesOutput();
     });
 
-    // Auth init
-    initAuthOnLoad();
+    // Auth changes (escucha y pinta)
+    sb().auth.onAuthStateChange(() => refreshAuthUI());
+    refreshAuthUI();
   }
 
-  // ---------- boot ----------
+  // ------------------ boot ------------------
   if (document.readyState === "complete" || document.readyState === "interactive") {
-    try { bindUI(); } catch (e) { console.error(e); }
+    try {
+      bindUI();
+    } catch (e) {
+      console.error(e);
+    }
   } else {
     document.addEventListener("DOMContentLoaded", () => {
-      try { bindUI(); } catch (e) { console.error(e); }
+      try {
+        bindUI();
+      } catch (e) {
+        console.error(e);
+      }
     });
   }
 
-  // makeRow fallback guard (si ui carga antes que autofill; la app real lo carga después)
+  // ------------------ makeRow fallback ------------------
   function makeRow(i, data) {
+    // si el autofill ya definió makeRow, úsalo
     if (window.makeRow) return window.makeRow(i, data);
+    // fallback mínimo para evitar errores si se carga antes
     const row = document.createElement("div");
     row.className = "row";
     ["n", "dur", "name"].forEach(() => {
@@ -556,3 +563,4 @@
     return row;
   }
 })();
+```0
