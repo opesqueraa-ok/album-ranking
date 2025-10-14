@@ -49,18 +49,23 @@
 <body>
   <header>
     <strong>🎧 Album Ranking</strong><span class="badge">v7.1</span>
+
+    <!-- Librería en la nube -->
     <button id="btnLibrary" title="Abrir/cerrar mi librería">📚 Library</button>
     <button id="btnSaveToLibrary" title="Guardar el álbum actual en la nube">💾 Save to Library</button>
+    <button id="btnExportLibrary" title="Exportar librería (nube)">⬇️ Export Library</button>
+    <input id="fileImportLibrary" type="file" accept="application/json" style="display:none">
+    <label class="btn" for="fileImportLibrary" title="Importar librería (nube)">⬆️ Import Library</label>
 
     <div class="spacer"></div>
 
-    <!-- Herramientas de datos del EDITOR local -->
+    <!-- Herramientas del editor local -->
     <select id="lang">
       <option value="en">English</option>
       <option value="es" selected>Español</option>
     </select>
-    <button id="exportJSON" title="Exportar datos locales (editor)">Export Data</button>
-    <label class="btn" for="importJSON" title="Importar datos locales (editor)">Import Data</label>
+    <button id="exportJSON" title="Exportar datos locales">Export Data</button>
+    <label class="btn" for="importJSON" title="Importar datos locales">Import Data</label>
     <input id="importJSON" type="file" accept="application/json" style="display:none" />
     <button id="clearAll">Clear All Data</button>
 
@@ -75,17 +80,17 @@
     <div class="grid">
       <div class="card pad">
         <div class="pair">
-          <div class="label" data-i18n="album">Album</div>
+          <div class="label">Album</div>
           <div style="display:flex;gap:8px;align-items:center">
             <input id="album" placeholder="Album name">
             <button id="btnBuscarAlbum" type="button">Buscar info</button>
           </div>
         </div>
-        <div class="pair"><div class="label" data-i18n="artist">Artist</div><input id="artist" placeholder="Artist"></div>
-        <div class="pair"><div class="label" data-i18n="released">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
-        <div class="pair"><div class="label" data-i18n="rankedby">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
-        <div class="pair"><div class="label" data-i18n="cover">Cover</div><input id="cover" type="file" accept="image/*"></div>
-        <div class="pair"><div class="label" data-i18n="trackcount">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
+        <div class="pair"><div class="label">Artist</div><input id="artist" placeholder="Artist"></div>
+        <div class="pair"><div class="label">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
+        <div class="pair"><div class="label">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
+        <div class="pair"><div class="label">Cover</div><input id="cover" type="file" accept="image/*"></div>
+        <div class="pair"><div class="label">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
 
         <div class="controls">
           <button id="applyCount">Apply Track Count</button>
@@ -155,17 +160,16 @@
     </div>
   </section>
 
-  <!-- Supabase UMD -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script>
-    // Cliente Supabase global
     window.SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
     window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
     window.SITE_URL = location.origin + location.pathname;
     window.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
   </script>
 
-  <!-- Migración a 7.1: limpia SWs y cache -->
+  <!-- Limpia SWs viejos -->
   <script>
     (async () => {
       if (!('serviceWorker' in navigator)) return;
