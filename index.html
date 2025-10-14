@@ -18,13 +18,9 @@
     th, td { padding:10px 12px; border-bottom:1px solid #1b1e25; }
     thead th { background:#151821; text-align:left; color:#cbd5e1; font-weight:600; }
     tbody tr:hover { background:#111521; }
-
-    /* columnas */
     .col-cover { width:64px; }
     .cover { width:44px; height:44px; object-fit:cover; border-radius:6px; display:block; }
     .col-average, .col-tracks, .col-open { text-align:center; width:110px; white-space:nowrap; }
-
-    /* estado auth */
     #authStatus { color:var(--accent); font-weight:600; }
   </style>
 </head>
@@ -33,7 +29,6 @@
     <strong>🎧 Album Ranking <span class="muted">v7.1</span></strong>
     <div class="spacer"></div>
 
-    <!-- Acciones -->
     <button id="btnLibrary" title="Abrir mi librería">📚 Library</button>
     <button id="btnExportLibrary" title="Exportar mi librería a JSON">⬇️ Export</button>
 
@@ -58,29 +53,27 @@
           <th class="col-open">Open</th>
         </tr>
       </thead>
-      <tbody id="tbody">
-        <!-- filas dinámicas -->
-      </tbody>
+      <tbody id="tbody"></tbody>
     </table>
   </main>
 
-  <!-- ========= LIBRERÍA DE SUPABASE (UMD) ========= -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" defer></script>
+  <!-- 1) Supabase UMD SIN defer (debe estar disponible antes de crear el cliente) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
-  <!-- ========= CREDENCIALES Y CLIENTE GLOBAL ========= -->
+  <!-- 2) Crea el cliente global -->
   <script>
-    // Ajusta con TU proyecto (los de tu captura actual)
     window.SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
     window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
-
-    // URL a la que volver tras OAuth (tu GitHub Pages raíz del proyecto)
     window.SITE_URL = location.origin + location.pathname;
 
-    // Crea cliente global para que lo usen auth/library
-    window.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    if (!window.supabase) {
+      console.error("supabase UMD no cargó");
+    } else {
+      window.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    }
   </script>
 
-  <!-- ========= SCRIPTS DE LA APP (orden importa) ========= -->
+  <!-- 3) App scripts (ya pueden usar window.sb) -->
   <script defer src="auth.v7.1.js?v=7.1"></script>
   <script defer src="library.v7.1.js?v=7.1"></script>
 </body>
