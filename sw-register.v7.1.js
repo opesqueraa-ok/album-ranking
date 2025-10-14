@@ -2,7 +2,7 @@
 (function () {
   if (!('serviceWorker' in navigator)) return;
 
-  // Desregistra SWs viejos
+  // Mata cualquier SW viejo que no sea el v7.1
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(reg => {
       const url = String(reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '');
@@ -11,8 +11,6 @@
   });
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('./sw.v7.1.js?v=7.1', { scope: './' })
-      .catch(() => {});
+    navigator.serviceWorker.register('./sw.v7.1.js?v=7.1', { scope: './' }).catch(() => {});
   });
 })();
