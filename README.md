@@ -1,7 +1,7 @@
-# Album Ranking App (Album Rater) — v7.0
+# Album Ranking App (Album Rater) — v7.1
 
 Try the latest version:
-- **GitHub Pages:** https://opesqueraa-ok.github.io/album-ranking/?v7.0
+- **GitHub Pages:** https://opesqueraa-ok.github.io/album-ranking/?v7.1
 
 ## What is this?
 A fast, offline-capable web app to **score music albums** track by track. You can:
@@ -52,10 +52,10 @@ All data is stored **locally** in your browser unless you export it manually. No
 
 ---
 
-# Aplicación de Ranking de Álbumes (Album Rater) — v7.0
+# Aplicación de Ranking de Álbumes (Album Rater) — v7.1
 
 Prueba la última versión:
-- **GitHub Pages:** https://opesqueraa-ok.github.io/album-ranking/?v7.0
+- **GitHub Pages:** https://opesqueraa-ok.github.io/album-ranking/?v7.1
 
 ## ¿Qué es?
 Una app web rápida, con soporte **offline**, para **puntuar álbumes** canción por canción. Puedes:
