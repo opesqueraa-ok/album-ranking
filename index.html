@@ -6,74 +6,160 @@
   <title>Album Ranking</title>
   <link rel="icon" href="favicon.ico" />
   <style>
-    :root { --gap: 10px; --bg:#0b0b0c; --card:#121317; --text:#eef; --muted:#9aa; --accent:#7dd3fc; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    header { display:flex; align-items:center; gap:var(--gap); padding:12px 14px; background:#0f1115; position:sticky; top:0; z-index:10; border-bottom:1px solid #1b1e25; }
-    header .spacer { flex:1; }
-    button, label.btn { background:#1a1f2a; color:var(--text); border:1px solid #283043; border-radius:8px; padding:8px 12px; cursor:pointer; }
-    button:hover, label.btn:hover { background:#202836; }
-    .muted { color:var(--muted); }
-    main { padding:18px; max-width:1100px; margin:0 auto; }
-    table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid #1b1e25; border-radius:10px; overflow:hidden; }
-    th, td { padding:10px 12px; border-bottom:1px solid #1b1e25; }
-    thead th { background:#151821; text-align:left; color:#cbd5e1; font-weight:600; }
-    tbody tr:hover { background:#111521; }
-    .col-cover { width:64px; }
-    .cover { width:44px; height:44px; object-fit:cover; border-radius:6px; display:block; }
-    .col-average, .col-tracks, .col-open { text-align:center; width:110px; white-space:nowrap; }
-    #authStatus { color:var(--accent); font-weight:600; }
+    :root{--gap:10px;--bg:#0b0b0c;--panel:#121317;--ink:#eef;--muted:#9aa;--line:#1b1e25;--accent:#7dd3fc;--neutral:#2a3140}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header{display:flex;align-items:center;gap:var(--gap);padding:12px 14px;background:#0f1115;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line)}
+    header .spacer{flex:1}
+    button,label.btn{background:#1a1f2a;color:var(--ink);border:1px solid #283043;border-radius:8px;padding:8px 12px;cursor:pointer}
+    button:hover,label.btn:hover{background:#202836}
+    .muted{color:var(--muted)}
+    .badge{opacity:.8;border:1px solid var(--line);padding:4px 8px;border-radius:8px;font-size:12px}
+    /* --- Editor (la app de puntuar) --- */
+    .wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+    .pad{padding:14px}
+    .pair{display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;margin-bottom:8px}
+    .label{font-size:13px;color:var(--muted)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+    .row{display:grid;grid-template-columns:60px 90px 1fr 160px 90px 36px;gap:8px;align-items:center;margin-bottom:6px}
+    .pill{display:inline-flex;justify-content:center;align-items:center;padding:6px 10px;border-radius:8px;color:#fff;font-weight:800;min-width:52px;text-align:center;background:var(--neutral)}
+    .noteBtn{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:#0e1218;color:var(--ink);cursor:pointer}
+    .noteBtn.active{outline:2px solid #3b82f6}
+    .cover{width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--line);border-radius:10px;background:#0d1117}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .final{font-size:52px;font-weight:800;text-align:center;margin-top:10px}
+    canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;background:#0e1218}
+    .footer{margin-top:10px;font-size:12px;color:#93a0b6}
+
+    /* --- Panel Library (tabla) --- */
+    #libPanel{max-width:1100px;margin:18px auto;padding:0 16px 32px;display:none}
+    #libCard{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    #tbl{width:100%;border-collapse:collapse}
+    #tbl thead th{background:#151821;color:#cbd5e1}
+    #tbl th,#tbl td{padding:10px 12px;border-bottom:1px solid #1b1e25}
+    .col-cover{width:64px}
+    .cover-sm{width:44px;height:44px;border-radius:6px;object-fit:cover;display:block;background:#0d1117;border:1px solid #1b1e25}
+    .col-average,.col-tracks,.col-open{text-align:center;width:110px;white-space:nowrap}
+    #authStatus{color:var(--accent);font-weight:600}
   </style>
 </head>
 <body>
   <header>
-    <strong>🎧 Album Ranking <span class="muted">v7.1</span></strong>
+    <strong>🎧 Album Ranking</strong><span class="badge">v7.1</span>
     <div class="spacer"></div>
-
-    <button id="btnLibrary" title="Abrir mi librería">📚 Library</button>
+    <button id="btnLibrary" title="Abrir/cerrar mi librería">📚 Library</button>
     <button id="btnExportLibrary" title="Exportar mi librería a JSON">⬇️ Export</button>
-
-    <input id="fileImport" type="file" accept="application/json" style="display:none" />
+    <input id="fileImport" type="file" accept="application/json" style="display:none">
     <label for="fileImport" class="btn" title="Importar librería desde JSON">⬆️ Import</label>
-
     <span id="authStatus" class="muted" style="display:none"></span>
     <button id="btnSignIn">Sign in with Google</button>
     <button id="btnSignOut" style="display:none">Sign out</button>
   </header>
 
-  <main>
-    <table id="tbl">
-      <thead>
-        <tr>
-          <th class="col-cover">Cover</th>
-          <th>Album</th>
-          <th>Artist</th>
-          <th>Released</th>
-          <th class="col-average">Average</th>
-          <th class="col-tracks">Tracks</th>
-          <th class="col-open">Open</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </main>
+  <!-- ======= EDITOR (lo que ya usabas para puntuar) ======= -->
+  <div id="app" class="wrap">
+    <div class="grid">
+      <!-- Left -->
+      <div class="card pad">
+        <div class="pair">
+          <div class="label">Album</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="album" placeholder="Album name">
+            <button id="btnBuscarAlbum" type="button">Buscar info</button>
+          </div>
+        </div>
+        <div class="pair"><div class="label">Artist</div><input id="artist" placeholder="Artist"></div>
+        <div class="pair"><div class="label">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
+        <div class="pair"><div class="label">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
+        <div class="pair"><div class="label">Cover</div><input id="cover" type="file" accept="image/*"></div>
+        <div class="pair"><div class="label">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
 
-  <!-- 1) Supabase UMD SIN defer (debe estar disponible antes de crear el cliente) -->
+        <div class="controls">
+          <button id="applyCount">Apply Track Count</button>
+          <button id="addRow">+ Add Row</button>
+          <button id="delRow">– Remove Last</button>
+          <button id="clearScores">Clear Score</button>
+          <button id="sortTop10">Sort Top 10</button>
+          <span class="muted" title="Unscored tracks are '-'">Unscored = ‘-’</span>
+        </div>
+
+        <div class="row" style="font-size:12px;color:#aeb5c0">
+          <div>#</div><div>Duration</div><div>Name</div><div>Score (int + decimal)</div><div>Color</div><div></div>
+        </div>
+        <div id="tracks"></div>
+      </div>
+
+      <!-- Right -->
+      <div class="card pad">
+        <div style="display:grid;grid-template-columns:1fr 360px;gap:16px">
+          <div>
+            <div id="info" style="display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:center"></div>
+            <table id="table"></table>
+          </div>
+          <div>
+            <img id="coverOut" class="cover" alt="Cover">
+            <div class="final" id="finalScore">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="font-size:12px;color:#aeb5c0;margin:6px 0">Enjoyment Timeline</div>
+          <canvas id="chart" width="900" height="360"></canvas>
+        </div>
+
+        <div id="notesSection" class="card pad" style="margin-top:12px">
+          <div style="font-size:12px;color:#aeb5c0;margin-bottom:6px">Notes & Review</div>
+          <div id="notesOutput" style="white-space:pre-wrap;line-height:1.5;font-size:14px"></div>
+          <div style="margin-top:10px">
+            <div class="label">Final Album Thoughts</div>
+            <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px"></textarea>
+          </div>
+        </div>
+
+        <div class="footer">Created by Ok Pretty Boy with help from ChatGPT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= LIBRARY (panel plegable) ======= -->
+  <section id="libPanel">
+    <div id="libCard">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th class="col-cover">Cover</th>
+            <th>Album</th>
+            <th>Artist</th>
+            <th>Released</th>
+            <th class="col-average">Average</th>
+            <th class="col-tracks">Tracks</th>
+            <th class="col-open">Open</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7" class="muted" style="padding:14px">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 1) Supabase UMD SIN defer -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-
-  <!-- 2) Crea el cliente global -->
+  <!-- 2) Cliente Supabase global -->
   <script>
     window.SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
     window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
     window.SITE_URL = location.origin + location.pathname;
-
-    if (!window.supabase) {
-      console.error("supabase UMD no cargó");
-    } else {
-      window.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-    }
+    window.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
   </script>
 
-  <!-- 3) App scripts (ya pueden usar window.sb) -->
+  <!-- 3) Scripts de la app -->
+  <script defer src="autofillAlbum.v7.1.js?v=7.1"></script>
+  <script defer src="ui.v7.1.js?v=7.1"></script>
   <script defer src="auth.v7.1.js?v=7.1"></script>
   <script defer src="library.v7.1.js?v=7.1"></script>
 </body>
