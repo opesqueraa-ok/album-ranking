@@ -1,204 +1,264 @@
-// library.v7.1.js
-(function(){
-  const $ = s => document.querySelector(s);
-  const $$ = s => document.querySelectorAll(s);
+// library.v7.1.js — v7.1 (JSON en albums.tracks)
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
 
-  // === Helpers ===
-  function fmt(n, d=1){
-    if(n == null || isNaN(n)) return '—';
-    return Number(n).toFixed(d);
-  }
-  function averageFromTracks(tracks){
-    if(!tracks || !tracks.length) return null;
-    const vals = tracks.map(t => Number(t.score)).filter(x=>!isNaN(x));
-    if(!vals.length) return null;
-    return vals.reduce((a,b)=>a+b,0)/vals.length;
-  }
-  function download(name, blob){
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+  // ---------- helpers ----------
+  const fmt = (n, d = 1) =>
+    n == null || isNaN(n) ? "—" : Number(n).toFixed(d);
+
+  const avgFromTracks = (tracks) => {
+    const arr = Array.isArray(tracks) ? tracks : [];
+    const vals = arr
+      .map((t) => Number(t?.score))
+      .filter((x) => Number.isFinite(x));
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+
+  const toast = (msg) => {
+    console.log(msg);
+    alert(msg); // simple, portable
+  };
+
+  // ---------- state/UI ----------
+  function setAuthUI(session) {
+    const signed = !!session?.user;
+    const btnLib = $("#btnLibrary");
+    const btnExp = $("#btnExportLibrary");
+    const imp = $("#fileImport");
+    const status = $("#authStatus");
+    const inBtn = $("#btnSignIn");
+    const outBtn = $("#btnSignOut");
+
+    if (signed) {
+      status.style.display = "inline";
+      status.textContent = session.user.email || "Signed in";
+      inBtn.style.display = "none";
+      outBtn.style.display = "inline-block";
+      btnLib.disabled = false;
+      btnExp.disabled = false;
+      imp.disabled = false;
+    } else {
+      status.style.display = "none";
+      status.textContent = "";
+      inBtn.style.display = "inline-block";
+      outBtn.style.display = "none";
+      btnLib.disabled = true;
+      btnExp.disabled = true;
+      imp.disabled = true;
+    }
   }
 
-  // === Render tabla ===
-  async function fetchAlbums(){
-    // Puedes cambiar por tu vista si la tienes. Aquí uso albums + un count de tracks y avg_score.
-    // Requiere: tabla public.albums (id, album, artist, released, cover, avg_score) y public.tracks (album_id, score)
-    const { data: albums, error } = await sb
-      .from('albums')
-      .select('id, album, artist, released, cover, avg_score, tracks:tracks(count)')
-      .order('updated_at', { ascending: false })
+  // ---------- render ----------
+  async function fetchMyAlbums() {
+    // Traemos solo lo que existe en TU esquema actual:
+    // id, album, artist, released, cover, avg_score (si existe),
+    // tracks (JSON), rankedby opcional, user_id para RLS
+    const { data: sess } = await sb.auth.getSession();
+    const uid = sess?.session?.user?.id || null;
+    if (!uid) return { items: [], needLogin: true };
+
+    // Si tienes RLS por user_id, úsalo; si no, quita el .eq('user_id', uid)
+    const { data, error } = await sb
+      .from("albums")
+      .select("id, album, artist, released, cover, avg_score, tracks, rankedby, updated_at, created_at, user_id")
+      .eq("user_id", uid)
+      .order("updated_at", { ascending: false })
       .limit(500);
-    if(error){ console.error(error); alert('Error loading albums: '+error.message); return []; }
-    return albums.map(a => ({
-      ...a,
-      tracksCount: Array.isArray(a.tracks) && a.tracks.length ? a.tracks[0].count : 0
-    }));
+
+    if (error) {
+      console.error(error);
+      toast("Error loading albums: " + error.message);
+      return { items: [] };
+    }
+
+    const items = (data || []).map((row) => {
+      const count = Array.isArray(row.tracks) ? row.tracks.length : 0;
+      const avg = row.avg_score ?? avgFromTracks(row.tracks);
+      return {
+        id: row.id,
+        album: row.album || "",
+        artist: row.artist || "",
+        released: row.released || "",
+        cover: row.cover || "",
+        avg_score: avg,
+        tracksCount: count,
+      };
+    });
+
+    return { items };
   }
 
-  function row(album){
-    const tr = document.createElement('tr');
+  function rowEl(a) {
+    const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="col-cover">
-        ${album.cover ? `<img class="cover" src="${album.cover}" alt="">` : ''}
-      </td>
-      <td>${album.album || ''}</td>
-      <td>${album.artist || ''}</td>
-      <td>${album.released || ''}</td>
-      <td class="col-average">${fmt(album.avg_score ?? album.avg ?? album.avgScore)}</td>
-      <td class="col-tracks">${album.tracksCount ?? '—'}</td>
-      <td class="col-open"><button data-open="${album.id}">Open</button></td>
+      <td class="col-cover">${a.cover ? `<img class="cover" src="${a.cover}" alt="">` : ""}</td>
+      <td>${a.album}</td>
+      <td>${a.artist}</td>
+      <td>${a.released}</td>
+      <td class="col-average">${fmt(a.avg_score)}</td>
+      <td class="col-tracks">${a.tracksCount || 0}</td>
+      <td class="col-open"><button data-open="${a.id}">Open</button></td>
     `;
     return tr;
   }
 
-  async function render(){
-    const tbody = $('#tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">Loading…</td></tr>';
-    const items = await fetchAlbums();
-    tbody.innerHTML = '';
-    if(!items.length){
-      tbody.innerHTML = '<tr><td colspan="7" class="muted">No albums yet</td></tr>';
+  async function render() {
+    const tbody = $("#tbody");
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">Loading...</td></tr>`;
+
+    const { items, needLogin } = await fetchMyAlbums();
+    if (needLogin) {
+      tbody.innerHTML = `<tr><td colspan="7" class="muted">Sign in to view your library.</td></tr>`;
       return;
     }
-    for(const a of items){ tbody.appendChild(row(a)); }
-    // wire "Open"
-    $$('#tbody [data-open]').forEach(btn=>{
-      if(btn._b) return; btn._b = true;
-      btn.addEventListener('click', e=>{
-        const id = btn.getAttribute('data-open');
-        // navega a tu vista/route de detalle si la tienes
-        alert('Abrir álbum: ' + id);
+
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="muted">No albums yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = "";
+    items.forEach((a) => tbody.appendChild(rowEl(a)));
+
+    // Wire "Open"
+    $$('#tbody [data-open]').forEach((btn) => {
+      if (btn._bound) return;
+      btn._bound = true;
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-open");
+        // Aquí puedes navegar a tu vista original de detalle; por ahora, solo mensaje.
+        alert("Abrir álbum: " + id);
       });
     });
   }
 
-  // === Export ===
-  async function exportLibrary(){
-    // Trae albums con sus tracks para exportar
-    const { data: albums, error } = await sb
-      .from('albums')
-      .select('id, lang, album, artist, released, rankedby, cover, avg_score, notes, created_at, updated_at, tracks:tracks(id, n, dur, name, score)')
-      .order('updated_at', { ascending: false });
-    if(error){ alert('Export failed: ' + error.message); return; }
+  // ---------- export ----------
+  async function exportLibrary() {
+    const { data: sess } = await sb.auth.getSession();
+    const uid = sess?.session?.user?.id || null;
+    if (!uid) return toast("Sign in first.");
+
+    const { data, error } = await sb
+      .from("albums")
+      .select("id, lang, album, artist, released, rankedby, cover, avg_score, tracks, final_notes, created_at, updated_at, user_id")
+      .eq("user_id", uid)
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return toast("Export failed: " + error.message);
+    }
 
     const shaped = {
-      albums: (albums||[]).map(a => ({
+      albums: (data || []).map((a) => ({
         id: a.id,
-        lang: a.lang ?? 'en',
-        album: a.album,
-        artist: a.artist,
-        released: a.released,
-        rankedby: a.rankedby ?? '',
-        cover: a.cover ?? '',
-        tracks: (a.tracks||[]).map(t=>({ id:t.id, n:t.n, dur:t.dur, name:t.name, score:t.score })),
-        avgScore: a.avg_score ?? averageFromTracks(a.tracks||[]),
-        notes: a.notes ?? { trackNotes:{}, final:'' },
+        lang: a.lang ?? "en",
+        album: a.album || "",
+        artist: a.artist || "",
+        released: a.released || "",
+        rankedby: a.rankedby || "",
+        cover: a.cover || "",
+        tracks: Array.isArray(a.tracks) ? a.tracks : [],
+        avgScore: a.avg_score ?? avgFromTracks(a.tracks),
+        notes: a.final_notes ?? "",
         updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now(),
         createdAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
-      }))
+      })),
     };
 
-    const blob = new Blob([JSON.stringify(shaped, null, 2)], { type:'application/json' });
-    download(`albumrater-library-${new Date().toISOString().slice(0,10)}.json`, blob);
+    const blob = new Blob([JSON.stringify(shaped, null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `albumrater-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
   }
 
-  // === Import ===
-  async function importLibrary(file){
-    try{
+  // ---------- import ----------
+  async function importLibrary(file) {
+    const { data: sess } = await sb.auth.getSession();
+    const uid = sess?.session?.user?.id || null;
+    if (!uid) return toast("Sign in first.");
+
+    try {
       const text = await file.text();
       const json = JSON.parse(text);
       const albums = Array.isArray(json.albums) ? json.albums : [];
-      if(!albums.length){ alert('El JSON no tiene albums.'); return; }
+      if (!albums.length) return toast("El JSON no contiene albums.");
 
-      // Usuario actual (para ownership si usas RLS por user_id)
-      const { data: sess } = await sb.auth.getUser();
-      const userId = sess?.user?.id || null;
-
-      // upsert por lotes en albums, luego tracks
-      // 1) ALBUMS
-      const albumsPayload = albums.map(a => ({
-        id: a.id, // respetamos id del archivo
-        lang: a.lang ?? 'en',
-        album: a.album ?? '',
-        artist: a.artist ?? '',
-        released: a.released ?? '',
-        rankedby: a.rankedby ?? '',
-        cover: a.cover ?? '',
-        avg_score: (a.avgScore != null ? Number(a.avgScore) : averageFromTracks(a.tracks||[])) ?? null,
-        user_id: userId, // si tu tabla lo requiere
+      // Prepara payload para TU esquema (tracks JSON en albums)
+      const rows = albums.map((a) => ({
+        id: a.id, // respetamos si viene id
+        user_id: uid,
+        lang: a.lang ?? "en",
+        album: a.album ?? "",
+        artist: a.artist ?? "",
+        released: a.released ?? "",
+        rankedby: a.rankedby ?? "",
+        cover: a.cover ?? "",
+        tracks: Array.isArray(a.tracks) ? a.tracks : [],
+        avg_score:
+          a.avgScore != null
+            ? Number(a.avgScore)
+            : avgFromTracks(a.tracks || []),
+        final_notes: typeof a.notes === "string" ? a.notes : (a.notes?.final ?? ""),
       }));
 
-      // upsert
-      {
-        const { error } = await sb.from('albums')
-          .upsert(albumsPayload, { onConflict: 'id' })
-          .select('id');
-        if(error){ console.error(error); throw new Error('Error upserting albums: ' + error.message); }
-      }
+      const { error } = await sb.from("albums").upsert(rows, {
+        onConflict: "id",
+      });
+      if (error) throw error;
 
-      // 2) TRACKS (borro y re-inserto del álbum para que coincida con el JSON)
-      for(const a of albums){
-        if(!a.id) continue;
-        // eliminar antiguos
-        {
-          const { error } = await sb.from('tracks').delete().eq('album_id', a.id);
-          if(error){ console.warn('No se pudo limpiar tracks de', a.id, error); }
-        }
-        // insertar nuevos
-        const tracks = Array.isArray(a.tracks) ? a.tracks : [];
-        if(tracks.length){
-          const rows = tracks.map(t => ({
-            album_id: a.id,
-            n: t.n ?? null,
-            dur: t.dur ?? null,
-            name: t.name ?? '',
-            score: (t.score != null ? Number(t.score) : null),
-            user_id: userId, // si tu RLS lo requiere
-          }));
-          const { error } = await sb.from('tracks').insert(rows).select('id');
-          if(error){ console.error(error); throw new Error('Error inserting tracks for album '+a.id+': ' + error.message); }
-        }
-      }
-
-      alert('Import terminado ✅');
+      toast("Import terminado ✅");
       render();
-    }catch(err){
-      console.error(err);
-      alert('Import failed: ' + (err?.message || err));
+    } catch (e) {
+      console.error(e);
+      toast("Import failed: " + (e?.message || e));
     }
   }
 
-  // === Library Button ===
-  async function openLibrary(){
-    // Puedes cambiar por tu modal/ruta; por ahora recarga la tabla.
-    await render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  // ---------- bind ----------
+  function bind() {
+    const btnLib = $("#btnLibrary");
+    const btnExport = $("#btnExportLibrary");
+    const fileImport = $("#fileImport");
 
-  // === Bind UI ===
-  function bind(){
-    const btnLib = $('#btnLibrary');
-    const btnExport = $('#btnExportLibrary');
-    const fileImport = $('#fileImport');
-
-    if(btnLib && !btnLib._b){ btnLib._b=true; btnLib.addEventListener('click', openLibrary); }
-    if(btnExport && !btnExport._b){ btnExport._b=true; btnExport.addEventListener('click', exportLibrary); }
-    if(fileImport && !fileImport._b){
-      fileImport._b=true;
-      fileImport.addEventListener('change', e=>{
+    if (btnLib && !btnLib._b) {
+      btnLib._b = true;
+      btnLib.addEventListener("click", render);
+    }
+    if (btnExport && !btnExport._b) {
+      btnExport._b = true;
+      btnExport.addEventListener("click", exportLibrary);
+    }
+    if (fileImport && !fileImport._b) {
+      fileImport._b = true;
+      fileImport.addEventListener("change", (e) => {
         const f = e.target.files?.[0];
-        if(!f) return;
+        if (!f) return;
         importLibrary(f);
-        e.target.value = ''; // permite re-seleccionar el mismo archivo
+        e.target.value = "";
       });
     }
 
-    // primera carga
-    render();
+    // Estado inicial de auth + render reactivo
+    sb.auth.getSession().then(({ data }) => {
+      setAuthUI(data.session);
+      render();
+    });
+    sb.auth.onAuthStateChange((_ev, session) => {
+      setAuthUI(session);
+      render();
+    });
   }
 
-  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', bind); } else { bind(); }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bind);
+  } else {
+    bind();
+  }
 })();
