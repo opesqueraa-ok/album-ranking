@@ -1,61 +1,52 @@
 // ui.v7.1.js — Auth (Google) + Library + Export/Import + Sort/Notes
 (function () {
   // ---------- helpers ----------
-  const $ = (s) => document.querySelector(s);
+  const $  = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const safe = (s) =>
-    (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
+  const safe = (s) => (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
 
   const SITE_RETURN_URL =
-    (window.SITE_URL || (location.origin + location.pathname)).replace(/(?<!:)\/{2,}/g, "/");
+    window.SITE_URL ||
+    "https://opesqueraa-ok.github.io/album-ranking/".replace(/(?<!:)\/{2,}/g, "/");
 
   // ---------- Supabase client ----------
   let supabaseClient = null;
   function sb() {
     if (!supabaseClient) {
       if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        console.error("Supabase no está listo (CDN o credenciales faltan).");
-        return null;
+        console.error("Supabase CDN o credenciales no están disponibles.");
+        throw new Error("Supabase client not configured");
       }
-      try {
-        supabaseClient = window.supabase.createClient(
-          window.SUPABASE_URL,
-          window.SUPABASE_ANON_KEY
-        );
-      } catch (e) {
-        console.error("No se pudo crear el cliente de Supabase:", e);
-        return null;
-      }
+      supabaseClient = window.supabase.createClient(
+        window.SUPABASE_URL,
+        window.SUPABASE_ANON_KEY
+      );
     }
     return supabaseClient;
   }
 
-  // ---------- Toast ----------
-  function toast(msg, ms = 2000) {
-    const t = $("#toast");
-    if (!t) return alert(msg);
-    t.textContent = msg;
-    t.style.display = "block";
-    clearTimeout(t._h);
-    t._h = setTimeout(() => (t.style.display = "none"), ms);
+  // Toast
+  function toast(msg) {
+    const t = $("#toast"); if (!t) return;
+    t.textContent = msg; t.style.display = "block";
+    setTimeout(() => (t.style.display = "none"), 2400);
   }
 
   // ---------- Auth UI ----------
   async function refreshAuthUI() {
     try {
-      const client = sb();
-      if (!client) return;
-      const { data } = await client.auth.getSession();
-      const signed = !!data?.session;
+      const { data } = await sb().auth.getSession();
+      const session = data?.session || null;
+      const signed = !!session;
 
-      const inBtn = $("#btnSigninGoogle");
+      const inBtn  = $("#btnSigninGoogle");
       const outBtn = $("#btnSignout");
-      const saveBtn = $("#btnSaveToLibrary");
-      const myLibBtn = $("#btnMyLibrary");
+      const saveBtn= $("#btnSaveToLibrary");
+      const myLibBtn=$("#btnMyLibrary");
 
-      if (inBtn) inBtn.style.display = signed ? "none" : "";
+      if (inBtn)  inBtn.style.display  = signed ? "none" : "";
       if (outBtn) outBtn.style.display = signed ? "" : "none";
-      if (saveBtn) saveBtn.style.display = signed ? "" : "none";
+      if (saveBtn)saveBtn.style.display= signed ? "" : "none";
       if (myLibBtn) myLibBtn.style.display = signed ? "" : "none";
     } catch (e) {
       console.warn("refreshAuthUI:", e);
@@ -64,44 +55,31 @@
 
   async function signInGoogle() {
     try {
-      const client = sb();
-      if (!client) return toast("Supabase no está listo.");
-      const { error } = await client.auth.signInWithOAuth({
+      const { error } = await sb().auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: SITE_RETURN_URL }
       });
-      if (error) {
-        console.error(error);
-        toast("No se pudo iniciar sesión con Google.");
-      }
-      // Redirección la hace Google→Supabase→SITE_RETURN_URL
+      if (error) throw error;
+      // La redirección la maneja Google/Supabase
     } catch (e) {
       console.error(e);
-      toast("No se pudo iniciar sesión con Google.");
+      alert("No se pudo iniciar sesión con Google.");
     }
   }
 
   async function signOut() {
     try {
-      const client = sb();
-      if (!client) return;
-      await client.auth.signOut();
-      toast("Signed out.");
+      await sb().auth.signOut();
+      toast("Signed out");
     } finally {
       await refreshAuthUI();
     }
   }
 
   // ---------- App state helpers ----------
-  function getAppState() {
-    return window.AlbumApp?.getState ? window.AlbumApp.getState() : null;
-  }
-  function setAppState(s) {
-    if (window.AlbumApp?.setState) window.AlbumApp.setState(s);
-  }
-  function saveLocal() {
-    if (window.AlbumApp?.save) window.AlbumApp.save();
-  }
+  function getAppState() { return window.AlbumApp?.getState ? window.AlbumApp.getState() : null; }
+  function setAppState(s) { if (window.AlbumApp?.setState) window.AlbumApp.setState(s); }
+  function saveLocal() { if (window.AlbumApp?.save) window.AlbumApp.save(); }
 
   // Average from scores
   function computeAverage(tracks) {
@@ -118,24 +96,15 @@
     try {
       const s = getAppState();
       const payload = { ...s };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json",
-      });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-
       const album = safe(s?.album || "Album");
       const artist = safe(s?.artist || "");
       const fname = artist ? `${album} - ${artist}.json` : `${album}.json`;
-
       const a = document.createElement("a");
-      a.href = url;
-      a.download = fname;
-      a.click();
+      a.href = url; a.download = fname; a.click();
       URL.revokeObjectURL(url);
-    } catch (e) {
-      toast("Could not export.");
-      console.error(e);
-    }
+    } catch (e) { alert("Could not export."); console.error(e); }
   }
 
   function importJSON(file) {
@@ -145,10 +114,8 @@
         const obj = JSON.parse(e.target.result);
         setAppState(obj);
         saveLocal();
-        toast("Imported.");
-      } catch (err) {
-        toast("Invalid file.");
-      }
+        alert("Imported.");
+      } catch (err) { alert("Invalid file."); }
     };
     r.readAsText(file);
   }
@@ -157,41 +124,23 @@
     if (!confirm("Are you sure you want to clear all fields?")) return;
     localStorage.removeItem("albumrater_v6_state");
     localStorage.removeItem("albumrater_v7_state");
-    setAppState({
-      lang: $("#lang")?.value || "en",
-      album: "",
-      artist: "",
-      released: "",
-      rankedby: "",
-      cover: "",
-      tracks: [],
-    });
-    toast("Cleared.");
+    setAppState({ lang: $("#lang")?.value || "en", album: "", artist: "", released: "", rankedby: "", cover: "", tracks: [] });
   }
 
-  // Limpia SOLO puntuaciones (las deja en “-”)
   function clearScores() {
-    const s = getAppState();
-    if (!s) return;
+    const s = getAppState(); if (!s) return;
     s.tracks = (s.tracks || []).map((t) => ({ ...t, score: NaN }));
-    setAppState(s);
-    saveLocal();
-    toast("Scores cleared.");
+    setAppState(s); saveLocal();
   }
 
-  // ---------- Notas por pista ----------
+  // ---------- Notes ----------
   function ensureNoteButtons() {
-    const container = $("#tracks");
-    if (!container) return;
+    const container = $("#tracks"); if (!container) return;
     [...container.children].forEach((row, idx) => {
       if (row.querySelector(".noteBtn")) return;
-
       const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "noteBtn";
-      btn.title = "Add note";
-      btn.innerHTML =
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33h-.5v-.5l9.06-9.06.5.5L5.92 19.58zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
+      btn.type = "button"; btn.className = "noteBtn"; btn.title = "Add note";
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33h-.5v-.5l9.06-9.06.5.5L5.92 19.58zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
       row.appendChild(btn);
 
       btn.addEventListener("click", () => {
@@ -202,11 +151,8 @@
         const text = prompt("Write a note for this track:", prev || "");
         if (text == null) return;
         current.note = String(text).trim();
-        tracks[idx] = current;
-        s.tracks = tracks;
-        setAppState(s);
-        saveLocal();
-        renderNotesOutput();
+        tracks[idx] = current; s.tracks = tracks;
+        setAppState(s); saveLocal(); renderNotesOutput();
         btn.classList.toggle("active", !!current.note);
       });
 
@@ -217,16 +163,10 @@
   }
 
   function renderNotesOutput() {
-    const out = $("#notesOutput");
-    if (!out) return;
+    const out = $("#notesOutput"); if (!out) return;
     const s = getAppState() || {};
     const lines = [];
-    (s.tracks || []).forEach((t, i) => {
-      if (t?.note) {
-        const name = t.name || `Track ${i + 1}`;
-        lines.push(`${i + 1}. ${name}: ${t.note}`);
-      }
-    });
+    (s.tracks || []).forEach((t, i) => { if (t?.note) { const name = t.name || `Track ${i + 1}`; lines.push(`${i + 1}. ${name}: ${t.note}`); } });
     const albumTitle = s.album ? `${s.album} by ${s.artist || ""}`.trim() : "";
     const header = albumTitle ? albumTitle + "\n" : "";
     const final = s.finalNotes || "";
@@ -236,47 +176,31 @@
 
   function bindFinalNotes() {
     const ta = $("#finalNotes");
-    if (!ta || ta._bound) return;
-    ta._bound = true;
+    if (!ta || ta._bound) return; ta._bound = true;
     ta.addEventListener("input", () => {
-      const s = getAppState() || {};
-      s.finalNotes = ta.value || "";
-      setAppState(s);
-      saveLocal();
-      renderNotesOutput();
+      const s = getAppState() || {}; s.finalNotes = ta.value || "";
+      setAppState(s); saveLocal(); renderNotesOutput();
     });
   }
 
   function observeTrackList() {
-    const target = $("#tracks");
-    if (!target || target._observerAttached) return;
+    const target = $("#tracks"); if (!target || target._observerAttached) return;
     target._observerAttached = true;
-
-    const mo = new MutationObserver(() => {
-      ensureNoteButtons();
-      renderNotesOutput();
-    });
+    const mo = new MutationObserver(() => { ensureNoteButtons(); renderNotesOutput(); });
     mo.observe(target, { childList: true });
-
-    ensureNoteButtons();
-    renderNotesOutput();
+    ensureNoteButtons(); renderNotesOutput();
   }
 
   // ---------- Sort Top 10 reversible ----------
   const SORT_STATE = { active: false, snapshot: null };
   function setSortButtonLabel() {
-    const b = $("#sortTop10");
-    if (!b) return;
+    const b = $("#sortTop10"); if (!b) return;
     b.textContent = SORT_STATE.active ? "Restore album order" : "Sort Top 10";
   }
   function bindSortTop10() {
-    const b = $("#sortTop10");
-    if (!b || b._bound) return;
-    b._bound = true;
+    const b = $("#sortTop10"); if (!b || b._bound) return; b._bound = true;
     b.addEventListener("click", () => {
-      const el = $("#tracks");
-      if (!el) return;
-
+      const el = $("#tracks"); if (!el) return;
       if (!SORT_STATE.active) {
         SORT_STATE.snapshot = [...el.children].map((r) => r.value());
         const arr = SORT_STATE.snapshot.map((x) => ({ ...x }));
@@ -286,41 +210,22 @@
         const top = scored.slice(0, 10);
         const rest = scored.slice(10).concat(un);
         const merged = top.concat(rest).map((t, i) => ({ ...t, n: i + 1 }));
-
-        el.innerHTML = "";
-        merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
-        SORT_STATE.active = true;
-        setSortButtonLabel();
-        ensureNoteButtons();
-        renderNotesOutput();
-        return;
+        el.innerHTML = ""; merged.forEach((t, i) => el.appendChild(makeRow(i, t)));
+        SORT_STATE.active = true; setSortButtonLabel(); ensureNoteButtons(); renderNotesOutput(); return;
       }
-
       const original = SORT_STATE.snapshot?.map((x) => ({ ...x })) || [];
-      el.innerHTML = "";
-      original.forEach((t, i) => el.appendChild(makeRow(i, t)));
-      SORT_STATE.active = false;
-      SORT_STATE.snapshot = null;
-      setSortButtonLabel();
-      ensureNoteButtons();
-      renderNotesOutput();
+      el.innerHTML = ""; original.forEach((t, i) => el.appendChild(makeRow(i, t)));
+      SORT_STATE.active = false; SORT_STATE.snapshot = null; setSortButtonLabel(); ensureNoteButtons(); renderNotesOutput();
     });
     setSortButtonLabel();
   }
 
   // ---------- Library (Supabase) ----------
   async function saveToLibrary() {
-    const client = sb();
-    if (!client) return;
-    const { data: sData } = await client.auth.getSession();
+    const { data: sData } = await sb().auth.getSession();
     const user = sData?.session?.user;
-    if (!user) {
-      toast("Please sign in first.");
-      return;
-    }
-    const s = getAppState();
-    if (!s) return;
-
+    if (!user) { alert("Please sign in first."); return; }
+    const s = getAppState(); if (!s) return;
     const avg = computeAverage(s.tracks);
     const payload = {
       user_id: user.id,
@@ -333,52 +238,37 @@
       avg: avg,
       final_notes: s.finalNotes || "",
     };
-
-    const { error } = await client.from("albums").insert(payload);
-    if (error) {
-      console.error(error);
-      toast("Error saving album.");
-      return;
-    }
-    toast("Saved to your library.");
+    const { error } = await sb().from("albums").insert(payload);
+    if (error) { console.error(error); alert("Error saving album."); return; }
+    alert("Saved to your library.");
   }
 
   function openLibraryModal(show) {
-    const bd = $("#libraryBackdrop");
-    if (!bd) return;
+    const bd = $("#libraryBackdrop"); if (!bd) return;
     bd.style.display = show ? "flex" : "none";
   }
 
   async function openLibrary() {
-    const client = sb();
-    if (!client) return;
-    const { data: sData } = await client.auth.getSession();
+    const { data: sData } = await sb().auth.getSession();
     const user = sData?.session?.user;
-    if (!user) {
-      toast("Please sign in first.");
-      return;
-    }
+    if (!user) { alert("Please sign in first."); return; }
 
     const sortSel = $("#librarySort");
     const order = sortSel?.value || "desc";
 
-    let q = client.from("albums").select("*").eq("user_id", user.id);
+    let q = sb().from("albums").select("*").eq("user_id", user.id);
     if (order === "desc") q = q.order("avg", { ascending: false, nullsFirst: false });
     else if (order === "asc") q = q.order("avg", { ascending: true, nullsFirst: true });
     else q = q.order("created_at", { ascending: false });
 
     const { data, error } = await q;
-    if (error) {
-      console.error(error);
-      toast("Error loading library.");
-      return;
-    }
+    if (error) { console.error(error); alert("Error loading library."); return; }
 
     const list = $("#libraryList");
     const empty = $("#libraryEmpty");
     list.innerHTML = `
-      <div style="grid-column:1/-1;display:grid;grid-template-columns:88px 1fr 96px 96px 96px;gap:10px;color:#9fb0c6;padding:6px 0 10px;position:sticky;top:0;background:#0f1218;"> 
-        <div>Cover</div><div>Album — Artist</div><div style="text-align:center">Avg</div><div style="text-align:center">Tracks</div><div style="text-align:center">Open</div>
+      <div style="grid-column:1/-1;display:grid;grid-template-columns:88px 1fr 96px 96px 96px;gap:10px;color:#9fb0c6;padding:6px 0 10px;position:sticky;top:0;background:#0f1218;">
+        <div>Cover</div><div>Album — Artist</div><div style="text-align:center">Avg</div><div style="text-align:center">Tracks</div><div style="text-align:center">Opened</div>
       </div>
     `;
 
@@ -425,8 +315,7 @@
         };
         setAppState(s);
         saveLocal();
-        const ta = $("#finalNotes");
-        if (ta) ta.value = row.final_notes || "";
+        const ta = $("#finalNotes"); if (ta) ta.value = row.final_notes || "";
         renderNotesOutput();
         openLibraryModal(false);
       });
@@ -442,89 +331,36 @@
   // ---------- Bind UI ----------
   function bindUI() {
     // Auth buttons
-    const bi = $("#btnSigninGoogle");
-    if (bi && !bi._bound) {
-      bi._bound = true;
-      bi.addEventListener("click", signInGoogle);
-    }
-    const bo = $("#btnSignout");
-    if (bo && !bo._bound) {
-      bo._bound = true;
-      bo.addEventListener("click", signOut);
-    }
-    const bs = $("#btnSaveToLibrary");
-    if (bs && !bs._bound) {
-      bs._bound = true;
-      bs.addEventListener("click", saveToLibrary);
-    }
-    const bm = $("#btnMyLibrary");
-    if (bm && !bm._bound) {
-      bm._bound = true;
-      bm.addEventListener("click", openLibrary);
-    }
+    const bi = $("#btnSigninGoogle"); if (bi && !bi._bound) { bi._bound = true; bi.addEventListener("click", signInGoogle); }
+    const bo = $("#btnSignout"); if (bo && !bo._bound) { bo._bound = true; bo.addEventListener("click", signOut); }
+    const bs = $("#btnSaveToLibrary"); if (bs && !bs._bound) { bs._bound = true; bs.addEventListener("click", saveToLibrary); }
+    const bm = $("#btnMyLibrary"); if (bm && !bm._bound) { bm._bound = true; bm.addEventListener("click", openLibrary); }
 
     // Modal controls
-    const bc = $("#libraryClose");
-    if (bc && !bc._bound) {
-      bc._bound = true;
-      bc.addEventListener("click", () => openLibraryModal(false));
-    }
-    const sortSel = $("#librarySort");
-    if (sortSel && !sortSel._bound) {
-      sortSel._bound = true;
-      sortSel.addEventListener("change", openLibrary);
-    }
-    const back = $("#libraryBackdrop");
-    if (back && !back._backdropBound) {
-      back._backdropBound = true;
-      back.addEventListener("click", (e) => {
-        if (e.target === back) openLibraryModal(false);
-      });
-    }
+    const bc = $("#libraryClose"); if (bc && !bc._bound) { bc._bound = true; bc.addEventListener("click", () => openLibraryModal(false)); }
+    const sortSel = $("#librarySort"); if (sortSel && !sortSel._bound) { sortSel._bound = true; sortSel.addEventListener("change", openLibrary); }
+    const back = $("#libraryBackdrop"); if (back && !back._backdropBound) { back._backdropBound = true; back.addEventListener("click", (e) => { if (e.target === back) openLibraryModal(false); }); }
 
     // Export / Import / Clear
-    const exp = $("#exportJSON");
-    if (exp && !exp._bound) {
-      exp._bound = true;
-      exp.addEventListener("click", exportJSON);
-    }
-    const imp = $("#importJSON");
-    if (imp && !imp._bound) {
+    const exp = $("#exportJSON"); if (exp && !exp._bound) { exp._bound = true; exp.addEventListener("click", exportJSON); }
+    const imp = $("#importJSON"); if (imp && !imp._bound) {
       imp._bound = true;
-      imp.addEventListener("change", (ev) => {
-        const f = ev.target.files[0];
-        if (f) importJSON(f);
-        ev.target.value = "";
-      });
+      imp.addEventListener("change", (ev) => { const f = ev.target.files[0]; if (f) importJSON(f); ev.target.value = ""; });
     }
-    const clrAll = $("#clearAll");
-    if (clrAll && !clrAll._bound) {
-      clrAll._bound = true;
-      clrAll.addEventListener("click", clearAll);
-    }
-    const clrScores = $("#clearScores");
-    if (clrScores && !clrScores._bound) {
-      clrScores._bound = true;
-      clrScores.addEventListener("click", clearScores);
-    }
+    const clrAll = $("#clearAll"); if (clrAll && !clrAll._bound) { clrAll._bound = true; clrAll.addEventListener("click", clearAll); }
+    const clrScores = $("#clearScores"); if (clrScores && !clrScores._bound) { clrScores._bound = true; clrScores.addEventListener("click", clearScores); }
 
     // Notes + observer
-    bindFinalNotes();
-    observeTrackList();
+    bindFinalNotes(); observeTrackList();
 
     // Sort Top 10
     bindSortTop10();
 
     // Re-pintar notas tras autofill
-    window.addEventListener("album-autofilled", () => {
-      bindFinalNotes();
-      observeTrackList();
-      renderNotesOutput();
-    });
+    window.addEventListener("album-autofilled", () => { bindFinalNotes(); observeTrackList(); renderNotesOutput(); });
 
     // Auth changes
-    const client = sb();
-    if (client) client.auth.onAuthStateChange(() => refreshAuthUI());
+    try { sb().auth.onAuthStateChange(() => refreshAuthUI()); } catch (e) { console.warn("onAuthStateChange no disponible todavía:", e); }
     refreshAuthUI();
   }
 
@@ -532,30 +368,17 @@
   if (document.readyState === "complete" || document.readyState === "interactive") {
     try { bindUI(); } catch (e) { console.error(e); }
   } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      try { bindUI(); } catch (e) { console.error(e); }
-    });
+    document.addEventListener("DOMContentLoaded", () => { try { bindUI(); } catch (e) { console.error(e); } });
   }
 
-  // Fallback makeRow si autofill aún no cargó
+  // makeRow fallback (si ui carga antes que autofill)
   function makeRow(i, data) {
     if (window.makeRow) return window.makeRow(i, data);
-    const row = document.createElement("div");
-    row.className = "row";
-    ["n", "dur", "name"].forEach(() => {
-      const inp = document.createElement("input");
-      row.appendChild(inp);
-    });
-    const selBox = document.createElement("div");
-    selBox.textContent = (data?.score ?? "-").toString();
-    row.appendChild(selBox);
-    const pill = document.createElement("div");
-    pill.className = "pill";
-    row.appendChild(pill);
-    const noteBtn = document.createElement("button");
-    noteBtn.className = "noteBtn";
-    row.appendChild(noteBtn);
-    row.value = () => data || {};
-    return row;
+    const row = document.createElement("div"); row.className = "row";
+    ["n", "dur", "name"].forEach(() => { const inp = document.createElement("input"); row.appendChild(inp); });
+    const selBox = document.createElement("div"); selBox.textContent = (data?.score ?? "-").toString(); row.appendChild(selBox);
+    const pill = document.createElement("div"); pill.className = "pill"; row.appendChild(pill);
+    const noteBtn = document.createElement("button"); noteBtn.className = "noteBtn"; row.appendChild(noteBtn);
+    row.value = () => data || {}; return row;
   }
 })();
