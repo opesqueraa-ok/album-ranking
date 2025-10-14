@@ -6,11 +6,13 @@
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(reg => {
       const url = String(reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '');
-      if (!url.includes('sw.v7.1.js')) reg.unregister().catch(() => {});
+      if (!url.includes('sw.v7.1.js')) reg.unregister().catch(()=>{});
     });
   });
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.v7.1.js?v=7.1', { scope: './' }).catch(() => {});
+    navigator.serviceWorker
+      .register('./sw.v7.1.js?v=7.1', { scope: './' })
+      .catch(()=>{});
   });
 })();
