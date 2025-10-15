@@ -40,7 +40,7 @@
     canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;background:#0e1218}
     .footer{margin-top:10px;font-size:12px;color:#93a0b6}
 
-    /* Panel Library (se muestra/oculta sin romper tu editor) */
+    /* Panel Library */
     #libPanel{display:none;max-width:1100px;margin:14px auto;padding:0 16px}
     #libPanel table{width:100%;border-collapse:collapse;background:#151a22;border:1px solid #222a3a;border-radius:12px;overflow:hidden}
     #libPanel th,#libPanel td{padding:10px 12px;border-bottom:1px solid #222a3a}
@@ -52,7 +52,7 @@
 </head>
 <body>
 
-  <!-- CABECERA nueva (auth + library + idioma) -->
+  <!-- CABECERA -->
   <header>
     <strong>🎧 Album Ranking <span class="tag">v7.1</span></strong>
     <button id="btnLibrary" class="btn">📚 Library</button>
@@ -63,14 +63,14 @@
     <div class="sp"></div>
     <select id="lang" class="btn">
       <option value="en">English</option>
-      <option value="es">Español</option>
+      <option value="es" selected>Español</option>
     </select>
     <span id="authStatus" style="display:none;margin-left:6px"></span>
     <button id="btnSignIn" class="btn">Sign in with Google</button>
     <button id="btnSignOut" class="btn" style="display:none">Sign out</button>
   </header>
 
-  <!-- PANEL LIBRARY (lista en tabla) -->
+  <!-- LIBRARY -->
   <main id="libPanel">
     <table>
       <thead>
@@ -88,7 +88,7 @@
     </table>
   </main>
 
-  <!-- TU EDITOR (tal cual lo tenías) -->
+  <!-- TU EDITOR (sin tocar) -->
   <div id="app" class="wrap">
     <div class="toolbar">
       <h1 style="margin-right:6px">Album Ranking</h1>
@@ -172,14 +172,14 @@
       'https://dfnrrkopmdnkpsrxlqew.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8'
     );
-    // Donde Google debe regresarte (conserva v=7.1 para romper cache de SW)
+    // A dónde volverá Google después del login
     window.SITE_URL = location.origin + location.pathname + '?v=7.1';
   </script>
 
-  <!-- Un único script para Auth + Library -->
+  <!-- ÚNICO script para Auth + Library -->
   <script src="./app-auth-library.v7.1.js"></script>
 
-  <!-- Tus scripts existentes del editor -->
+  <!-- Tus scripts del editor -->
   <script defer src="autofillAlbum.v7.1.js?v=7.1"></script>
   <script defer src="ui.v7.1.js?v=7.1"></script>
 </body>
