@@ -1,212 +1,180 @@
-// library.v7.1.js
-(function(){
+<script>
+/* library.v7.1.js – abre/guarda/exp-imp la librería en Supabase */
+
+(function () {
   const $ = s => document.querySelector(s);
+  const sb = window.sb;
 
-  // === Utilidades ===
-  function toJsonSafeTrack(t){
-    // convierte NaN/undefined -> null (JSON válido)
-    const score = Number.isFinite(t?.score) ? t.score : null;
-    return { n: t?.n ?? null, dur: t?.dur ?? '', name: t?.name ?? '', score };
-  }
-  function avgScore(tracks) {
-    const vals = (tracks || [])
-      .map(t => t?.score)
-      .filter(v => Number.isFinite(v) && v >= 5 && v <= 10);
-    return vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
+  function avgScore(tracks = []) {
+    const vals = tracks.map(t => t.score).filter(v => Number.isFinite(v) && v >= 5 && v <= 10);
+    return vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : null;
   }
 
-  async function tryEnsureCoversBucket(){
-    // si el bucket no existe, evitamos que el upload rompa el guardado
-    try {
-      const { data, error } = await sb.storage.listBuckets();
-      if (error) return false;
-      return !!(data || []).find(b => b.name === 'covers');
-    } catch { return false; }
+  function requireSession() {
+    return sb.auth.getSession().then(({ data }) => data.session || null);
   }
 
-  async function uploadCoverIfNeeded(userId, coverSrc){
-    if (!coverSrc || coverSrc.startsWith('http')) return coverSrc;
-    const hasBucket = await tryEnsureCoversBucket();
-    if (!hasBucket) return null; // skip: no bloquees el guardado
-
-    const m = coverSrc.match(/^data:(.+?);base64,(.*)$/);
-    if (!m) return null;
-    const mime = m[1]; const b64 = m[2];
-    const bin  = atob(b64); const len = bin.length;
-    const buf  = new Uint8Array(len); for (let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
-    const file = new Blob([buf], { type: mime });
-    const filename = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-
-    const { error } = await sb.storage.from('covers').upload(filename, file, { upsert:false, contentType:mime });
-    if (error) { console.warn('cover upload error', error); return null; }
-
-    const { data:pub } = sb.storage.from('covers').getPublicUrl(filename);
-    return pub?.publicUrl || null;
+  function renderRows(items) {
+    const tbody = $('#tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;color:#aeb5c0">No albums yet.</td></tr>';
+      return;
+    }
+    for (const a of items) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="col-cover">${a.cover_url ? `<img class="cover-sm" src="${a.cover_url}">` : ''}</td>
+        <td>${a.album || '—'}</td>
+        <td>${a.artist || '—'}</td>
+        <td>${a.released || ''}</td>
+        <td class="col-average">${a.avg?.toFixed?.(1) ?? a.avg_score?.toFixed?.(1) ?? '—'}</td>
+        <td class="col-tracks">${Array.isArray(a.tracks) ? a.tracks.length : '—'}</td>
+        <td class="col-open"><button class="openBtn" data-id="${a.id}">Open</button></td>
+      `;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll('.openBtn').forEach(btn => {
+      btn.addEventListener('click', async (ev) => {
+        const id = ev.currentTarget.getAttribute('data-id');
+        const { data, error } = await sb.from('albums').select('*').eq('id', id).single();
+        if (error) { alert('No se pudo abrir: ' + error.message); return; }
+        // pinta en el editor
+        window.AlbumApp?.setState?.({
+          lang: localStorage.getItem('albumrater_lang') || 'en',
+          album: data.album,
+          artist: data.artist,
+          released: data.released || '',
+          rankedby: data.rankedby || '',
+          cover: data.cover_url || '',
+          tracks: data.tracks || []
+        });
+        window.UI_Notes_set?.(data.notes || { trackNotes: {}, final: '' });
+        // sube al editor y oculta panel
+        document.getElementById('libPanel').style.display = 'none';
+        document.getElementById('app').style.display = '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
   }
 
-  // === Guardar álbum actual en la nube ===
-  async function saveCurrentToCloud(){
-    const { data:{ session } } = await sb.auth.getSession();
-    if (!session) return alert('Sign in first.');
+  async function fetchMyAlbums() {
+    const session = await requireSession();
+    if (!session) { alert('Inicia sesión para usar la Library.'); return; }
+    const { data, error } = await sb.from('albums')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { alert('Error al cargar: ' + error.message); return; }
+    renderRows(data || []);
+  }
+
+  async function saveCurrent() {
+    const session = await requireSession();
+    if (!session) { alert('Inicia sesión para guardar en la Library.'); return; }
     const uid = session.user.id;
 
-    const s = window.AlbumApp?.getState?.();
-    if (!s) return alert('Editor not ready.');
-
-    // ¡SANITIZAR!
-    const safeTracks = (s.tracks || []).map(toJsonSafeTrack);
-    const notes  = window.UI_Notes_get?.() || { trackNotes:{}, final:'' };
-
-    let coverUrl = null;
-    try { coverUrl = await uploadCoverIfNeeded(uid, s.cover); } catch (e) { console.warn(e); }
+    const s = window.AlbumApp?.getState?.() || {};
+    const notes = window.UI_Notes_get?.() || { trackNotes: {}, final: '' };
+    const avg = avgScore(s.tracks || []);
 
     const payload = {
       user_id: uid,
-      album:   s.album || '—',
-      artist:  s.artist || '—',
-      released:s.released || '',
-      rankedby:s.rankedby || '',
-      cover_url: coverUrl || '',
-      avg_score: avgScore(safeTracks),
-      tracks:  safeTracks,
+      album: s.album || '—',
+      artist: s.artist || '—',
+      released: s.released || '',
+      rankedby: s.rankedby || '',
+      cover_url: s.cover || '',
+      avg_score: avg,
+      tracks: (s.tracks || []).map(t => ({
+        n: t.n || null,
+        dur: t.dur || '',
+        name: t.name || '',
+        score: Number.isFinite(t.score) ? t.score : null
+      })),
       notes
     };
 
     const { error } = await sb.from('albums').insert(payload);
-    if (error) {
-      console.error('Insert error:', error);
-      alert('Could not save: ' + (error.message || 'Unknown error'));
-      return;
-    }
-    alert('Saved to your library ✅');
-    const panel = $('#libPanel');
-    if (panel && panel.style.display === 'block') loadMyLibrary();
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    alert('Guardado en tu Library ✅');
+    fetchMyAlbums();
   }
 
-  // === Listado y apertura ===
-  function rowHtml(a){
-    const cov = a.cover_url ? `<img class="cover-sm" src="${a.cover_url}">` : '';
-    const avg = (a.avg_score ?? '').toString();
-    const tracksLen = Array.isArray(a.tracks) ? a.tracks.length : '';
-    return `<tr data-id="${a.id}">
-      <td class="col-cover">${cov}</td>
-      <td>${a.album || '—'}</td>
-      <td>${a.artist || '—'}</td>
-      <td>${a.released || '—'}</td>
-      <td class="col-average">${avg || '—'}</td>
-      <td class="col-tracks">${tracksLen || '—'}</td>
-      <td class="col-open"><button class="openAlbum">Open</button></td>
-    </tr>`;
-  }
-
-  async function loadMyLibrary(){
-    const body = $('#tbody');
-    try{
-      const { data:{ session } } = await sb.auth.getSession();
-      if (!session) {
-        body.innerHTML = `<tr><td colspan="7" style="padding:14px;color:#aeb5c0">Sign in to view your library.</td></tr>`;
-        return;
-      }
-      body.innerHTML = `<tr><td colspan="7" style="padding:14px;color:#aeb5c0">Loading…</td></tr>`;
-
-      const { data, error } = await sb
-        .from('albums')
-        .select('id,album,artist,released,avg_score,tracks,cover_url,created_at,rankedby,notes')
-        .order('created_at', { ascending:false });
-
-      if (error) {
-        console.error('Select error:', error);
-        body.innerHTML = `<tr><td colspan="7" style="padding:14px;color:#e99">Error loading: ${error.message}</td></tr>`;
-        return;
-      }
-
-      if (!data || !data.length) {
-        body.innerHTML = `<tr><td colspan="7" style="padding:14px;color:#aeb5c0">No albums saved yet.</td></tr>`;
-        return;
-      }
-
-      body.innerHTML = data.map(rowHtml).join('');
-      body.querySelectorAll('.openAlbum').forEach(btn=>{
-        btn.addEventListener('click', async (ev)=>{
-          const id = ev.currentTarget.closest('tr')?.dataset?.id;
-          if (!id) return;
-          const { data, error } = await sb.from('albums').select('*').eq('id', id).single();
-          if (error || !data) { alert('Album not found'); return; }
-
-          window.AlbumApp?.setState?.({
-            lang: (localStorage.getItem('albumrater_lang')||'en'),
-            album: data.album,
-            artist: data.artist,
-            released: data.released || '',
-            rankedby: data.rankedby || '',
-            cover: data.cover_url || '',
-            tracks: (data.tracks || []).map(toJsonSafeTrack)
-          });
-          window.UI_Notes_set?.(data.notes || { trackNotes:{}, final:'' });
-
-          togglePanel(false);
-          window.scrollTo({ top:0, behavior:'smooth' });
-        });
-      });
-    }catch(e){
-      console.error(e);
-      body.innerHTML = `<tr><td colspan="7" style="padding:14px;color:#e99">Unexpected error.</td></tr>`;
-    }
-  }
-
-  function togglePanel(force){
-    const panel = $('#libPanel');
-    if (!panel) return;
-    const open = (typeof force === 'boolean') ? force : (panel.style.display !== 'block');
-    panel.style.display = open ? 'block' : 'none';
-    if (open) loadMyLibrary();
-  }
-
-  // (Opcional) export/import de library en la nube…
-  async function exportLibrary(){
-    const { data, error } = await sb.from('albums').select('*').order('created_at', { ascending:false });
-    if (error) return alert('Export failed: ' + error.message);
-    const blob = new Blob([JSON.stringify(data||[], null, 2)], { type:'application/json' });
+  // Export/Import de la LIBRERÍA (tabla albums)
+  async function exportLibrary() {
+    const session = await requireSession();
+    if (!session) { alert('Inicia sesión'); return; }
+    const { data, error } = await sb.from('albums').select('*').order('created_at', { ascending: false });
+    if (error) { alert('Error al exportar: ' + error.message); return; }
+    const blob = new Blob([JSON.stringify(data || [], null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'album-library.json';
+    a.download = 'albumrater-library.json';
     a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
-  }
-  async function importLibraryFromFile(file){
-    try{
-      const txt = await file.text();
-      const arr = JSON.parse(txt);
-      if (!Array.isArray(arr)) throw new Error('Invalid JSON');
-      const uid = (await sb.auth.getUser()).data.user?.id || null;
-      const toInsert = arr.map(x => ({
-        user_id: uid,
-        album: x.album || '—',
-        artist: x.artist || '—',
-        released: x.released || '',
-        rankedby: x.rankedby || '',
-        cover_url: x.cover_url || '',
-        avg_score: x.avg_score ?? avgScore((x.tracks||[]).map(toJsonSafeTrack)),
-        tracks: (x.tracks||[]).map(toJsonSafeTrack),
-        notes: x.notes || { trackNotes:{}, final:'' }
-      }));
-      const { error } = await sb.from('albums').insert(toInsert);
-      if (error) return alert('Import failed: ' + error.message);
-      alert('Library imported ✔');
-      loadMyLibrary();
-    }catch(e){ alert('Import failed: ' + e.message); }
+    URL.revokeObjectURL(a.href);
   }
 
-  function bind(){
-    const btnLib = $('#btnLibrary'); if (btnLib && !btnLib._b){ btnLib._b=true; btnLib.addEventListener('click', ()=> togglePanel()); }
-    const btnSave = $('#btnSaveToLibrary'); if (btnSave && !btnSave._b){ btnSave._b=true; btnSave.addEventListener('click', saveCurrentToCloud); }
+  async function importLibrary(file) {
+    const session = await requireSession();
+    if (!session) { alert('Inicia sesión'); return; }
+    const text = await file.text();
+    let arr = [];
+    try { arr = JSON.parse(text); } catch { alert('JSON inválido'); return; }
+    if (!Array.isArray(arr)) { alert('JSON inválido'); return; }
+    for (const rec of arr) {
+      const payload = {
+        user_id: session.user.id,
+        album: rec.album || rec.title || '—',
+        artist: rec.artist || '',
+        released: rec.released || rec.year || '',
+        rankedby: rec.rankedby || '',
+        cover_url: rec.cover_url || rec.cover || '',
+        avg_score: rec.avg ?? rec.avg_score ?? null,
+        tracks: rec.tracks || [],
+        notes: rec.notes || { trackNotes: {}, final: '' }
+      };
+      await sb.from('albums').insert(payload);
+    }
+    alert('Importados ✅');
+    fetchMyAlbums();
+  }
 
-    const btnExportLib = $('#btnExportLibrary'); if (btnExportLib && !btnExportLib._b){ btnExportLib._b=true; btnExportLib.addEventListener('click', exportLibrary); }
-    const fileImportLib = $('#fileImportLibrary'); if (fileImportLib && !fileImportLib._b){
-      fileImportLib._b=true; fileImportLib.addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if(f) importLibraryFromFile(f); e.target.value=''; });
+  // Panel show/hide
+  function toggleLibraryPanel(show) {
+    const panel = document.getElementById('libPanel');
+    const app   = document.getElementById('app');
+    if (show === true || (show !== false && panel.style.display === 'none')) {
+      panel.style.display = '';
+      app.style.display = 'none';
+      fetchMyAlbums();
+    } else {
+      panel.style.display = 'none';
+      app.style.display = '';
     }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
-  else bind();
+  function bind() {
+    const btnLib = $('#btnLibrary');
+    const btnSave = $('#btnSaveToLibrary');
+    const btnExp = $('#btnExportLibrary');
+    const fileImp = $('#fileImportLibrary');
+
+    if (btnLib && !btnLib._b)  { btnLib._b = true;  btnLib.addEventListener('click', () => toggleLibraryPanel()); }
+    if (btnSave && !btnSave._b){ btnSave._b = true; btnSave.addEventListener('click', saveCurrent); }
+    if (btnExp && !btnExp._b)  { btnExp._b = true;  btnExp.addEventListener('click', exportLibrary); }
+    if (fileImp && !fileImp._b){ fileImp._b = true; fileImp.addEventListener('change', e => {
+      const f = e.target.files?.[0]; if (f) importLibrary(f);
+      e.target.value = '';
+    }); }
+  }
+
+  window.Library = { refresh: fetchMyAlbums, open: () => toggleLibraryPanel(true) };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bind);
+  } else {
+    bind();
+  }
 })();
+</script>
