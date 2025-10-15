@@ -2,32 +2,57 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Album Ranking</title>
-  <link rel="icon" href="favicon.ico" />
+  <link rel="icon" href="favicon.png" />
   <meta name="theme-color" content="#0f1115" />
   <style>
-    :root{--bg:#0f1115;--panel:#151922;--ink:#e9edf1;--muted:#aeb5c0;--line:#283143}
-    html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    header{position:sticky;top:0;z-index:20;display:flex;gap:8px;align-items:center;padding:10px 12px;background:#0f1115;border-bottom:1px solid #1b2030}
+    :root{
+      --c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;
+      --bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140
+    }
+    html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:0}
+    header{position:sticky;top:0;z-index:50;background:#0f1115;border-bottom:1px solid #1b2130;padding:10px 12px;display:flex;gap:8px;align-items:center}
     header .sp{flex:1}
     .btn, label.btn{background:#1a2030;border:1px solid #2a3248;color:var(--ink);padding:8px 12px;border-radius:10px;cursor:pointer}
     .btn[disabled]{opacity:.5;cursor:not-allowed}
-    .tag{padding:6px 8px;border:1px solid #2a3248;border-radius:8px;font-size:12px}
-    main{max-width:1100px;margin:0 auto;padding:14px}
-    /* Panel de Library */
-    #libPanel{display:none;margin-top:12px}
-    table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid #222a3a;border-radius:12px;overflow:hidden}
-    th,td{padding:10px 12px;border-bottom:1px solid #222a3a}
-    thead th{background:#111724;color:#cbd5e1;text-align:left}
+    .tag{opacity:.75;font-size:12px;border:1px solid var(--line);padding:6px 8px;border-radius:8px}
+    .wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
+    h1{font-size:20px;margin:0 0 6px}
+    .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .select,input,select,button{background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px}
+    button{cursor:pointer;font-weight:600}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+    .pad{padding:14px}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .pair{display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;margin-bottom:8px}
+    .label{font-size:13px;color:var(--muted)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+    .row{display:grid;grid-template-columns:60px 90px 1fr 160px 90px 36px;gap:8px;align-items:center;margin-bottom:6px}
+    .pill{display:inline-flex;justify-content:center;align-items:center;padding:6px 10px;border-radius:8px;color:white;font-weight:800;min-width:52px;text-align:center}
+    .cover{width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--line);border-radius:10px;background:#0d1117}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .final{font-size:52px;font-weight:800;text-align:center;margin-top:10px}
+    canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;background:#0e1218}
+    .footer{margin-top:10px;font-size:12px;color:#93a0b6}
+
+    /* Panel Library (se muestra/oculta sin romper tu editor) */
+    #libPanel{display:none;max-width:1100px;margin:14px auto;padding:0 16px}
+    #libPanel table{width:100%;border-collapse:collapse;background:#151a22;border:1px solid #222a3a;border-radius:12px;overflow:hidden}
+    #libPanel th,#libPanel td{padding:10px 12px;border-bottom:1px solid #222a3a}
+    #libPanel thead th{background:#111724;color:#cbd5e1;text-align:left}
     .col-average,.col-tracks,.col-open{width:110px;text-align:center;white-space:nowrap}
     .col-cover{width:64px}
     .cover-sm{width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:1px solid #2a3248}
-    /* Contenedor del editor existente */
-    #app{margin-top:12px}
   </style>
 </head>
 <body>
+
+  <!-- CABECERA nueva (auth + library + idioma) -->
   <header>
     <strong>🎧 Album Ranking <span class="tag">v7.1</span></strong>
     <button id="btnLibrary" class="btn">📚 Library</button>
@@ -45,7 +70,7 @@
     <button id="btnSignOut" class="btn" style="display:none">Sign out</button>
   </header>
 
-  <!-- Panel Library -->
+  <!-- PANEL LIBRARY (lista en tabla) -->
   <main id="libPanel">
     <table>
       <thead>
@@ -63,28 +88,98 @@
     </table>
   </main>
 
-  <!-- Aquí va TU editor existente (inputs, botones Sort Top 10, etc) -->
-  <main id="app">
-    <!-- Mantén tu HTML actual (el que ya te funciona para puntuar) -->
-    <!-- No lo duplico aquí para no alargar la respuesta -->
-  </main>
+  <!-- TU EDITOR (tal cual lo tenías) -->
+  <div id="app" class="wrap">
+    <div class="toolbar">
+      <h1 style="margin-right:6px">Album Ranking</h1>
+      <span id="verBadge" class="tag">v7.1</span>
+      <div class="sub" id="subtitle" style="margin-left:8px">Quick form to score albums.</div>
+    </div>
 
-  <!-- Supabase UMD -->
+    <div class="grid">
+      <!-- Left: form -->
+      <div class="card pad">
+        <div class="pair">
+          <div class="label" data-i18n="album">Album</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="album" placeholder="Album name">
+            <button id="btnBuscarAlbum" type="button">Buscar info</button>
+          </div>
+        </div>
+        <div class="pair"><div class="label" data-i18n="artist">Artist</div><input id="artist" placeholder="Artist"></div>
+        <div class="pair"><div class="label" data-i18n="released">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
+        <div class="pair"><div class="label" data-i18n="rankedby">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
+        <div class="pair"><div class="label" data-i18n="cover">Cover</div><input id="cover" type="file" accept="image/*"></div>
+        <div class="pair"><div class="label" data-i18n="trackcount">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
+
+        <div class="controls">
+          <button id="applyCount">Apply Track Count</button>
+          <button id="addRow">+ Add Row</button>
+          <button id="delRow">– Remove Last</button>
+          <button id="clearScores">Clear Score</button>
+          <button id="sortTop10">Sort Top 10</button>
+        </div>
+
+        <div class="row" style="font-size:12px;color:#aeb5c0">
+          <div data-i18n="num">#</div>
+          <div data-i18n="duration">Duration</div>
+          <div data-i18n="name">Name</div>
+          <div data-i18n="score">Score (int + decimal)</div>
+          <div data-i18n="color">Color</div>
+          <div><!-- notes btn col --></div>
+        </div>
+        <div id="tracks"></div>
+      </div>
+
+      <!-- Right: preview -->
+      <div class="card pad">
+        <div style="display:grid;grid-template-columns:1fr 360px;gap:16px">
+          <div>
+            <div id="info" style="display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:center"></div>
+            <table id="table"></table>
+          </div>
+          <div>
+            <img id="coverOut" class="cover" alt="Cover">
+            <div class="final" id="finalScore">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="font-size:12px;color:#aeb5c0;margin:6px 0">Enjoyment Timeline</div>
+          <canvas id="chart" width="900" height="360"></canvas>
+        </div>
+
+        <!-- Notes & Review -->
+        <div id="notesSection" class="card pad" style="margin-top:12px">
+          <div style="font-size:12px;color:#aeb5c0;margin-bottom:6px">Notes & Review</div>
+          <div id="notesOutput" style="white-space:pre-wrap; line-height:1.5; font-size:14px"></div>
+          <div style="margin-top:10px">
+            <div class="label">Final Album Thoughts</div>
+            <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px"></textarea>
+          </div>
+        </div>
+
+        <div class="footer">Created by Ok Pretty Boy with help from ChatGPT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script>
-    // Config Supabase (tu proyecto actual)
+    // Cliente único de Supabase
     window.sb = window.supabase.createClient(
       'https://dfnrrkopmdnkpsrxlqew.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8'
     );
-    // Donde Google debe regresarte
+    // Donde Google debe regresarte (conserva v=7.1 para romper cache de SW)
     window.SITE_URL = location.origin + location.pathname + '?v=7.1';
   </script>
 
-  <!-- Un SOLO script que maneja Auth + Library (evita choques) -->
+  <!-- Un único script para Auth + Library -->
   <script src="./app-auth-library.v7.1.js"></script>
 
-  <!-- Tus scripts del editor (los que ya tenías y funcionan) -->
+  <!-- Tus scripts existentes del editor -->
   <script defer src="autofillAlbum.v7.1.js?v=7.1"></script>
   <script defer src="ui.v7.1.js?v=7.1"></script>
 </body>
