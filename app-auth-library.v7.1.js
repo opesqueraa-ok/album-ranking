@@ -1,241 +1,279 @@
 // app-auth-library.v7.1.js
-(function () {
-  const $ = s => document.querySelector(s);
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const SITE_URL = window.SITE_URL || (location.origin + location.pathname + '?v=7.1');
   const sb = window.sb;
 
-  // ---------- UTIL ----------
+  // ===== Helpers =====
   function avgScore(tracks = []) {
     const vals = tracks.map(t => t.score).filter(v => Number.isFinite(v) && v >= 5 && v <= 10);
-    return vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : null;
+    return vals.length ? +(vals.reduce((a,b)=>a+b,0) / vals.length).toFixed(1) : null;
   }
+  function nowISO() { return new Date().toISOString(); }
 
-  async function requireSession() {
-    const { data } = await sb.auth.getSession();
-    return data.session || null;
-  }
-
-  function showPanel(panelId, show) {
-    const el = document.getElementById(panelId);
-    if (!el) return;
-    el.style.display = show ? '' : 'none';
-  }
-
-  // ---------- AUTH ----------
-  async function handleOAuthReturn() {
-    const url = new URL(location.href);
-
-    // PKCE (?code=..)
-    if (url.searchParams.get('code')) {
-      const { error } = await sb.auth.exchangeCodeForSession(location.href);
-      if (error) console.error('exchangeCodeForSession:', error);
+  async function ensureLogged() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      alert('Primero inicia sesión con Google.');
+      return null;
     }
-
-    // Implicito (#access_token=..)
-    if (url.hash.includes('access_token=')) {
-      const p = new URLSearchParams(url.hash.slice(1));
-      const access_token = p.get('access_token');
-      const refresh_token = p.get('refresh_token');
-      if (access_token && refresh_token) {
-        const { error } = await sb.auth.setSession({ access_token, refresh_token });
-        if (error) console.error('setSession:', error);
-      }
-    }
-
-    // Limpia URL pero conserva ?v=7.1
-    const clean = url.pathname + (url.search.includes('v=') ? url.search : '?v=7.1');
-    if (url.search || url.hash) history.replaceState({}, document.title, clean);
+    return session.user;
   }
 
-  async function signInGoogle() {
-    const redirectTo = window.SITE_URL || (location.origin + location.pathname);
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo,
-        queryParams: { access_type: 'offline', prompt: 'select_account' }
-      }
-    });
-    if (error) alert('No se pudo iniciar sesión: ' + error.message);
+  // Sube cover si viene como dataURL. Devuelve URL pública o cadena vacía.
+  async function uploadCoverIfNeeded(userId, src) {
+    if (!src) return '';
+    if (!/^data:/.test(src)) return src; // ya es URL
+
+    const m = src.match(/^data:(.+?);base64,(.*)$/);
+    if (!m) return '';
+    const mime = m[1], b64 = m[2];
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    const file = new Blob([bytes], { type: mime });
+
+    const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
+    const { error } = await sb.storage.from('covers').upload(path, file, { upsert: false, contentType: mime });
+    if (error) { console.warn('cover upload error', error); return ''; }
+    const { data } = sb.storage.from('covers').getPublicUrl(path);
+    return data?.publicUrl || '';
   }
 
-  async function signOut() {
-    const { error } = await sb.auth.signOut();
-    if (error) alert('No se pudo cerrar sesión: ' + error.message);
-  }
-
-  function paintAuthUI(session) {
+  // ===== AUTH UI =====
+  async function paintAuth() {
+    const { data: { session } } = await sb.auth.getSession();
     const u = session?.user || null;
-    const email = u?.email || u?.identities?.[0]?.identity_data?.email || '';
-    const st = $('#authStatus');
-    const inBtn = $('#btnSignIn');
-    const outBtn = $('#btnSignOut');
-    const gated = [$('#btnLibrary'), $('#btnSaveToLibrary'), $('#btnExportLibrary'), document.querySelector('label[for="fileImportLibrary"]')];
+
+    const sIn  = $('#btnSignIn');
+    const sOut = $('#btnSignOut');
+    const stat = $('#authStatus');
+    const lib  = $('#btnLibrary');
+    const save = $('#btnSaveToLibrary');
+    const exp  = $('#btnExportLibrary');
+    const impL = $('label[for="fileImportLibrary"]');
 
     if (u) {
-      if (st) { st.style.display='inline'; st.textContent=email; }
-      if (inBtn) inBtn.style.display='none';
-      if (outBtn) outBtn.style.display='inline-block';
-      gated.forEach(b => b && (b.disabled = false));
+      sIn.style.display = 'none';
+      sOut.style.display = 'inline-block';
+      stat.style.display = 'inline-block';
+      stat.textContent = u.email || 'Signed in';
+      lib.disabled = false; save.disabled = false; exp.disabled = false; impL.classList.remove('disabled');
     } else {
-      if (st) { st.style.display='none'; st.textContent=''; }
-      if (inBtn) inBtn.style.display='inline-block';
-      if (outBtn) outBtn.style.display='none';
-      gated.forEach(b => b && (b.disabled = true));
+      sIn.style.display = 'inline-block';
+      sOut.style.display = 'none';
+      stat.style.display = 'none';
+      stat.textContent = '';
+      lib.disabled = true; save.disabled = true; exp.disabled = true; // Import lo dejamos habilitado (no requiere login)
     }
   }
 
-  // ---------- LIBRARY ----------
-  function renderRows(items) {
+  // ===== LIBRARY =====
+  async function loadLibrary() {
+    const user = await ensureLogged(); if (!user) return;
     const tbody = $('#tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;color:#aeb5c0">No albums yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;color:#aeb5c0">Loading…</td></tr>';
+
+    const { data, error } = await sb
+      .from('albums')
+      .select('id, album, artist, released, avg_score, tracks, cover_url, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(error);
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;color:#f88">Could not load library.</td></tr>';
       return;
     }
-    for (const a of items) {
-      const tr = document.createElement('tr');
-      const avg = (a.avg ?? a.avg_score);
-      tr.innerHTML = `
-        <td class="col-cover">${a.cover_url ? `<img class="cover-sm" src="${a.cover_url}" alt="">` : ''}</td>
-        <td>${a.album || '—'}</td>
-        <td>${a.artist || '—'}</td>
-        <td>${a.released || ''}</td>
-        <td class="col-average">${Number.isFinite(avg) ? (+avg).toFixed(1) : '—'}</td>
-        <td class="col-tracks">${Array.isArray(a.tracks) ? a.tracks.length : '—'}</td>
-        <td class="col-open"><button class="btn openBtn" data-id="${a.id}">Open</button></td>
-      `;
-      tbody.appendChild(tr);
+    if (!data || !data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;color:#aeb5c0">No albums saved yet.</td></tr>';
+      return;
     }
-    tbody.querySelectorAll('.openBtn').forEach(btn => {
+
+    const rows = data.map(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="col-cover"><img class="cover-sm" src="${r.cover_url || ''}" alt=""></td>
+        <td>${r.album || '—'}</td>
+        <td>${r.artist || '—'}</td>
+        <td>${r.released || ''}</td>
+        <td class="col-average">${(r.avg_score ?? '')}</td>
+        <td class="col-tracks">${(Array.isArray(r.tracks)? r.tracks.length : (r.tracks_count ?? ''))}</td>
+        <td class="col-open"><button class="btn btn-open" data-id="${r.id}">Open</button></td>
+      `;
+      return tr;
+    });
+
+    tbody.innerHTML = '';
+    rows.forEach(tr => tbody.appendChild(tr));
+
+    // abrir en el editor
+    tbody.querySelectorAll('.btn-open').forEach(btn => {
       btn.addEventListener('click', async (ev) => {
         const id = ev.currentTarget.getAttribute('data-id');
         const { data, error } = await sb.from('albums').select('*').eq('id', id).single();
-        if (error) { alert('No se pudo abrir: ' + error.message); return; }
-        // pinta en el editor
-        window.AlbumApp?.setState?.({
-          lang: localStorage.getItem('albumrater_lang') || 'en',
-          album: data.album,
-          artist: data.artist,
+        if (error || !data) { alert('Album not found'); return; }
+
+        // Pasamos los datos al editor sin romper nada
+        window.AlbumApp?.setState({
+          lang: (localStorage.getItem('albumrater_lang') || 'en'),
+          album: data.album || '',
+          artist: data.artist || '',
           released: data.released || '',
           rankedby: data.rankedby || '',
           cover: data.cover_url || '',
           tracks: data.tracks || []
         });
-        window.UI_Notes_set?.(data.notes || { trackNotes:{}, final:'' });
-        showPanel('libPanel', false);
-        showPanel('app', true);
+
+        // ocultar panel
+        $('#libPanel').style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+      }, { once: false });
     });
   }
 
-  async function fetchMyAlbums() {
-    const session = await requireSession();
-    if (!session) { alert('Inicia sesión para usar Library'); return; }
-    const { data, error } = await sb.from('albums').select('*').order('created_at', { ascending:false });
-    if (error) { alert('Error al cargar: ' + error.message); return; }
-    renderRows(data || []);
-  }
+  // ===== SAVE =====
+  async function saveCurrentToLibrary() {
+    const user = await ensureLogged(); if (!user) return;
 
-  async function saveCurrent() {
-    const session = await requireSession();
-    if (!session) { alert('Inicia sesión para guardar'); return; }
-    const s = window.AlbumApp?.getState?.() || {};
-    const notes = window.UI_Notes_get?.() || { trackNotes:{}, final:'' };
+    if (!window.AlbumApp?.getState) { alert('Editor no encontrado'); return; }
+    const s = window.AlbumApp.getState();
+
+    const coverSrc = $('#coverOut')?.src || '';
+    const coverUrl = await uploadCoverIfNeeded(user.id, coverSrc);
+
     const payload = {
-      user_id: session.user.id,
+      user_id: user.id,
       album: s.album || '—',
       artist: s.artist || '—',
       released: s.released || '',
       rankedby: s.rankedby || '',
-      cover_url: s.cover || '',
-      avg_score: avgScore(s.tracks || []),
-      tracks: (s.tracks || []).map(t => ({
-        n: t.n || null, dur: t.dur || '', name: t.name || '',
-        score: Number.isFinite(t.score) ? t.score : null
-      })),
-      notes
+      cover_url: coverUrl || (coverSrc.startsWith('http') ? coverSrc : ''),
+      avg_score: avgScore(s.tracks),
+      tracks: s.tracks || [],
+      created_at: nowISO()
     };
+
     const { error } = await sb.from('albums').insert(payload);
-    if (error) { alert('No se pudo guardar: ' + error.message); return; }
-    alert('Guardado ✅');
-    fetchMyAlbums();
+    if (error) { alert('Could not save: ' + error.message); return; }
+    alert('Saved to your library ✅');
+    if ($('#libPanel').style.display !== 'none') loadLibrary();
   }
 
+  // ===== EXPORT / IMPORT =====
   async function exportLibrary() {
-    const session = await requireSession(); if (!session) return alert('Inicia sesión');
-    const { data, error } = await sb.from('albums').select('*').order('created_at',{ascending:false});
-    if (error) return alert('Error al exportar: '+error.message);
-    const blob = new Blob([JSON.stringify(data||[],null,2)],{type:'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'albumrater-library.json'; a.click(); URL.revokeObjectURL(a.href);
+    const user = await ensureLogged(); if (!user) return;
+    const { data, error } = await sb
+      .from('albums')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (error) { alert('Could not export: ' + error.message); return; }
+
+    const blob = new Blob([JSON.stringify(data || [], null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'albumrater-library.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
   }
 
-  async function importLibrary(file) {
-    const session = await requireSession(); if (!session) return alert('Inicia sesión');
-    const txt = await file.text(); let arr=[]; try{arr=JSON.parse(txt)}catch{return alert('JSON inválido')}
-    if (!Array.isArray(arr)) return alert('JSON inválido');
-    for (const rec of arr) {
-      const payload = {
-        user_id: session.user.id,
-        album: rec.album || rec.title || '—',
-        artist: rec.artist || '',
-        released: rec.released || rec.year || '',
-        rankedby: rec.rankedby || '',
-        cover_url: rec.cover_url || rec.cover || '',
-        avg_score: rec.avg ?? rec.avg_score ?? null,
-        tracks: rec.tracks || [],
-        notes: rec.notes || { trackNotes:{}, final:'' }
-      };
-      await sb.from('albums').insert(payload);
+  function readFileAsText(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result || ''));
+      r.onerror = rej;
+      r.readAsText(file);
+    });
+  }
+
+  async function importLibraryFromFile(file) {
+    const user = await ensureLogged(); if (!user) return;
+    try {
+      const text = await readFileAsText(file);
+      const arr = JSON.parse(text);
+      if (!Array.isArray(arr)) throw new Error('JSON debe ser un arreglo');
+      const rows = arr.map(x => ({
+        user_id: user.id,
+        album: x.album || '—',
+        artist: x.artist || '—',
+        released: x.released || '',
+        rankedby: x.rankedby || '',
+        cover_url: x.cover_url || '',
+        avg_score: x.avg_score ?? null,
+        tracks: Array.isArray(x.tracks) ? x.tracks : [],
+        created_at: x.created_at || nowISO()
+      }));
+      // Inserción en lotes pequeños por seguridad
+      while (rows.length) {
+        const chunk = rows.splice(0, 200);
+        const { error } = await sb.from('albums').insert(chunk);
+        if (error) throw error;
+      }
+      alert('Import completed ✅');
+      if ($('#libPanel').style.display !== 'none') loadLibrary();
+    } catch (e) {
+      console.error(e);
+      alert('Import failed: ' + (e.message || e));
     }
-    alert('Importados ✅'); fetchMyAlbums();
   }
 
-  // ---------- BIND ----------
-  function bind() {
+  // ===== BINDINGS =====
+  function bindUI() {
     // Auth
-    const inBtn  = $('#btnSignIn');
-    const outBtn = $('#btnSignOut');
-    if (inBtn && !inBtn._b)  { inBtn._b  = true; inBtn.addEventListener('click', signInGoogle); }
-    if (outBtn && !outBtn._b){ outBtn._b = true; outBtn.addEventListener('click', signOut); }
+    $('#btnSignIn')?.addEventListener('click', async () => {
+      await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: SITE_URL, queryParams: { prompt: 'consent', access_type: 'offline' } }
+      });
+    });
+    $('#btnSignOut')?.addEventListener('click', async () => {
+      await sb.auth.signOut(); paintAuth();
+    });
 
-    // Library
-    const bLib  = $('#btnLibrary');
-    const bSave = $('#btnSaveToLibrary');
-    const bExp  = $('#btnExportLibrary');
-    const fImp  = $('#fileImportLibrary');
-    if (bLib && !bLib._b){ bLib._b = true; bLib.addEventListener('click', () => {
-      const showing = getComputedStyle($('#libPanel')).display !== 'none';
-      showPanel('libPanel', !showing);
-      showPanel('app', showing);
-      if (!showing) fetchMyAlbums();
-    });}
-    if (bSave && !bSave._b){ bSave._b = true; bSave.addEventListener('click', saveCurrent); }
-    if (bExp && !bExp._b){ bExp._b = true; bExp.addEventListener('click', exportLibrary); }
-    if (fImp && !fImp._b){ fImp._b = true; fImp.addEventListener('change', e=>{
-      const f = e.target.files?.[0]; if (f) importLibrary(f); e.target.value='';
-    }); }
+    // Library toggle
+    $('#btnLibrary')?.addEventListener('click', async () => {
+      const el = $('#libPanel');
+      const showing = el.style.display !== 'none';
+      if (showing) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = 'block';
+        loadLibrary();
+      }
+    });
 
-    // Idioma (tu UI ya escucha #lang en ui.v7.1.js)
-    const langSel = $('#lang');
-    if (langSel) {
-      const saved = localStorage.getItem('albumrater_lang') || (navigator.language||'en').startsWith('es')?'es':'en';
-      langSel.value = saved;
-      langSel.onchange = () => { localStorage.setItem('albumrater_lang', langSel.value); window.AlbumApp?.setState?.({ ...window.AlbumApp?.getState?.(), lang: langSel.value }); };
-    }
+    // Save / Export / Import
+    $('#btnSaveToLibrary')?.addEventListener('click', saveCurrentToLibrary);
+    $('#btnExportLibrary')?.addEventListener('click', exportLibrary);
+    $('#fileImportLibrary')?.addEventListener('change', (ev) => {
+      const f = ev.target.files?.[0]; if (!f) return;
+      importLibraryFromFile(f).finally(() => (ev.target.value = ''));
+    });
+
+    // Idioma (opcional – si tu UI ya lo maneja, esto no estorba)
+    $('#lang')?.addEventListener('change', (e) => {
+      const v = e.target.value;
+      try {
+        const st = (window.AlbumApp?.getState?.() || {});
+        window.AlbumApp?.setState?.({ ...st, lang: v });
+        localStorage.setItem('albumrater_lang', v);
+      } catch {}
+    });
   }
 
-  async function boot() {
-    await handleOAuthReturn();
-    const { data } = await sb.auth.getSession();
-    paintAuthUI(data.session);
-    sb.auth.onAuthStateChange((_evt, session) => paintAuthUI(session));
-    bind();
+  // ===== INIT =====
+  function boot() {
+    bindUI();
+    paintAuth(); // estado inicial
+    sb.auth.onAuthStateChange((_evt) => paintAuth()); // reacciona a login regreso de Google
+    // Oculta library al inicio
+    const lib = $('#libPanel'); if (lib) lib.style.display = 'none';
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
-
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
