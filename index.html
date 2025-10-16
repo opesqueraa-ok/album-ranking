@@ -2,31 +2,28 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Album Ranking</title>
-  <link rel="icon" href="favicon.png" />
+  <link rel="icon" href="favicon.ico" />
   <meta name="theme-color" content="#0f1115" />
   <style>
     :root{
       --c10:#2e47ee;--c9:#0285c6;--c8:#02aec6;--c7:#23be32;--c6:#f0ca15;--c5:#e12928;
       --bg:#0f1115;--panel:#161a22;--ink:#e9edf1;--muted:#aeb5c0;--line:#2a3140;--neutral:#2a3140
     }
+    *{box-sizing:border-box}
     html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:0}
-    header{position:sticky;top:0;z-index:50;background:#0f1115;border-bottom:1px solid #1b2130;padding:10px 12px;display:flex;gap:8px;align-items:center}
-    header .sp{flex:1}
-    .btn, label.btn{background:#1a2030;border:1px solid #2a3248;color:var(--ink);padding:8px 12px;border-radius:10px;cursor:pointer}
-    .btn[disabled]{opacity:.5;cursor:not-allowed}
-    .tag{opacity:.75;font-size:12px;border:1px solid var(--line);padding:6px 8px;border-radius:8px}
     .wrap{max-width:1100px;margin:18px auto;padding:0 16px 64px}
-    h1{font-size:20px;margin:0 0 6px}
-    .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    header{position:sticky;top:0;z-index:5;background:#0f1115;border-bottom:1px solid var(--line)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px}
+    h1{font-size:18px;margin:0}
+    .badge{opacity:.75;font-size:12px;border:1px solid var(--line);padding:6px 8px;border-radius:8px}
     .select,input,select,button{background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px}
     button{cursor:pointer;font-weight:600}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
-    .pad{padding:14px}
     .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+    .pad{padding:14px}
     .pair{display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;margin-bottom:8px}
     .label{font-size:13px;color:var(--muted)}
     .controls{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
@@ -39,63 +36,56 @@
     .final{font-size:52px;font-weight:800;text-align:center;margin-top:10px}
     canvas{width:100%;height:320px;border:1px solid var(--line);border-radius:12px;background:#0e1218}
     .footer{margin-top:10px;font-size:12px;color:#93a0b6}
+    .badge-help{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#c9d3e3}
+    .badge-dot{width:8px;height:8px;border-radius:999px;background:var(--neutral);display:inline-block}
 
-    /* Panel Library */
-    #libPanel{display:none;max-width:1100px;margin:14px auto;padding:0 16px}
-    #libPanel table{width:100%;border-collapse:collapse;background:#151a22;border:1px solid #222a3a;border-radius:12px;overflow:hidden}
-    #libPanel th,#libPanel td{padding:10px 12px;border-bottom:1px solid #222a3a}
-    #libPanel thead th{background:#111724;color:#cbd5e1;text-align:left}
-    .col-average,.col-tracks,.col-open{width:110px;text-align:center;white-space:nowrap}
-    .col-cover{width:64px}
-    .cover-sm{width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:1px solid #2a3248}
+    /* Library modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999}
+    .modal{width:min(960px,94vw);background:#0f1218;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .modal-body{padding:12px;max-height:70vh;overflow:auto}
+    .lib-grid{display:grid;grid-template-columns:88px 1fr 110px 110px 120px;gap:10px;align-items:center}
+    .lib-row{padding:8px 6px;border-bottom:1px solid #1b2230;display:contents}
+    .lib-cover{width:72px;height:72px;border-radius:8px;border:1px solid var(--line);object-fit:cover;background:#0d1117}
+    .lib-empty{padding:18px;color:#aeb5c0}
+    .center{text-align:center}
+
+    /* Toast */
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#111a;backdrop-filter:blur(6px);color:#fff;padding:10px 14px;border:1px solid #334;border-radius:10px;z-index:99999;display:none}
   </style>
 </head>
 <body>
-
-  <!-- CABECERA -->
   <header>
-    <strong>🎧 Album Ranking <span class="tag">v7.1</span></strong>
-    <button id="btnLibrary" class="btn">📚 Library</button>
-    <button id="btnSaveToLibrary" class="btn">💾 Save to Library</button>
-    <button id="btnExportLibrary" class="btn">⬇️ Export Library</button>
-    <input id="fileImportLibrary" type="file" accept="application/json" hidden />
-    <label for="fileImportLibrary" class="btn">⬆️ Import Library</label>
-    <div class="sp"></div>
-    <select id="lang" class="btn">
-      <option value="en">English</option>
-      <option value="es" selected>Español</option>
-    </select>
-    <span id="authStatus" style="display:none;margin-left:6px"></span>
-    <button id="btnSignIn" class="btn">Sign in with Google</button>
-    <button id="btnSignOut" class="btn" style="display:none">Sign out</button>
+    <div class="toolbar">
+      <h1>Album Ranking</h1>
+      <span id="verBadge" class="badge">v7.2</span>
+
+      <!-- Auth & Library -->
+      <button id="btnSigninGoogle">Sign in with Google</button>
+      <button id="btnSignout" style="display:none">Sign out</button>
+      <button id="btnSaveToLibrary" style="display:none">Save to Library</button>
+      <button id="btnMyLibrary" style="display:none">Library</button>
+
+      <div style="flex:1"></div>
+
+      <!-- Language & data tools -->
+      <select id="lang" class="select" title="Language">
+        <option value="en">English</option>
+        <option value="es" selected>Español</option>
+      </select>
+      <button id="exportJSON">Export Data</button>
+      <label style="position:relative">
+        <span id="importLabel" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;display:inline-block">Import Data</span>
+        <input id="importJSON" type="file" accept="application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer">
+      </label>
+      <button id="clearAll">Clear All</button>
+      <button id="clearScores">Clear Scores</button>
+      <button id="sortTop10">Sort Top 10</button>
+      <span id="authMini" class="badge" style="display:none">Sesión iniciada</span>
+    </div>
   </header>
 
-  <!-- LIBRARY -->
-  <main id="libPanel">
-    <table>
-      <thead>
-      <tr>
-        <th class="col-cover">Cover</th>
-        <th>Album</th>
-        <th>Artist</th>
-        <th>Released</th>
-        <th class="col-average">Average</th>
-        <th class="col-tracks">Tracks</th>
-        <th class="col-open">Open</th>
-      </tr>
-      </thead>
-      <tbody id="tbody"><tr><td colspan="7" style="padding:14px;color:#aeb5c0">Loading…</td></tr></tbody>
-    </table>
-  </main>
-
-  <!-- TU EDITOR (sin tocar) -->
-  <div id="app" class="wrap">
-    <div class="toolbar">
-      <h1 style="margin-right:6px">Album Ranking</h1>
-      <span id="verBadge" class="tag">v7.1</span>
-      <div class="sub" id="subtitle" style="margin-left:8px">Quick form to score albums.</div>
-    </div>
-
+  <div class="wrap">
     <div class="grid">
       <!-- Left: form -->
       <div class="card pad">
@@ -109,15 +99,23 @@
         <div class="pair"><div class="label" data-i18n="artist">Artist</div><input id="artist" placeholder="Artist"></div>
         <div class="pair"><div class="label" data-i18n="released">Release Date</div><input id="released" placeholder="Aug 1, 2025"></div>
         <div class="pair"><div class="label" data-i18n="rankedby">Ranked by</div><input id="rankedby" placeholder="Your name or alias"></div>
-        <div class="pair"><div class="label" data-i18n="cover">Cover</div><input id="cover" type="file" accept="image/*"></div>
+        <div class="pair">
+          <div class="label" data-i18n="cover">Cover</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="cover" type="file" accept="image/*">
+            <button id="btnClearCover" type="button">Borrar cover</button>
+          </div>
+        </div>
         <div class="pair"><div class="label" data-i18n="trackcount">Tracks</div><input id="trackcount" type="number" min="1" value="7"></div>
 
         <div class="controls">
           <button id="applyCount">Apply Track Count</button>
           <button id="addRow">+ Add Row</button>
           <button id="delRow">– Remove Last</button>
-          <button id="clearScores">Clear Score</button>
-          <button id="sortTop10">Sort Top 10</button>
+          <span class="badge-help" title="Unscored tracks are '-'">
+            <span class="badge-dot"></span>
+            Unscored = '-'
+          </span>
         </div>
 
         <div class="row" style="font-size:12px;color:#aeb5c0">
@@ -164,23 +162,48 @@
     </div>
   </div>
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <!-- Library Modal -->
+  <div id="libraryBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-head">
+        <strong>My Library</strong>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="librarySearch" placeholder="Search album/artist" style="background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:8px;border-radius:8px;width:220px">
+          <select id="librarySort" class="select">
+            <option value="new">Newest</option>
+            <option value="avg_desc">Average: High → Low</option>
+            <option value="avg_asc">Average: Low → High</option>
+            <option value="alpha">A → Z</option>
+          </select>
+          <button id="libraryClose">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="lib-grid" style="color:#9fb0c6;padding:6px 0 10px;position:sticky;top:0;background:#0f1218;border-bottom:1px solid var(--line)">
+          <div>Cover</div><div>Album — Artist</div><div class="center">Average</div><div class="center">Tracks</div><div class="center">Actions</div>
+        </div>
+        <div id="libraryList" style="display:grid;grid-template-columns:88px 1fr 110px 110px 120px;gap:10px"></div>
+        <div id="libraryEmpty" class="lib-empty" style="display:none">No albums saved yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Supabase (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" defer></script>
+
+  <!-- Config del proyecto -->
   <script>
-    // Cliente único de Supabase
-    window.sb = window.supabase.createClient(
-      'https://dfnrrkopmdnkpsrxlqew.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8'
-    );
-    // A dónde volverá Google después del login
-    window.SITE_URL = location.origin + location.pathname + '?v=7.1';
+    window.SUPABASE_URL = "https://dfnrrkopmdnkpsrxlqew.supabase.co";
+    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbnJya29wbWRua3BzcnhscWV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzA5NjYsImV4cCI6MjA3NTg0Njk2Nn0.Z3Bl1xfV943MBSW068AlDaN74XxIwsbsILKEE2ECse8";
+    window.SITE_URL = location.origin + location.pathname;
   </script>
 
-  <!-- ÚNICO script para Auth + Library -->
-  <script src="./app-auth-library.v7.1.js"></script>
-
-  <!-- Tus scripts del editor -->
-  <script defer src="autofillAlbum.v7.1.js?v=7.1"></script>
-  <script defer src="ui.v7.1.js?v=7.1"></script>
+  <!-- App scripts existentes -->
+  <script defer src="autofillAlbum.v7.0.js?v=7.0"></script>
+  <!-- UI v7.2 (auth + library popup + clear cover + clear all + oauth hash fix) -->
+  <script defer src="ui.v7.2.js?v=7.2"></script>
 </body>
 </html>
