@@ -1,105 +1,87 @@
-# Album Ranking App (Album Rater) — v7.1
+# 💿 Album Rater — v7.2
+A fast, local, and fully offline web application for scoring music albums track by track.
 
-Try the latest version:
-- **GitHub Pages:** https://opesqueraa-ok.github.io/album-ranking/?v7.1
+Try the latest version: https://opesqueraa-ok.github.io/album-ranking/?v7.2
 
-## What is this?
-A fast, offline-capable web app to **score music albums** track by track. You can:
-- Autofill album data (title, year, tracks, cover) using **MusicBrainz** (with iTunes fallback).
-- Rate each track with **integer + decimal** (5.0–10.0) or leave it **unscored** (“-”).
-- See a **live average** and a **timeline chart** of your enjoyment.
-- Add **per-track notes** and **final album thoughts** (review).
-- **Sort Top 10** (toggle between best-10 and original album order).
-- **Export / Import** your data (JSON) — the export filename includes “`Album - Artist.json`”.
-- Works on **mobile and desktop**, and can be installed as a **PWA**.
+Core Features (Local-First Design)
+This version is focused on stability and self-sufficiency, working entirely as a Local-First tool.
 
-> v7.0 focuses on versioned caching & asset busting for more reliable updates.
+Track-by-Track Scoring: Rate tracks with an integer + decimal system (5.0–10.0) or mark them as "Unscored" (—).
 
-## Key Features
-- **Two-tap scoring** (integer + decimal) with color badges.
-- **Unscored mode** for tracks you haven’t rated yet.
-- **Notes & Review**: per-track notes (with pencil button) and a final notes box; rendered summary below the chart.
-- **Library (optional)**: you can store multiple albums (local). *Cloud sync (Supabase) is coming soon.*
-- **PWA**: works offline once cached; add it to your home screen.
+Live Analysis: Instantly view the Average Score and the Enjoyment Timeline chart.
 
-## Tech Stack
-- Plain **HTML/CSS/JS** (no framework).
-- **MusicBrainz** + **Cover Art Archive**, fallback to **iTunes Search API**.
-- **Service Worker** for offline caching.
-- Local persistence via **localStorage** + JSON export/import.
+Autofill: Quickly fetch album metadata, tracklists, and cover art using MusicBrainz (with iTunes fallback).
 
-## Files
-- `index.html` — UI layout and wiring.
-- `autofillAlbum.v6.5.js` — autofill logic (MB + iTunes) and rating grid.
-- `ui.v6.5.js` — i18n, export/import, clear, notes, “Sort Top 10”, etc.
-- `manifest.webmanifest` — PWA metadata.
-- `sw-register.v7.0.js`, `sw.v7.0.js` — service worker registration & caching.
+Local Library: Permanently store, load, and manage your rated albums locally within your browser's localStorage.
 
-> If you prefer, rename `autofillAlbum`/`ui` to `*.v7.0.js` and update references in `index.html` and `sw.v7.0.js`.
+Data Utilities: Includes clear tools for managing your data:
 
-## Development
-Just open `index.html` locally or serve with any static web server.
-To deploy, push to the repo’s `main` branch and enable **GitHub Pages**.
+Export/Import data (JSON).
 
-## Privacy
-All data is stored **locally** in your browser unless you export it manually. No tracking.
+Clear All fields / Clear Scores.
 
-## Changelog
-- **v7.0**
-  - Bumped versioned assets and cache name.
-  - Cleaned SW precache list and manifest references.
-  - Kept storage keys to preserve existing data.
+Sort Top 10 tracks toggle.
 
----
+Language selection (English/Spanish).
 
-# Aplicación de Ranking de Álbumes (Album Rater) — v7.1
+PWA Ready: Installable on mobile and desktop for guaranteed offline use.
 
-Prueba la última versión:
-- **GitHub Pages:** https://opesqueraa-ok.github.io/album-ranking/?v7.1
+Technology Stack
+Built for speed, lightness, and minimal dependencies.
 
-## ¿Qué es?
-Una app web rápida, con soporte **offline**, para **puntuar álbumes** canción por canción. Puedes:
-- Autocompletar datos del álbum (título, año, canciones, portada) con **MusicBrainz** (fallback a iTunes).
-- Puntuar cada track con **entero + decimal** (5.0–10.0) o dejarlo **sin puntuar** (“-”).
-- Ver el **promedio** en vivo y un **gráfico** de tu disfrute.
-- Añadir **notas por canción** y una **conclusión final** del álbum.
-- **Ordenar Top 10** (alternar entre top-10 y el orden original del álbum).
-- **Exportar / Importar** tus datos (JSON) — el nombre del archivo exportado incluye “`Álbum - Artista.json`”.
-- Funciona en **móvil y escritorio** y se puede instalar como **PWA**.
+Frontend: Plain HTML, CSS, & JavaScript (Vanilla JS).
 
-> v7.0 se centra en versionado de assets y cache busting para actualizaciones más fiables.
+Data Sources: MusicBrainz + Cover Art Archive (with iTunes fallback).
 
-## Funcionalidades clave
-- **Puntaje en dos pasos** (entero + decimal) con badges de color.
-- **Modo sin puntuar** para canciones aún no calificadas.
-- **Notas & Reseña**: notas por canción (botón con lápiz) y nota final; el resumen se muestra bajo el gráfico.
-- **Biblioteca (opcional)**: puedes almacenar múltiples álbumes (local). *Sincronización en la nube (Supabase) próximamente.*
-- **PWA**: funciona offline una vez cacheada; añádela a tu pantalla de inicio.
+Offline: Service Worker for asset caching (PWA).
 
-## Tecnologías
-- **HTML/CSS/JS** puro (sin framework).
-- **MusicBrainz** + **Cover Art Archive**, fallback a **iTunes Search API**.
-- **Service Worker** para cacheo offline.
-- Persistencia local con **localStorage** + exportación/importación JSON.
+Persistence: Local storage via localStorage.
 
-## Archivos
-- `index.html` — estructura e integración de la UI.
-- `autofillAlbum.v6.5.js` — autofill (MB + iTunes) y grilla de puntuación.
-- `ui.v6.5.js` — i18n, export/import, limpiar, notas, “Sort Top 10”, etc.
-- `manifest.webmanifest` — metadatos PWA.
-- `sw-register.v7.0.js`, `sw.v7.0.js` — registro del SW y cacheo.
+Development & Privacy
+To run the app, simply open index.html locally or serve it with any static web server.
 
-> Si prefieres, renombra `autofillAlbum`/`ui` a `*.v7.0.js` y actualiza referencias en `index.html` y `sw.v7.0.js`.
+Privacy: All your album data is stored locally in your browser. There is no cloud sync or tracking.
 
-## Desarrollo
-Abre `index.html` localmente o sirve con cualquier servidor estático.
-Para publicar, haz push a `main` y habilita **GitHub Pages**.
+💿 Album Rater — v7.2
+Una aplicación web rápida, local y totalmente desconectada para puntuar álbumes musicales canción por canción.
 
-## Privacidad
-Tus datos se guardan **localmente** en tu navegador salvo que exportes manualmente. No hay tracking.
+Prueba la última versión: https://opesqueraa-ok.github.io/album-ranking/?v7.2
 
-## Cambios
-- **v7.0**
-  - Actualización de versiones en assets y nombre de caché.
-  - Limpieza de la lista de precarga del SW y referencias del manifest.
-  - Se mantienen las keys de almacenamiento para no perder datos.
+Funcionalidades Clave (Diseño Local-First)
+Esta versión se centra en la estabilidad y la autosuficiencia, funcionando completamente como una herramienta Local-First.
+
+Puntuación por Canción: Califica cada track con entero + decimal (5.0–10.0) o déjalo "Sin puntuar" (—).
+
+Análisis en Vivo: Consulta al instante el Promedio de Puntaje y el gráfico Enjoyment Timeline.
+
+Autocompletado: Obtén rápidamente metadatos del álbum, lista de canciones y portada usando MusicBrainz (con fallback a iTunes).
+
+Biblioteca Local: Almacena, carga y gestiona permanentemente tus álbumes calificados de forma local en el localStorage de tu navegador.
+
+Herramientas de Gestión de Datos: Incluye utilidades claras para manejar tus datos:
+
+Exportar/Importar datos (JSON).
+
+Borrar Todos los campos / Borrar Puntajes.
+
+Alternar Orden Top 10 de canciones.
+
+Selección de Idioma (Inglés/Español).
+
+Lista para PWA: Se puede instalar en móvil y escritorio para garantizar su uso offline.
+
+Pila Tecnológica
+Construida para ser rápida, ligera y con dependencias mínimas.
+
+Frontend: HTML, CSS, & JavaScript puro (Vanilla JS).
+
+Fuentes de Datos: MusicBrainz + Cover Art Archive (con fallback a iTunes).
+
+Offline: Service Worker para caché de assets (PWA).
+
+Persistencia: Almacenamiento local mediante localStorage.
+
+Desarrollo y Privacidad
+Para ejecutar la aplicación, simplemente abre index.html localmente o sírvela con cualquier servidor web estático.
+
+Privacidad: Todos tus datos de álbumes se guardan localmente en tu navegador. No hay sincronización en la nube ni seguimiento.
