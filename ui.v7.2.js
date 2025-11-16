@@ -1,439 +1,286 @@
-// ui.v7.2.js – Auth (Google) + Library modal + Export/Import + Sort/Notes wiring + Clear Cover + Clear All + OAuth return fix
-(() => {
-  // ---------- helpers ----------
-  const $  = (s) => document.querySelector(s);
-  const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const safe = (s) => (s || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, " ");
+/* ----------------------------------------------------------
+   UI v7.2 — Offline version
+   Controla:
+   - Idioma
+   - Botones del topbar
+   - Export / Import
+   - Clear All
+   - Clear Scores
+   - Sort Top 10
+   - Notas por track
+   - Notas finales
+   - Render general
+   - Guardado local
+---------------------------------------------------------- */
 
-  // Supabase client
-  let supabaseClient = null;
-  function sb() {
-    if (!supabaseClient) {
-      supabaseClient = window.supabase.createClient(
-        window.SUPABASE_URL,
-        window.SUPABASE_ANON_KEY
-      );
+(function () {
+
+  const $ = s => document.querySelector(s);
+  const KEY_LANG = "albumrater_lang";
+  const KEY_STATE = "albumrater_v7.2_state";
+
+  /* ========================================
+     IDIOMAS
+  ======================================== */
+  const I18N = {
+    en: {
+      subtitle: "Quick form to score albums. Choose track count, pick scores with two taps (integer + decimal), and everything updates live.",
+      album: "Album",
+      artist: "Artist",
+      released: "Release Date",
+      rankedby: "Ranked by",
+      cover: "Cover",
+      trackcount: "Tracks",
+      duration: "Duration",
+      name: "Name",
+      score: "Score (int + decimal)",
+      color: "Color",
+      num: "#",
+      clear_all: "Clear All",
+      clear_scores: "Clear Scores",
+      sort_top10: "Sort Top 10",
+      restore_order: "Restore Order",
+      import_data: "Import Data",
+      export_data: "Export Data",
+      save_library: "Save to Library",
+      library: "Library",
+      library_title: "My Library",
+      final_thoughts: "Final Album Thoughts",
+      notes_review: "Notes & Review",
+      deleted: "Deleted",
+      saved: "Saved",
+      no_albums: "No albums saved yet."
+    },
+    es: {
+      subtitle: "Formulario rápido para puntuar álbumes. Elige número de canciones, selecciona puntaje en dos toques (entero + decimal) y todo se actualiza al instante.",
+      album: "Álbum",
+      artist: "Artista",
+      released: "Fecha de lanzamiento",
+      rankedby: "Rankeado por",
+      cover: "Portada",
+      trackcount: "Canciones",
+      duration: "Duración",
+      name: "Nombre",
+      score: "Puntaje (entero + decimal)",
+      color: "Color",
+      num: "#",
+      clear_all: "Borrar Todo",
+      clear_scores: "Borrar Puntajes",
+      sort_top10: "Ordenar Top 10",
+      restore_order: "Restaurar Orden",
+      import_data: "Importar Datos",
+      export_data: "Exportar Datos",
+      save_library: "Guardar en Biblioteca",
+      library: "Biblioteca",
+      library_title: "Mi Biblioteca",
+      final_thoughts: "Conclusión Final del Álbum",
+      notes_review: "Notas y Reseña",
+      deleted: "Eliminado",
+      saved: "Guardado",
+      no_albums: "Aún no hay álbumes guardados."
     }
-    return supabaseClient;
+  };
+
+  function applyLanguage(lang) {
+    const t = I18N[lang];
+    $("#subtitle").textContent = t.subtitle;
+    $('[data-i18n="album"]').textContent = t.album;
+    $('[data-i18n="artist"]').textContent = t.artist;
+    $('[data-i18n="released"]').textContent = t.released;
+    $('[data-i18n="rankedby"]').textContent = t.rankedby;
+    $('[data-i18n="cover"]').textContent = t.cover;
+    $('[data-i18n="trackcount"]').textContent = t.trackcount;
+    $('[data-i18n="num"]').textContent = t.num;
+    $('[data-i18n="duration"]').textContent = t.duration;
+    $('[data-i18n="name"]').textContent = t.name;
+    $('[data-i18n="score"]').textContent = t.score;
+    $('[data-i18n="color"]').textContent = t.color;
+    $('[data-i18n="library_title"]').textContent = t.library_title;
+
+    $("#importLabel").textContent = t.import_data;
+    $("#exportJSON").textContent = t.export_data;
+    $("#clearAll").textContent = t.clear_all;
+    $("#clearScores").textContent = t.clear_scores;
+    $("#sortTop10").textContent = t.sort_top10;
+    $("#btnSaveToLibrary").textContent = t.save_library;
+    $("#btnMyLibrary").textContent = t.library;
   }
 
-  // ---------- OAuth return hash cleanup ----------
-  function isOAuthHash(h) {
-    if (!h) return false;
-    const q = h.replace(/^#/, "");
-    return /access_token=|refresh_token=|provider_token=/.test(q);
-  }
-  async function handleOAuthReturn() {
-    if (isOAuthHash(location.hash)) {
-      try { await sb().auth.getSession(); } catch {}
-      history.replaceState(null, "", location.pathname + location.search);
-    }
-  }
-
-  // ---------- Auth UI ----------
-  async function refreshAuthUI() {
-    const { data } = await sb().auth.getSession();
-    const session = data?.session || null;
-    const signed = !!session;
-
-    const inBtn   = $("#btnSigninGoogle");
-    const outBtn  = $("#btnSignout");
-    const saveBtn = $("#btnSaveToLibrary");
-    const libBtn  = $("#btnMyLibrary");
-    const authMini= $("#authMini");
-
-    if (inBtn)   inBtn.style.display   = signed ? "none" : "";
-    if (outBtn)  outBtn.style.display  = signed ? "" : "none";
-    if (saveBtn) saveBtn.style.display = signed ? "" : "none";
-    if (libBtn)  libBtn.style.display  = signed ? "" : "none";
-    if (authMini) authMini.style.display = signed ? "inline-flex" : "none";
-  }
-
-  async function signInGoogle() {
-    await sb().auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.SITE_URL }
-    });
-  }
-  async function signOut() {
-    await sb().auth.signOut();
-    await refreshAuthUI();
-  }
-
-  // ---------- App state helpers (delegan en autofill script) ----------
-  function getAppState() {
-    return window.AlbumApp?.getState ? window.AlbumApp.getState() : null;
-  }
-  function setAppState(s) {
-    if (window.AlbumApp?.setState) window.AlbumApp.setState(s);
-  }
-  function saveLocal() {
-    if (window.AlbumApp?.save) window.AlbumApp.save();
-  }
-
-  // Average from scores
-  function computeAverage(tracks) {
-    const valid = (tracks || [])
-      .map((t) => Number(t.score))
-      .filter((v) => Number.isFinite(v) && v >= 5 && v <= 10);
-    if (!valid.length) return null;
-    const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
-    return Number(avg.toFixed(2));
-  }
-
-  // ---------- Export / Import (estado local, no cloud) ----------
+  /* ========================================
+     EXPORTAR / IMPORTAR JSON (estado actual)
+  ======================================== */
   function exportJSON() {
-    try {
-      const s = getAppState();
-      const payload = { ...s };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const album = safe(s?.album || "Album");
-      const artist = safe(s?.artist || "");
-      const fname = artist ? `${album} - ${artist}.json` : `${album}.json`;
-      const a = document.createElement("a");
-      a.href = url; a.download = fname; a.click();
-      URL.revokeObjectURL(url);
-      toast("Exported current album data.");
-    } catch (e) {
-      alert("Could not export.");
-      console.error(e);
-    }
+    const s = window.AlbumApp.getState();
+    const blob = new Blob([JSON.stringify(s, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+
+    const album = s.album || "album";
+    const artist = s.artist || "artist";
+    a.download = `${album} - ${artist}.json`;
+
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
+
   function importJSON(file) {
     const r = new FileReader();
-    r.onload = (e) => {
+    r.onload = e => {
       try {
         const obj = JSON.parse(e.target.result);
-        setAppState(obj);
-        saveLocal();
-        toast("Imported.");
-      } catch (err) {
+        window.AlbumApp.setState(obj);
+        window.AlbumApp.save();
+        showToast("Loaded");
+      } catch {
         alert("Invalid file.");
       }
     };
     r.readAsText(file);
   }
 
-  // ---------- Clear All & Clear Scores ----------
+  /* ========================================
+     CLEAR ALL
+  ======================================== */
   function clearAll() {
-    if (!confirm("Are you sure you want to clear EVERYTHING?")) return;
-    localStorage.removeItem("albumrater_v6_state");
-    localStorage.removeItem("albumrater_v7_state");
-    setAppState({
-      lang: $("#lang")?.value || "en",
+    if (!confirm("Clear ALL fields?")) return;
+
+    window.AlbumApp.setState({
+      lang: $("#lang").value,
       album: "",
       artist: "",
       released: "",
       rankedby: "",
       cover: "",
-      tracks: [],
-      finalNotes: ""
+      tracks: []
     });
-    const img = $("#coverOut"); if (img) img.src = "";
-    const ta  = $("#finalNotes"); if (ta) ta.value = "";
-    saveLocal();
-    toast("All cleared.");
-  }
-  function clearScores() {
-    const s = getAppState();
-    if (!s) return;
-    s.tracks = (s.tracks || []).map((t) => ({ ...t, score: NaN }));
-    setAppState(s);
-    saveLocal();
-    toast("Scores cleared.");
+
+    window.AlbumApp.ensureRows(7);
+    window.AlbumApp.render();
+    window.AlbumApp.save();
   }
 
-  // ---------- Clear Cover ----------
-  function clearCover() {
-    const img = $("#coverOut");
-    const file = $("#cover");
-    if (img) img.src = "";
-    if (file) file.value = "";
-    const s = getAppState() || {};
-    s.cover = "";
-    setAppState(s);
-    saveLocal();
-    toast("Cover cleared.");
+  /* ========================================
+     TOP 10 SORT TOGGLE
+  ======================================== */
+  const SORT_STATE = { active: false, snapshot: null };
+
+  function setSortButton(active) {
+    const lang = $("#lang").value;
+    $("#sortTop10").textContent = active ? I18N[lang].restore_order : I18N[lang].sort_top10;
   }
 
-  // ---------- Notes live output ----------
-  function renderNotesOutput() {
-    const out = $("#notesOutput");
-    if (!out) return;
-    const s = getAppState() || {};
-    const lines = [];
-    (s.tracks || []).forEach((t, i) => {
-      if (t?.note) {
-        const name = t.name || `Track ${i + 1}`;
-        lines.push(`${i + 1}. ${name}: ${t.note}`);
-      }
-    });
-    const albumTitle = s.album ? `${s.album} by ${s.artist || ""}`.trim() : "";
-    const header = albumTitle ? albumTitle + "\n" : "";
-    const final = s.finalNotes || "";
-    const tail = final.trim() ? `\nFinal Album Thoughts: ${final.trim()}` : "";
-    out.textContent = header + lines.join("\n") + tail;
-  }
-  function bindFinalNotes() {
-    const ta = $("#finalNotes");
-    if (!ta || ta._bound) return;
-    ta._bound = true;
-    ta.addEventListener("input", () => {
-      const s = getAppState() || {};
-      s.finalNotes = ta.value || "";
-      setAppState(s);
-      saveLocal();
-      renderNotesOutput();
-    });
-  }
-  window.addEventListener("album-autofilled", () => renderNotesOutput());
+  function sortTop10() {
+    const el = $("#tracks");
 
-  // ---------- Sort Top 10 reversible (delegado a autofill; aquí solo etiqueta) ----------
-  function setSortButtonLabel(active) {
-    const b = $("#sortTop10");
-    if (!b) return;
-    b.textContent = active ? "Restore album order" : "Sort Top 10";
-  }
+    if (!SORT_STATE.active) {
+      SORT_STATE.snapshot = [...el.children].map(r => r.value());
 
-  // ---------- Library (Supabase) ----------
-  function openLibraryModal(show) {
-    const bd = $("#libraryBackdrop");
-    if (!bd) return;
-    bd.style.display = show ? "flex" : "none";
-  }
+      const arr = SORT_STATE.snapshot.map(x => ({ ...x }));
+      const scored = arr.filter(t => Number.isFinite(t.score));
+      const unscored = arr.filter(t => !Number.isFinite(t.score));
 
-  function colorFor(score) {
-    if (!Number.isFinite(score)) return "var(--neutral)";
-    const k = Math.max(5, Math.min(10, Math.floor(Number(score) || 0)));
-    const colors = {10:'var(--c10)',9:'var(--c9)',8:'var(--c8)',7:'var(--c7)',6:'var(--c6)',5:'var(--c5)'};
-    return colors[k] || "var(--neutral)";
-  }
+      scored.sort((a, b) => b.score - a.score);
 
-  async function saveToLibrary() {
-    const { data: sData } = await sb().auth.getSession();
-    const user = sData?.session?.user;
-    if (!user) { alert("Please sign in first."); return; }
-    const s = getAppState();
-    if (!s) return;
+      const top = scored.slice(0, 10);
+      const rest = scored.slice(10).concat(unscored);
 
-    const avg = computeAverage(s.tracks);
-    const payload = {
-      user_id: user.id,
-      album: s.album || "",
-      artist: s.artist || "",
-      released: s.released || "",
-      rankedby: s.rankedby || "",
-      cover: s.cover || $("#coverOut")?.src || "",
-      tracks: s.tracks || [],
-      avg: avg, // asumimos que ya creaste la columna avg (como acordamos)
-      final_notes: s.finalNotes || ""
-    };
+      const merged = top.concat(rest).map((t, i) => ({ ...t, n: i + 1 }));
 
-    const { error } = await sb().from("albums").insert(payload);
-    if (error) { console.error(error); alert("Error saving album."); return; }
-    toast("Saved to your library.");
-  }
+      el.innerHTML = "";
+      merged.forEach((t, i) => el.appendChild(window.AlbumApp.makeRow(i, t)));
 
-  let LIB_CACHE = [];
-  function paintLibraryList(rows) {
-    const list = $("#libraryList");
-    const empty = $("#libraryEmpty");
-    list.innerHTML = "";
-    if (!rows || !rows.length) {
-      empty.style.display = "";
+      SORT_STATE.active = true;
+      window.AlbumApp.render();
+      setSortButton(true);
       return;
     }
-    empty.style.display = "none";
 
-    rows.forEach((row) => {
-      // cover
-      const c = document.createElement("img");
-      c.className = "lib-cover";
-      c.src = row.cover || "";
+    el.innerHTML = "";
+    SORT_STATE.snapshot.forEach((t, i) => el.appendChild(window.AlbumApp.makeRow(i, t)));
 
-      // title
-      const t = document.createElement("div");
-      t.innerHTML = `<div style="font-weight:700">${row.album || "—"}</div><div style="opacity:.8">${row.artist || ""}</div>`;
+    SORT_STATE.active = false;
+    SORT_STATE.snapshot = null;
+    window.AlbumApp.render();
+    setSortButton(false);
+  }
 
-      // average (colored badge)
-      const av = document.createElement("div");
-      av.className = "center";
-      const val = (row.avg == null || Number.isNaN(row.avg)) ? "—" : Number(row.avg).toFixed(1);
-      const bg = (row.avg == null || Number.isNaN(row.avg)) ? "var(--neutral)" : colorFor(row.avg);
-      av.innerHTML = `<span class="pill" style="background:${bg}">${val}</span>`;
+  /* ========================================
+     TOAST
+  ======================================== */
+  function showToast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    setTimeout(() => (t.style.display = "none"), 1500);
+  }
 
-      // tracks
-      const tc = document.createElement("div");
-      tc.className = "center";
-      tc.textContent = Array.isArray(row.tracks) ? row.tracks.length : "—";
+  /* ========================================
+     BIND UI
+  ======================================== */
+  function bindUI() {
 
-      // actions: Open + Delete
-      const act = document.createElement("div");
-      act.className = "center";
-      const open = document.createElement("button");
-      open.textContent = "Open";
-      open.addEventListener("click", () => {
-        const s = {
-          lang: $("#lang")?.value || "en",
-          album: row.album,
-          artist: row.artist,
-          released: row.released,
-          rankedby: row.rankedby,
-          cover: row.cover,
-          tracks: row.tracks || [],
-          finalNotes: row.final_notes || ""
-        };
-        setAppState(s);
-        const ta = $("#finalNotes"); if (ta) ta.value = row.final_notes || "";
-        saveLocal();
-        renderNotesOutput();
-        openLibraryModal(false);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+    /* idioma */
+    let lang = localStorage.getItem(KEY_LANG) || "en";
+    $("#lang").value = lang;
+    applyLanguage(lang);
+
+    $("#lang").addEventListener("change", e => {
+      localStorage.setItem(KEY_LANG, e.target.value);
+      applyLanguage(e.target.value);
+      window.AlbumApp.render();
+    });
+
+    /* export */
+    $("#exportJSON").addEventListener("click", exportJSON);
+
+    /* import */
+    $("#importJSON").addEventListener("change", ev => {
+      const f = ev.target.files[0];
+      if (f) importJSON(f);
+      ev.target.value = "";
+    });
+
+    /* clear all */
+    $("#clearAll").addEventListener("click", clearAll);
+
+    /* sort top 10 */
+    $("#sortTop10").addEventListener("click", sortTop10);
+
+    /* clear cover */
+    $("#btnClearCover").addEventListener("click", () => {
+      $("#coverOut").src = "";
+      window.AlbumApp.save();
+    });
+
+    /* limpieza de puntajes */
+    $("#clearScores").addEventListener("click", () => {
+      const el = $("#tracks");
+      [...el.children].forEach(row => {
+        const v = row.value();
+        v.score = NaN;
+        row.replaceWith(window.AlbumApp.makeRow(0, v));
       });
-      const del = document.createElement("button");
-      del.textContent = "Delete";
-      del.style.marginLeft = "8px";
-      del.addEventListener("click", async () => {
-        if (!confirm("Delete this album from cloud?")) return;
-        const { data: sData } = await sb().auth.getSession();
-        const user = sData?.session?.user;
-        const { error } = await sb().from("albums").delete().eq("id", row.id).eq("user_id", user.id);
-        if (error) { alert("Could not delete."); return; }
-        toast("Deleted.");
-        // remove locally & repaint
-        LIB_CACHE = LIB_CACHE.filter(r => r.id !== row.id);
-        applyLibSearchSort(); // repaint after delete
-      });
-      act.append(open, del);
+      window.AlbumApp.render();
+    });
 
-      // append as grid
-      const frag = document.createDocumentFragment();
-      [c, t, av, tc, act].forEach(el => frag.appendChild(el));
-      list.appendChild(frag);
+    /* library buttons — la funcionalidad estará en library.v7.2.js */
+    $("#btnSaveToLibrary").addEventListener("click", () => {
+      window.Library.saveCurrent();
+    });
+    $("#btnMyLibrary").addEventListener("click", () => {
+      window.Library.openModal();
+    });
+    $("#libraryClose").addEventListener("click", () => {
+      $("#libraryBackdrop").style.display = "none";
     });
   }
 
-  function applyLibSearchSort() {
-    const q = ($("#librarySearch")?.value || "").toLowerCase().trim();
-    const mode = $("#librarySort")?.value || "new";
-    let rows = [...LIB_CACHE];
-
-    if (q) {
-      rows = rows.filter(r =>
-        (r.album || "").toLowerCase().includes(q) ||
-        (r.artist || "").toLowerCase().includes(q)
-      );
-    }
-    if (mode === "new") rows.sort((a,b) => (b.created_at || "").localeCompare(a.created_at || ""));
-    if (mode === "avg_desc") rows.sort((a,b) => (Number(b.avg)||-1) - (Number(a.avg)||-1));
-    if (mode === "avg_asc") rows.sort((a,b) => (Number(a.avg)||-1) - (Number(b.avg)||-1));
-    if (mode === "alpha") rows.sort((a,b) => (a.album||"").localeCompare(b.album||""));
-
-    paintLibraryList(rows);
+  /* ========================================
+     BOOT
+  ======================================== */
+  function boot() {
+    bindUI();
   }
 
-  async function openLibrary() {
-    const { data: sData } = await sb().auth.getSession();
-    const user = sData?.session?.user;
-    if (!user) { alert("Please sign in first."); return; }
-
-    const { data, error } = await sb().from("albums")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) { console.error(error); alert("Error loading library."); return; }
-
-    LIB_CACHE = data || [];
-    applyLibSearchSort();
-    openLibraryModal(true);
-  }
-
-  // ---------- Toast ----------
-  let toastTimer = null;
-  function toast(msg, ms = 1600) {
-    const el = $("#toast");
-    if (!el) return;
-    el.textContent = msg;
-    el.style.display = "block";
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (el.style.display = "none"), ms);
-  }
-
-  // ---------- Bind UI ----------
-  function bindUI() {
-    // Auth buttons
-    const bi = $("#btnSigninGoogle");
-    if (bi && !bi._bound) { bi._bound = true; bi.addEventListener("click", signInGoogle); }
-    const bo = $("#btnSignout");
-    if (bo && !bo._bound) { bo._bound = true; bo.addEventListener("click", signOut); }
-    const bs = $("#btnSaveToLibrary");
-    if (bs && !bs._bound) { bs._bound = true; bs.addEventListener("click", saveToLibrary); }
-    const bm = $("#btnMyLibrary");
-    if (bm && !bm._bound) { bm._bound = true; bm.addEventListener("click", openLibrary); }
-
-    // Library modal controls
-    const bc = $("#libraryClose");
-    if (bc && !bc._bound) { bc._bound = true; bc.addEventListener("click", () => openLibraryModal(false)); }
-    const back = $("#libraryBackdrop");
-    if (back && !back._backdropBound) {
-      back._backdropBound = true;
-      back.addEventListener("click", (e) => { if (e.target === back) openLibraryModal(false); });
-    }
-    const search = $("#librarySearch");
-    if (search && !search._bound) { search._bound = true; search.addEventListener("input", applyLibSearchSort); }
-    const sortSel = $("#librarySort");
-    if (sortSel && !sortSel._bound) { sortSel._bound = true; sortSel.addEventListener("change", applyLibSearchSort); }
-
-    // Export / Import / Clear
-    const exp = $("#exportJSON");
-    if (exp && !exp._bound) { exp._bound = true; exp.addEventListener("click", exportJSON); }
-    const imp = $("#importJSON");
-    if (imp && !imp._bound) {
-      imp._bound = true;
-      imp.addEventListener("change", (ev) => {
-        const f = ev.target.files[0];
-        if (f) importJSON(f);
-        ev.target.value = "";
-      });
-    }
-    const clrAll = $("#clearAll");
-    if (clrAll && !clrAll._bound) { clrAll._bound = true; clrAll.addEventListener("click", clearAll); }
-    const clrScores = $("#clearScores");
-    if (clrScores && !clrScores._bound) { clrScores._bound = true; clrScores.addEventListener("click", clearScores); }
-
-    // Clear Cover
-    const clrCover = $("#btnClearCover");
-    if (clrCover && !clrCover._bound) { clrCover._bound = true; clrCover.addEventListener("click", clearCover); }
-    const coverInput = $("#cover");
-    if (coverInput && !coverInput._bound) {
-      coverInput._bound = true;
-      coverInput.addEventListener("change", ev => {
-        const f = ev.target.files[0]; if (!f) return;
-        const r = new FileReader();
-        r.onload = e => { const img = $("#coverOut"); if (img) img.src = e.target.result; const s = getAppState()||{}; s.cover = e.target.result; setAppState(s); saveLocal(); };
-        r.readAsDataURL(f);
-      });
-    }
-
-    // Notes binder
-    bindFinalNotes();
-
-    // sort button label sync (autofill gestiona la lógica)
-    setSortButtonLabel(false);
-
-    // react to auth state
-    sb().auth.onAuthStateChange(() => refreshAuthUI());
-    refreshAuthUI();
-  }
-
-  // ---------- boot ----------
-  (async function boot(){
-    await handleOAuthReturn();
-    if (document.readyState === "complete" || document.readyState === "interactive") {
-      bindUI();
-    } else {
-      document.addEventListener("DOMContentLoaded", bindUI);
-    }
-  })();
+  boot();
 })();
