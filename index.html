@@ -1,429 +1,340 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Album Rater</title>
+  <title>Album Rater | Editorial Edition</title>
 
-  <!-- PWA -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Lora:ital,wght@0,700;0,900;1,700&display=swap" rel="stylesheet">
+
   <link rel="manifest" href="manifest.webmanifest?v=7.2">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7.2">
   <link rel="icon" href="favicon.png?v=7.2">
-  <meta name="theme-color" content="#0f1115">
+  <meta name="theme-color" content="#0a0c10">
 
   <style>
-    :root{
-      --c10:#2e47ee;
-      --c9:#0285c6;
-      --c8:#02aec6;
-      --c7:#23be32;
-      --c6:#f0ca15;
-      --c5:#e12928;
-      --bg:#0f1115;
-      --panel:#161a22;
-      --ink:#e9edf1;
-      --muted:#aeb5c0;
-      --line:#2a3140;
-      --neutral:#2a3140;
-    }
-    *{box-sizing:border-box}
-    html,body{
-      background:var(--bg);
-      color:var(--ink);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;
-      margin:0;
-    }
-    .wrap{
-      max-width:1100px;
-      margin:18px auto;
-      padding:0 16px 64px;
-    }
-    h1{
-      font-size:20px;
-      margin:0 0 6px;
-    }
-    .sub{
-      color:var(--muted);
-      font-size:13px;
-      margin-bottom:12px;
-    }
-    .toolbar{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin-bottom:10px;
-    }
-    .select,input,select,button{
-      background:#0e1218;
-      border:1px solid var(--line);
-      color:var(--ink);
-      padding:10px;
-      border-radius:10px;
-    }
-    button{
-      cursor:pointer;
-      font-weight:600;
-    }
-    .badge{
-      opacity:.75;
-      font-size:12px;
-      border:1px solid var(--line);
-      padding:6px 8px;
-      border-radius:8px;
-    }
-    .card{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:14px;
-    }
-    .pad{padding:14px}
-    .grid{
-      display:grid;
-      grid-template-columns:1.1fr .9fr;
-      gap:16px;
-    }
-    @media (max-width:900px){
-      .grid{grid-template-columns:1fr}
-    }
-    .pair{
-      display:grid;
-      grid-template-columns:140px 1fr;
-      gap:8px;
-      align-items:center;
-      margin-bottom:8px;
-    }
-    .label{
-      font-size:13px;
-      color:var(--muted);
-    }
-    .controls{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      margin:6px 0 10px;
-    }
-    .row{
-      display:grid;
-      grid-template-columns:60px 90px 1fr 160px 90px 36px;
-      gap:8px;
-      align-items:center;
-      margin-bottom:6px;
-    }
-    .noteBtn{
-      width:36px;
-      height:36px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border:1px solid var(--line);
-      border-radius:8px;
-      background:#0e1218;
-      color:var(--ink);
-      cursor:pointer;
-    }
-    .noteBtn.active{outline:2px solid #3b82f6}
-    .pill{
-      display:inline-flex;
-      justify-content:center;
-      align-items:center;
-      padding:6px 10px;
-      border-radius:8px;
-      color:white;
-      font-weight:800;
-      min-width:52px;
-      text-align:center;
-    }
-    .cover{
-      width:100%;
-      aspect-ratio:1/1;
-      object-fit:cover;
-      border:1px solid var(--line);
-      border-radius:10px;
-      background:#0d1117;
-    }
-    table{
-      width:100%;
-      border-collapse:collapse;
-      margin-top:8px;
-    }
-    th,td{
-      border-bottom:1px solid var(--line);
-      padding:8px 6px;
-      text-align:left;
-      font-size:14px;
-    }
-    th{
-      color:var(--muted);
-      font-weight:600;
-    }
-    .final{
-      font-size:52px;
-      font-weight:800;
-      text-align:center;
-      margin-top:10px;
-    }
-    canvas{
-      width:100%;
-      height:320px;
-      border:1px solid var(--line);
-      border-radius:12px;
-      background:#0e1218;
-    }
-    .footer{
-      margin-top:10px;
-      font-size:12px;
-      color:#93a0b6;
-    }
-    .badge-help{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      font-size:12px;
-      color:#c9d3e3;
-    }
-    .badge-dot{
-      width:8px;
-      height:8px;
-      border-radius:999px;
-      background:var(--neutral);
-      display:inline-block;
+    :root {
+      --c10: #2e47ee;
+      --c9: #0285c6;
+      --c8: #02aec6;
+      --c7: #23be32;
+      --c6: #f0ca15;
+      --c5: #e12928;
+      --bg: #0a0c10;
+      --panel: #11141b;
+      --ink: #f0f2f5;
+      --muted: #8a94a3;
+      --line: rgba(255, 255, 255, 0.08);
+      --neutral: #2a3140;
+      --accent: #7a9aff;
     }
 
-    /* Library modal */
-    .modal-backdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.6);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:9999;
-    }
-    .modal{
-      width:min(900px,92vw);
-      background:#0f1218;
-      border:1px solid var(--line);
-      border-radius:12px;
-      overflow:hidden;
-    }
-    .modal-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:12px 14px;
-      border-bottom:1px solid var(--line);
-    }
-    .modal-body{
-      padding:12px;
-      max-height:70vh;
-      overflow:auto;
-    }
-    .lib-row{
-      display:grid;
-      grid-template-columns:88px 1.8fr 1.2fr 80px 80px 70px 70px;
-      gap:10px;
-      align-items:center;
-      padding:8px 6px;
-      border-bottom:1px solid #1b2230;
-      font-size:13px;
-    }
-    .lib-cover{
-      width:72px;
-      height:72px;
-      border-radius:8px;
-      border:1px solid var(--line);
-      object-fit:cover;
-      background:#0d1117;
-    }
-    .lib-empty{
-      padding:18px;
-      color:#aeb5c0;
-    }
-    .lib-score-pill{
-      display:inline-flex;
-      justify-content:center;
-      align-items:center;
-      padding:4px 8px;
-      border-radius:999px;
-      min-width:48px;
-      font-weight:700;
-      color:#fff;
-      font-size:13px;
+    * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      line-height: 1.6;
     }
 
-    /* Toast */
-    .toast{
-      position:fixed;
-      left:50%;
-      transform:translateX(-50%);
-      bottom:20px;
-      background:#111a;
-      backdrop-filter:blur(6px);
-      color:#fff;
-      padding:10px 14px;
-      border:1px solid #334;
-      border-radius:10px;
-      z-index:99999;
-      display:none;
-      font-size:13px;
+    /* Títulos estilo Pitchfork */
+    h1, h2, .final-score-title {
+      font-family: 'Lora', serif;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px 100px;
+    }
+
+    /* Toolbar refinada */
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar h1 { font-size: 28px; margin: 0; color: var(--ink); }
+
+    /* Inputs y Botones minimalistas */
+    input, select, button, textarea {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(255,255,255,0.06);
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 12px 20px;
+    }
+
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    button#clearAll, button#delRow { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+
+    /* Tarjetas con profundidad */
+    .card {
+      background: var(--panel);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .pad { padding: 30px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+
+    .pair {
+      margin-bottom: 18px;
+    }
+
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    /* Tabla Estilo Lista de Revista */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 10px 5px;
+      border-bottom: 1px solid var(--line);
+      letter-spacing: 1px;
+    }
+
+    td {
+      padding: 14px 5px;
+      border-bottom: 1px solid var(--line);
+      font-size: 15px;
+    }
+
+    /* La Nota Final Impactante */
+    .final {
+      font-family: 'Lora', serif;
+      font-size: 100px;
+      font-weight: 900;
+      text-align: center;
+      line-height: 1;
+      margin: 10px 0;
+      background: linear-gradient(180deg, #fff 0%, var(--muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .cover {
+      width: 100%;
+      aspect-ratio: 1/1;
+      object-fit: cover;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      transition: transform 0.3s ease;
+    }
+
+    .cover:hover { transform: scale(1.02); }
+
+    canvas {
+      width: 100%;
+      height: 300px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.2);
+      margin-top: 15px;
+    }
+
+    /* El selector de tracks (UI interna) */
+    .row {
+      display: grid;
+      grid-template-columns: 40px 80px 1fr 140px 60px 36px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .pill {
+      font-family: 'Lora', serif;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 16px;
+      min-width: 45px;
+    }
+
+    /* Review & Notes Area */
+    #notesSection {
+      margin-top: 30px;
+      border-top: 1px solid var(--line);
+      padding-top: 20px;
+    }
+
+    #finalNotes {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--line);
+      font-family: 'Lora', serif;
+      font-size: 17px;
+      line-height: 1.7;
+    }
+
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 1px;
     }
   </style>
 </head>
 <body>
+
 <div class="wrap">
   <div class="toolbar">
-    <h1 style="margin-right:6px">Album Rater</h1>
-    <span id="verBadge" class="badge">v7.2 (offline)</span>
-
-    <!-- Language -->
-    <select id="lang" class="select">
-      <option value="en">English</option>
-      <option value="es">Español</option>
-    </select>
-
-    <!-- Data tools (estado local del álbum actual) -->
-    <button id="exportJSON">Export Data</button>
-    <label style="position:relative">
-      <span id="importLabel" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;display:inline-block">
-        Import Data
-      </span>
-      <input id="importJSON" type="file" accept="application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer">
-    </label>
-    <button id="clearAll">Clear All</button>
-    <button id="sortTop10">Sort Top 10</button>
-
+    <h1>Album Rater</h1>
+    <span id="verBadge" style="font-size:10px; color:var(--muted); border:1px solid var(--line); padding:2px 8px; border-radius:4px">EDITORIAL V7.2</span>
+    
     <div style="flex:1"></div>
 
-    <!-- Local Library (IndexedDB) -->
-    <button id="btnSaveToLibrary">Save to Library</button>
-    <button id="btnMyLibrary">Library</button>
-  </div>
-
-  <div class="sub" id="subtitle">
-    Quick form to score albums. Choose track count, pick scores with two taps (integer + decimal), and everything updates live.
+    <select id="lang">
+      <option value="en">EN</option>
+      <option value="es">ES</option>
+    </select>
+    <button id="btnMyLibrary" style="background:transparent; color:var(--ink); border:1px solid var(--line)">Library</button>
+    <button id="btnSaveToLibrary">Save Album</button>
   </div>
 
   <div class="grid">
-    <!-- Left: form -->
-    <div class="card pad">
-      <div class="pair">
-        <div class="label" data-i18n="album">Album</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="album" placeholder="Album name">
-          <button id="btnBuscarAlbum" type="button">Buscar info</button>
+    <div>
+      <div class="card pad">
+        <h2 style="margin-top:0; font-size:20px; margin-bottom:25px">Album Metadata</h2>
+        
+        <div class="pair">
+          <div class="label">Artist & Album</div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+            <input id="artist" placeholder="Artist Name">
+            <input id="album" placeholder="Album Title">
+          </div>
+          <button id="btnBuscarAlbum" style="width:100%; margin-top:10px; background:#fff; color:#000">Fetch Info (MusicBrainz/iTunes)</button>
+        </div>
+
+        <div class="pair">
+          <div class="label">Release & Ranker</div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+            <input id="released" placeholder="Year">
+            <input id="rankedby" placeholder="Reviewer">
+          </div>
+        </div>
+
+        <div class="pair">
+          <div class="label">Tracklist Management</div>
+          <div style="display:flex; gap:8px">
+            <input id="trackcount" type="number" style="width:70px" value="7">
+            <button id="applyCount" style="background:var(--line); color:var(--ink)">Set</button>
+            <button id="addRow" style="background:var(--line); color:var(--ink)">+ Add</button>
+          </div>
+        </div>
+
+        <div id="tracks" style="margin-top:30px">
+          </div>
+
+        <div style="margin-top:20px; display:flex; gap:10px">
+          <button id="clearScores" style="flex:1; background:transparent; border:1px solid var(--line); color:var(--muted)">Reset Scores</button>
+          <button id="clearAll" style="flex:1">Clear All</button>
         </div>
       </div>
-      <div class="pair">
-        <div class="label" data-i18n="artist">Artist</div>
-        <input id="artist" placeholder="Artist">
-      </div>
-      <div class="pair">
-        <div class="label" data-i18n="released">Release Date</div>
-        <input id="released" placeholder="Aug 1, 2025">
-      </div>
-      <div class="pair">
-        <div class="label" data-i18n="rankedby">Ranked by</div>
-        <input id="rankedby" placeholder="Your name or alias">
-      </div>
-      <div class="pair">
-        <div class="label" data-i18n="cover">Cover</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="cover" type="file" accept="image/*">
-          <button id="btnClearCover" type="button">Clear cover</button>
-        </div>
-      </div>
-      <div class="pair">
-        <div class="label" data-i18n="trackcount">Tracks</div>
-        <input id="trackcount" type="number" min="1" value="7">
-      </div>
-
-      <div class="controls">
-        <button id="applyCount">Apply Track Count</button>
-        <button id="addRow">+ Add Row</button>
-        <button id="delRow">– Remove Last</button>
-        <button id="clearScores">Clear Score</button>
-        <span class="badge-help" title="Unscored tracks are '-'">
-          <span class="badge-dot"></span>
-          Unscored = '-'
-        </span>
-      </div>
-
-      <div class="row" style="font-size:12px;color:#aeb5c0">
-        <div data-i18n="num">#</div>
-        <div data-i18n="duration">Duration</div>
-        <div data-i18n="name">Name</div>
-        <div data-i18n="score">Score (int + decimal)</div>
-        <div data-i18n="color">Color</div>
-        <div><!-- notes btn col --></div>
-      </div>
-      <div id="tracks"></div>
     </div>
 
-    <!-- Right: preview -->
-    <div class="card pad">
-      <div style="display:grid;grid-template-columns:1fr 360px;gap:16px">
-        <div>
-          <div id="info" style="display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:6px;align-items:center"></div>
-          <table id="table"></table>
-        </div>
-        <div>
-          <img id="coverOut" class="cover" alt="Cover">
+    <div>
+      <div class="card pad" style="position: sticky; top: 20px;">
+        <div style="text-align:center">
+          <img id="coverOut" class="cover" alt="Album Cover">
+          <div class="label" style="margin-top:20px">Overall Score</div>
           <div class="final" id="finalScore">—</div>
         </div>
-      </div>
 
-      <div style="margin-top:12px">
-        <div style="font-size:12px;color:#aeb5c0;margin:6px 0">Enjoyment Timeline</div>
-        <canvas id="chart" width="900" height="360"></canvas>
-      </div>
+        <div id="info" style="margin-bottom:20px; text-align:center">
+          </div>
 
-      <!-- Notes & Review -->
-      <div id="notesSection" class="card pad" style="margin-top:12px">
-        <div style="font-size:12px;color:#aeb5c0;margin-bottom:6px">Notes & Review</div>
-        <div id="notesOutput" style="white-space:pre-wrap; line-height:1.5; font-size:14px"></div>
-        <div style="margin-top:10px">
-          <div class="label">Final Album Thoughts</div>
-          <textarea id="finalNotes" rows="4" placeholder="Write your closing thoughts..." style="width:100%;background:#0e1218;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px"></textarea>
+        <table id="table">
+          </table>
+
+        <div style="margin-top:40px">
+          <div class="label">Enjoyment Timeline</div>
+          <canvas id="chart"></canvas>
+        </div>
+
+        <div id="notesSection">
+          <div class="label">Review / Thoughts</div>
+          <textarea id="finalNotes" rows="5" placeholder="Write your editorial review here..." style="width:100%"></textarea>
+        </div>
+
+        <div class="toolbar" style="border:none; margin-top:20px; justify-content: center; opacity:0.5">
+          <button id="exportJSON" style="font-size:11px; padding:5px 10px">Export</button>
+          <label style="cursor:pointer; font-size:11px; border:1px solid var(--line); padding:5px 10px; border-radius:8px">
+            Import <input id="importJSON" type="file" style="display:none">
+          </label>
         </div>
       </div>
-
-      <div class="footer">Created by Ok Pretty Boy (offline v7.2)</div>
     </div>
+  </div>
+
+  <div class="footer">
+    &copy; 2026 ALBUM RATER | DESIGNED FOR CURATORS
   </div>
 </div>
 
-<!-- Library Modal (local IndexedDB) -->
-<div id="libraryBackdrop" class="modal-backdrop" aria-hidden="true">
-  <div class="modal">
-    <div class="modal-head">
-      <strong data-i18n="library_title">My Library</strong>
-      <div style="display:flex;gap:8px;align-items:center">
-        <select id="librarySort" class="select">
-          <option value="new">Newest</option>
-          <option value="avg_desc">Average: High → Low</option>
-          <option value="avg_asc">Average: Low → High</option>
-          <option value="alpha">A → Z</option>
-        </select>
-        <button id="libraryClose">Close</button>
-      </div>
-    </div>
-    <div class="modal-body">
-      <div id="libraryEmpty" class="lib-empty" style="display:none">
-        No albums saved yet.
-      </div>
-      <div id="libraryList"></div>
-    </div>
+<div id="libraryBackdrop" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(10px)">
+  <div class="modal card pad" style="width:min(900px, 95vw); max-height:90vh; overflow:auto">
+    <h2 class="final-score-title">Collection</h2>
+    <div id="libraryList"></div>
+    <button id="libraryClose" style="margin-top:20px">Close</button>
   </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" class="toast"></div>
+<div id="toast" style="display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent); color:#000; padding:12px 24px; border-radius:50px; font-weight:700; z-index:10000"></div>
 
-<!-- App scripts (OFFLINE) -->
 <script defer src="autofillAlbum.v7.2.js?v=7.2"></script>
-<script defer src="ui.v7.2.js?v=7.2"></script>
 <script defer src="library.v7.2.js?v=7.2"></script>
-<script defer src="sw-register.v7.2.js?v=7.2"></script>
+
 </body>
 </html>
