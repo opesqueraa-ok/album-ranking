@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Album Rater - Editorial V7.2</title>
+    <title>Album Rater - Editorial Final</title>
     
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" type="image/png" href="favicon.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
     <style>
-        /* --- ESTILOS GENERALES (Dark Mode Editorial) --- */
+        /* --- ESTILOS GENERALES --- */
         :root {
             --bg-dark: #0b0f15;
             --bg-card: #161b26;
@@ -42,167 +42,123 @@
 
         /* HEADER */
         header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 30px;
         }
-
-        h1 {
-            font-family: 'Lora', serif;
-            font-size: 24px;
-            margin: 0;
-        }
-
+        h1 { font-family: 'Lora', serif; font-size: 24px; margin: 0; }
         .badge {
-            font-family: 'Inter', sans-serif;
-            font-size: 10px;
-            background: rgba(255,255,255,0.1);
-            padding: 4px 8px;
-            border-radius: 4px;
-            vertical-align: middle;
-            margin-left: 10px;
-            color: var(--text-muted);
+            font-family: 'Inter', sans-serif; font-size: 10px; background: rgba(255,255,255,0.1);
+            padding: 4px 8px; border-radius: 4px; vertical-align: middle; margin-left: 10px; color: var(--text-muted);
         }
 
         .header-actions button {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-main);
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-left: 10px;
-            transition: all 0.2s;
+            background: transparent; border: 1px solid var(--border); color: var(--text-main);
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-left: 10px; transition: 0.2s;
         }
-        .header-actions button:hover {
-            background: rgba(255,255,255,0.05);
-            border-color: white;
-        }
-        .header-actions button.primary {
-            background: var(--accent);
-            border-color: var(--accent);
-            font-weight: 600;
-        }
+        .header-actions button:hover { background: rgba(255,255,255,0.05); border-color: white; }
+        .header-actions button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
 
         /* GRID LAYOUT */
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 40px;
-        }
+        .main-grid { display: grid; grid-template-columns: 1fr 420px; gap: 40px; }
+        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
 
-        @media (max-width: 900px) {
-            .main-grid { grid-template-columns: 1fr; }
-        }
-
-        /* INPUT SECTIONS */
-        .panel {
-            background: var(--bg-card);
-            padding: 25px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-        }
-
-        h2 {
-            font-family: 'Lora', serif;
-            margin-top: 0;
-            font-size: 20px;
-            margin-bottom: 20px;
-        }
-
-        .input-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-
-        .input-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-
+        /* INPUT PANELS */
+        .panel { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); }
+        h2 { font-family: 'Lora', serif; margin-top: 0; font-size: 20px; margin-bottom: 20px; }
+        
+        .input-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .input-group { flex: 1; display: flex; flex-direction: column; }
+        
+        label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
         input[type="text"], input[type="number"] {
-            background: #0b0f15;
-            border: 1px solid var(--border);
-            color: white;
-            padding: 12px;
-            border-radius: 6px;
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            outline: none;
+            background: #0b0f15; border: 1px solid var(--border); color: white;
+            padding: 12px; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px; outline: none;
             transition: border-color 0.2s;
         }
-
         input:focus { border-color: var(--accent); }
 
         /* BOTÓN FETCH */
         #btnFetch {
-            width: 100%;
-            background: rgba(255,255,255,0.05);
-            color: white;
-            border: 1px dashed var(--border);
-            padding: 10px;
-            cursor: pointer;
-            margin-bottom: 20px;
-            border-radius: 6px;
-            font-size: 13px;
+            width: 100%; background: rgba(255,255,255,0.05); color: white; border: 1px dashed var(--border);
+            padding: 12px; cursor: pointer; margin-bottom: 20px; border-radius: 6px; font-size: 13px; font-weight: 500;
             transition: 0.2s;
         }
         #btnFetch:hover { background: rgba(255,255,255,0.1); border-color: white; }
 
-        /* TRACKLIST EDITOR */
-        .track-editor { margin-top: 20px; }
+        /* EDITOR DE TRACKS (Izquierda) */
+        .track-editor { margin-top: 10px; }
         .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
-        .track-num { width: 30px; text-align: center; color: var(--text-muted); font-size: 12px; }
-        .btn-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; }
+        .track-num { width: 25px; text-align: center; color: var(--text-muted); font-size: 12px; }
+        .btn-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; padding: 0 5px; }
 
-        /* PREVIEW CARD */
+        /* --- PREVIEW CARD (Derecha - Estilo Final) --- */
         .preview-wrapper { position: sticky; top: 20px; }
+        
         .card-editorial {
-            background: #000;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            border: 1px solid var(--border);
+            background: #050505; /* Fondo casi negro */
+            border-radius: 16px; padding: 35px; text-align: center;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6); border: 1px solid #222;
         }
+
         .cover-container {
-            width: 100%; aspect-ratio: 1/1; background: #1a1a1a;
-            border-radius: 4px; overflow: hidden; margin-bottom: 20px;
+            width: 100%; aspect-ratio: 1/1; background: #1a1a1a; border-radius: 6px;
+            overflow: hidden; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            position: relative;
         }
         .cover-img { width: 100%; height: 100%; object-fit: cover; }
-        .big-score {
-            font-family: 'Inter', sans-serif; font-weight: 700; font-size: 64px;
-            line-height: 1; margin: 10px 0;
-            background: linear-gradient(135deg, #fff, #a5b4fc);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .meta-preview { margin-bottom: 30px; }
-        .meta-artist { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
-        .meta-album { font-family: 'Lora', serif; font-size: 22px; font-weight: 400; color: #fff; }
-        .meta-details { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
-        .track-list-preview { text-align: left; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
-        .p-track { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px; }
         
-        /* TOAST */
+        /* Puntuación General Grande */
+        .big-score {
+            font-family: 'Inter', sans-serif; font-weight: 800; font-size: 80px; line-height: 1;
+            margin: 20px 0 10px 0; color: white; letter-spacing: -3px;
+        }
+
+        /* Metadata Preview */
+        .meta-artist { font-weight: 700; font-size: 18px; color: white; margin-bottom: 5px; letter-spacing: -0.5px; }
+        .meta-album { font-family: 'Lora', serif; font-size: 26px; font-style: italic; color: #e2e8f0; margin-bottom: 12px; line-height: 1.2; }
+        .meta-details { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; }
+
+        /* --- TABLA DE TRACKS (Preview) --- */
+        .track-list-preview { text-align: left; margin-top: 20px; border-top: 1px solid #222; padding-top: 20px; }
+        
+        /* Cabecera de la tabla */
+        .p-header {
+            display: flex; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+            padding-bottom: 10px; margin-bottom: 5px;
+        }
+        
+        /* Fila de canción */
+        .p-track {
+            display: flex; align-items: center; padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;
+        }
+
+        /* Columnas */
+        .col-dur { width: 50px; color: #666; font-variant-numeric: tabular-nums; font-size: 12px; }
+        .col-num { width: 30px; color: #444; text-align: center; margin-right: 15px; font-weight: 600; }
+        .col-name { flex: 1; font-weight: 500; color: #eee; padding-right: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .col-score { width: 45px; display: flex; justify-content: flex-end; }
+
+        /* --- BADGES DE COLOR SÓLIDO (Estilo Captura) --- */
+        .score-badge {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px;
+            height: 24px;
+            border-radius: 4px;
+            font-weight: 700;
+            color: white; 
+            font-size: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Toast Notificación */
         #toast {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: white; color: black; padding: 10px 20px;
-            border-radius: 30px; font-weight: 600; display: none; z-index: 9999;
+            background: white; color: black; padding: 10px 25px; border-radius: 30px;
+            font-weight: 600; display: none; z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -210,7 +166,7 @@
 
     <div class="app-container">
         <header>
-            <h1>Album Rater <span class="badge">V7.2</span></h1>
+            <h1>Album Rater <span class="badge">V7.3</span></h1>
             <div class="header-actions">
                 <button id="btnLibrary">Library</button>
                 <button id="btnSaveLibrary" class="primary">Save Album</button>
@@ -231,11 +187,13 @@
                             <input type="text" id="inAlbum" placeholder="Album Title">
                         </div>
                     </div>
-                    <button id="btnFetch">Buscar Álbum</button>
+                    
+                    <button id="btnFetch">Fetch Info (MusicBrainz/iTunes)</button>
+
                     <div class="input-row">
                         <div class="input-group">
-                            <label>Year</label>
-                            <input type="text" id="inYear" placeholder="2024">
+                            <label>Release Year</label>
+                            <input type="text" id="inYear" placeholder="2025">
                         </div>
                         <div class="input-group">
                             <label>Ranked By</label>
@@ -245,95 +203,212 @@
                 </div>
 
                 <div class="panel" style="margin-top: 20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h2>Tracklist</h2>
-                        <button onclick="window.AlbumApp.addTrack()" style="background:none; border:1px solid #333; color:white; padding:4px 10px; cursor:pointer; border-radius:4px;">+ Add Track</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h2>Tracklist & Scores</h2>
+                        <div style="gap:10px; display:flex;">
+                             <button onclick="window.AlbumApp.clearScores()" style="font-size:11px; background:none; border:none; color:#ef4444; cursor:pointer; text-transform:uppercase; font-weight:600;">Clear Scores</button>
+                             <button onclick="window.AlbumApp.addTrack()" style="font-size:11px; background:#333; border:none; color:white; padding:4px 10px; cursor:pointer; border-radius:4px; text-transform:uppercase; font-weight:600;">+ Add Track</button>
+                        </div>
                     </div>
-                    <div id="trackEditor" class="track-editor"></div>
+                    
+                    <div id="trackEditor" class="track-editor">
+                        </div>
                 </div>
             </div>
 
             <div class="preview-col">
                 <div class="preview-wrapper">
                     <div class="card-editorial" id="cardExport">
+                        
                         <div class="cover-container">
-                            <img id="prevCover" src="https://via.placeholder.com/600x600/111/333?text=Cover" class="cover-img">
+                            <img id="prevCover" src="https://via.placeholder.com/800x800/111/333?text=Cover" class="cover-img">
                         </div>
-                        <div style="font-size: 11px; letter-spacing: 1px; color: #888; text-transform: uppercase;">Overall Score</div>
+
+                        <div style="font-size: 10px; letter-spacing: 2px; color: #555; text-transform: uppercase; font-weight:700; margin-top:10px;">Overall Score</div>
                         <div id="prevScore" class="big-score">0.0</div>
+
                         <div class="meta-preview">
-                            <div id="prevArtist" class="meta-artist">Artist</div>
-                            <div id="prevAlbum" class="meta-album">Album</div>
-                            <div id="prevDetails" class="meta-details">2024 • Ranked by You</div>
+                            <div id="prevArtist" class="meta-artist">Artist Name</div>
+                            <div id="prevAlbum" class="meta-album">Album Title</div>
+                            <div id="prevDetails" class="meta-details">2025 • Ranked by You</div>
                         </div>
-                        <div id="prevTracks" class="track-list-preview"></div>
+
+                        <div class="track-list-preview">
+                            <div class="p-header">
+                                <div class="col-dur">Time</div>
+                                <div class="col-num">#</div>
+                                <div class="col-name">Track Title</div>
+                                <div class="col-score">Rate</div>
+                            </div>
+                            <div id="prevTracks">
+                                </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    
     <div id="toast">Saved!</div>
 
     <script>
+        // --- LOGICA PRINCIPAL ---
         window.AlbumApp = (function() {
-            let state = { artist: "", album: "", released: "", rankedby: "", cover: "", tracks: [{ name: "", score: "" }, { name: "", score: "" }, { name: "", score: "" }], lang: "en" };
-            const dom = { inArtist: document.getElementById("inArtist"), inAlbum: document.getElementById("inAlbum"), inYear: document.getElementById("inYear"), inRanker: document.getElementById("inRanker"), trackEditor: document.getElementById("trackEditor"), pCover: document.getElementById("prevCover"), pScore: document.getElementById("prevScore"), pArtist: document.getElementById("prevArtist"), pAlbum: document.getElementById("prevAlbum"), pDetails: document.getElementById("prevDetails"), pTracks: document.getElementById("prevTracks") };
+            // Estado inicial
+            let state = { 
+                artist: "", album: "", released: "", rankedby: "", cover: "", 
+                tracks: [
+                    { name: "", duration: "", score: "" },
+                    { name: "", duration: "", score: "" },
+                    { name: "", duration: "", score: "" }
+                ]
+            };
 
-            function getColor(s) { s = parseFloat(s); if(!s && s!==0)return"#555"; if(s>=9)return"#3b82f6"; if(s>=8)return"#38bdf8"; if(s>=7)return"#4ade80"; if(s>=6)return"#facc15"; if(s>=4)return"#fb923c"; return"#ef4444"; }
-            function computeAvg() { let t=0,c=0; state.tracks.forEach(x=>{const s=parseFloat(x.score); if(!isNaN(s)){t+=s;c++;}}); return c===0?"0.0":(t/c).toFixed(1); }
+            const dom = {
+                inArtist: document.getElementById("inArtist"),
+                inAlbum: document.getElementById("inAlbum"),
+                inYear: document.getElementById("inYear"),
+                inRanker: document.getElementById("inRanker"),
+                trackEditor: document.getElementById("trackEditor"),
+                pCover: document.getElementById("prevCover"),
+                pScore: document.getElementById("prevScore"),
+                pArtist: document.getElementById("prevArtist"),
+                pAlbum: document.getElementById("prevAlbum"),
+                pDetails: document.getElementById("prevDetails"),
+                pTracks: document.getElementById("prevTracks")
+            };
+
+            // COLORES SÓLIDOS (Basado en tu captura)
+            function getBadgeColor(scoreVal) {
+                const s = parseFloat(scoreVal);
+                if (isNaN(s)) return "#333"; // Gris si está vacío
+                
+                // Colores exactos de estilo editorial
+                if (s >= 9.0) return "#3b82f6"; // Azul Intenso (10)
+                if (s >= 8.0) return "#06b6d4"; // Cyan/Celeste (8.0 - 8.9)
+                if (s >= 7.0) return "#22c55e"; // Verde (7.0 - 7.9)
+                if (s >= 6.0) return "#eab308"; // Amarillo (6.0 - 6.9)
+                if (s >= 4.0) return "#f97316"; // Naranja
+                return "#ef4444"; // Rojo (< 4)
+            }
+
+            function computeAvg() {
+                let t=0, c=0; 
+                state.tracks.forEach(x => {
+                    const s = parseFloat(x.score); 
+                    if(!isNaN(s)){ t+=s; c++; }
+                }); 
+                return c===0 ? "0.0" : (t/c).toFixed(1);
+            }
             
             function render() {
+                // Sincronizar inputs si no están en foco
                 if(document.activeElement!==dom.inArtist) dom.inArtist.value=state.artist;
                 if(document.activeElement!==dom.inAlbum) dom.inAlbum.value=state.album;
                 if(document.activeElement!==dom.inYear) dom.inYear.value=state.released;
                 if(document.activeElement!==dom.inRanker) dom.inRanker.value=state.rankedby;
 
-                dom.pArtist.textContent = state.artist || "Artist Name";
+                // Preview Metadata
+                dom.pArtist.textContent = state.artist || "Artist";
                 dom.pAlbum.textContent = state.album || "Album Title";
-                dom.pDetails.textContent = `${state.released||"Year"} • ${state.rankedby||"Ranker"}`;
-                if(state.cover) dom.pCover.src=state.cover;
+                dom.pDetails.textContent = `${state.released || "Year"} • ${state.rankedby || "Ranked by You"}`;
+                if(state.cover) dom.pCover.src = state.cover;
 
-                const avg=computeAvg();
-                dom.pScore.textContent=avg;
-                dom.pScore.style.background=`linear-gradient(135deg, #fff, ${getColor(avg)})`;
-                dom.pScore.style.webkitBackgroundClip="text";
+                // Score General
+                const avg = computeAvg();
+                dom.pScore.textContent = avg;
+                // Opcional: Colorear el score grande también
+                // dom.pScore.style.color = getBadgeColor(avg); 
 
-                dom.pTracks.innerHTML="";
-                state.tracks.forEach((t,i)=>{
-                    if(!t.name)return;
-                    const d=document.createElement("div"); d.className="p-track";
-                    d.innerHTML=`<span style="color:#aaa;margin-right:10px;">${i+1}</span><span>${t.name}</span><span style="font-weight:700;color:${getColor(t.score)}">${t.score||"-"}</span>`;
-                    dom.pTracks.appendChild(d);
+                // Render Tracks Preview (Tabla)
+                dom.pTracks.innerHTML = "";
+                state.tracks.forEach((t, i) => {
+                    if(!t.name && !t.score) return;
+                    
+                    const row = document.createElement("div"); 
+                    row.className = "p-track";
+                    
+                    // Lógica del Badge
+                    let badgeHtml = `<span style="color:#333; font-weight:bold;">-</span>`;
+                    if(t.score !== "") {
+                        const bg = getBadgeColor(t.score);
+                        badgeHtml = `<span class="score-badge" style="background-color:${bg}">${t.score}</span>`;
+                    }
+
+                    row.innerHTML = `
+                        <div class="col-dur">${t.duration || "--:--"}</div>
+                        <div class="col-num">${i+1}</div>
+                        <div class="col-name">${t.name}</div>
+                        <div class="col-score">${badgeHtml}</div>
+                    `;
+                    dom.pTracks.appendChild(row);
                 });
 
-                const inputs=document.querySelectorAll(".track-input-name");
-                if(inputs.length!==state.tracks.length) renderEditor();
+                // Render Editor Inputs (Solo si cambia el número de tracks para no perder foco)
+                const inputs = document.querySelectorAll(".track-input-name");
+                if(inputs.length !== state.tracks.length) renderEditor();
             }
 
             function renderEditor(){
-                dom.trackEditor.innerHTML="";
-                state.tracks.forEach((t,i)=>{
-                    const r=document.createElement("div"); r.className="track-row";
-                    r.innerHTML=`<span class="track-num">${i+1}</span><input class="track-input-name" type="text" value="${t.name}" oninput="window.AlbumApp.updateTrack(${i},'name',this.value)" style="flex:1;" placeholder="Track"><input type="number" value="${t.score}" oninput="window.AlbumApp.updateTrack(${i},'score',this.value)" style="width:50px;text-align:center;" placeholder="0"><button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>`;
-                    dom.trackEditor.appendChild(r);
+                dom.trackEditor.innerHTML = "";
+                state.tracks.forEach((t,i) => {
+                    const row = document.createElement("div"); 
+                    row.className = "track-row";
+                    
+                    row.innerHTML = `
+                        <span class="track-num">${i+1}</span>
+                        <input type="text" value="${t.duration||''}" 
+                            oninput="window.AlbumApp.updateTrack(${i},'duration',this.value)" 
+                            style="width:45px; text-align:center; color:#888; font-size:12px; padding:8px 4px;" placeholder="m:ss">
+                            
+                        <input class="track-input-name" type="text" value="${t.name}" 
+                            oninput="window.AlbumApp.updateTrack(${i},'name',this.value)" 
+                            style="flex:1;" placeholder="Track Title">
+                        
+                        <input type="number" step="0.1" value="${t.score}" 
+                            oninput="window.AlbumApp.updateTrack(${i},'score',this.value)" 
+                            style="width:50px; text-align:center; font-weight:bold; color:white;" placeholder="-">
+                        
+                        <button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>
+                    `;
+                    dom.trackEditor.appendChild(row);
                 });
             }
 
-            function setState(s){ state={...state,...s}; if(s.tracks) renderEditor(); render(); }
+            // API Pública
+            function setState(newState){ 
+                state = {...state, ...newState}; 
+                // Si la actualización trae tracks (del fetch), forzar render del editor
+                if(newState.tracks) renderEditor();
+                render(); 
+            }
             
-            // Listeners
-            dom.inArtist.addEventListener("input",e=>setState({artist:e.target.value}));
-            dom.inAlbum.addEventListener("input",e=>setState({album:e.target.value}));
-            dom.inYear.addEventListener("input",e=>setState({released:e.target.value}));
-            dom.inRanker.addEventListener("input",e=>setState({rankedby:e.target.value}));
+            function updateTrack(i, field, val) { state.tracks[i][field] = val; render(); }
+            function addTrack() { state.tracks.push({name:"", duration:"", score:""}); renderEditor(); }
+            function removeTrack(i) { state.tracks.splice(i,1); renderEditor(); render(); }
+            function clearScores() { 
+                state.tracks.forEach(t => t.score = ""); 
+                renderEditor(); render(); 
+            }
+            function getState() { return state; }
+            function getColors(s) { return getBadgeColor(s); } // Helper para libreria
 
-            renderEditor(); render();
-            return { setState, getState:()=>state, computeAvg, getColor, updateTrack:(i,f,v)=>{state.tracks[i][f]=v; render();}, addTrack:()=>{state.tracks.push({name:"",score:""}); renderEditor();}, removeTrack:(i)=>{state.tracks.splice(i,1); renderEditor(); render();} };
+            // Listeners
+            dom.inArtist.addEventListener("input", e => setState({artist: e.target.value}));
+            dom.inAlbum.addEventListener("input", e => setState({album: e.target.value}));
+            dom.inYear.addEventListener("input", e => setState({released: e.target.value}));
+            dom.inRanker.addEventListener("input", e => setState({rankedby: e.target.value}));
+
+            // Inicializar
+            renderEditor(); 
+            render();
+
+            return { setState, getState, updateTrack, addTrack, removeTrack, clearScores, computeAvg, getBadgeColor: getColors };
         })();
     </script>
 
     <script src="autofillAlbum.v7.2.js"></script>
-
     <script src="library.v7.2.js"></script>
 
 </body>
