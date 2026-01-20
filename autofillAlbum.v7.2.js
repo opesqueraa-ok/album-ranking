@@ -1,78 +1,101 @@
 /* ----------------------------------------------------------
-   autofill.v7.2.js — EDITORIAL AUTOFILL
-   - Busca en iTunes API (más fiable para carátulas y años)
-   - Actualiza el estado global de AlbumApp
-   - Soporta Artist, Album, Year y Cover
+   autofill.v7.2.js — ITUNES API FETCH
+   - Conecta con iTunes Search API.
+   - Obtiene Carátula High-Res (600x600).
+   - Extrae el Año de Lanzamiento.
+   - Actualiza el estado global de window.AlbumApp.
 ---------------------------------------------------------- */
 
 (function () {
-  const btnFetch = document.getElementById("btnFetch");
+  // Helper para seleccionar elementos por ID
+  const $ = (id) => document.getElementById(id);
 
-  if (!btnFetch) return;
+  // Esperar a que el DOM esté listo para evitar errores de elementos nulos
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = $("btnFetch");
 
-  btnFetch.addEventListener("click", async () => {
-    const artistInput = document.getElementById("inArtist").value.trim();
-    const albumInput = document.getElementById("inAlbum").value.trim();
+    // Si por alguna razón el botón no existe, salimos
+    if (!btn) return;
 
-    if (!artistInput || !albumInput) {
-      alert(
-        window.AlbumApp.state.lang === "es"
-          ? "Por favor, ingresa Artista y Álbum."
-          : "Please enter Artist and Album."
-      );
-      return;
-    }
+    btn.addEventListener("click", async () => {
+      // Leer valores actuales
+      const artistVal = $("inArtist").value.trim();
+      const albumVal = $("inAlbum").value.trim();
+      
+      // Detectar idioma actual desde la App
+      const lang = window.AlbumApp?.state.lang || "en";
 
-    // UI Feedback
-    const originalText = btnFetch.textContent;
-    btnFetch.textContent = window.AlbumApp.state.lang === "es" ? "Buscando..." : "Searching...";
-    btnFetch.disabled = true;
-
-    try {
-      // Usamos iTunes API por su sencillez y calidad de carátulas
-      const searchTerm = encodeURIComponent(`${artistInput} ${albumInput}`);
-      const url = `https://itunes.apple.com/search?term=${searchTerm}&entity=album&limit=1`;
-
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (data.results && data.results.length > 0) {
-        const albumData = data.results[0];
-
-        // 1. Obtener carátula en alta resolución (reemplazamos 100x100 por 600x600)
-        const coverUrl = albumData.artworkUrl100.replace(
-          "100x100bb.jpg",
-          "600x600bb.jpg"
-        );
-
-        // 2. Extraer el año (YYYY-MM-DD...)
-        const releaseYear = albumData.releaseDate
-          ? albumData.releaseDate.split("-")[0]
-          : "";
-
-        // 3. Actualizar el estado global de la App
-        // Esto disparará automáticamente el renderPreview() del index.html
-        window.AlbumApp.setState({
-          artist: albumData.artistName,
-          album: albumData.collectionName,
-          released: releaseYear,
-          cover: coverUrl
-        });
-
-        console.log("Autofill exitoso:", albumData.collectionName);
-      } else {
-        alert(
-          window.AlbumApp.state.lang === "es"
-            ? "No se encontraron resultados."
-            : "No results found."
-        );
+      // 1. Validación básica
+      if (!artistVal || !albumVal) {
+        alert(lang === "es"
+          ? "Por favor, ingresa el Artista y el nombre del Álbum."
+          : "Please enter both Artist and Album names.");
+        return;
       }
-    } catch (error) {
-      console.error("Error en autofill:", error);
-      alert("Error conectando con el servicio de búsqueda.");
-    } finally {
-      btnFetch.textContent = originalText;
-      btnFetch.disabled = false;
-    }
+
+      // 2. Feedback visual (Botón en estado de carga)
+      const originalText = btn.textContent;
+      btn.textContent = lang === "es" ? "Buscando..." : "Searching...";
+      btn.disabled = true;
+      btn.style.opacity = "0.7";
+      btn.style.cursor = "wait";
+
+      try {
+        // 3. Petición a la API de iTunes
+        const query = encodeURIComponent(`${artistVal} ${albumVal}`);
+        // limit=1 para obtener la coincidencia más relevante
+        const url = `https://itunes.apple.com/search?term=${query}&entity=album&limit=1`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.results && data.results.length > 0) {
+          const result = data.results[0];
+
+          // 4. Procesar Datos
+          
+          // Truco para High-Res: iTunes devuelve 100x100, cambiamos a 600x600 o 1000x1000
+          // "bb" asegura fondo negro/borde si es necesario, jpg formato standard
+          const highResCover = result.artworkUrl100
+            ? result.artworkUrl100.replace("100x100bb", "600x600bb")
+            : "";
+
+          // Año: iTunes devuelve formato ISO (2023-01-01T...), cortamos los primeros 4 chars
+          const year = result.releaseDate
+            ? result.releaseDate.substring(0, 4)
+            : "";
+
+          // 5. Actualizar Estado Global de la App
+          // Esto disparará automáticamente el renderPreview() en index.html
+          window.AlbumApp.setState({
+            artist: result.artistName,
+            album: result.collectionName, // Nombre oficial del álbum
+            released: year,
+            cover: highResCover
+          });
+
+          console.log(`✅ Autofill success: ${result.collectionName}`);
+
+        } else {
+          // No se encontraron resultados
+          alert(lang === "es"
+            ? "No se encontraron resultados en iTunes."
+            : "No results found on iTunes.");
+        }
+
+      } catch (err) {
+        console.error("Autofill Error:", err);
+        alert(lang === "es" 
+          ? "Error de conexión con el servicio de búsqueda." 
+          : "Connection error with search service.");
+      } finally {
+        // 6. Restaurar Botón
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.style.cursor = "pointer";
+      }
+    });
   });
+
 })();
