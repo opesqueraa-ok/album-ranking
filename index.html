@@ -13,6 +13,7 @@
             --text: #ffffff;
             --muted: #8a94a6;
             --accent: #3b82f6;
+            --danger: #e12928;
             --border: rgba(255, 255, 255, 0.08);
         }
 
@@ -34,37 +35,22 @@
             width: 100%;
         }
 
+        /* --- Header --- */
         header {
             grid-column: 1 / -1;
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 10px 0 30px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
         }
 
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .logo-area { display: flex; align-items: center; gap: 12px; }
+        .logo-area h1 { font-family: 'Lora', serif; font-size: 24px; margin: 0; }
+        .version-badge { font-size: 9px; letter-spacing: 1px; border: 1px solid var(--muted); padding: 2px 6px; border-radius: 4px; opacity: 0.6; text-transform: uppercase; }
 
-        .logo-area h1 {
-            font-family: 'Lora', serif;
-            font-size: 24px;
-            margin: 0;
-        }
-
-        .version-badge {
-            font-size: 9px;
-            letter-spacing: 1px;
-            border: 1px solid var(--muted);
-            padding: 2px 6px;
-            border-radius: 4px;
-            opacity: 0.6;
-            text-transform: uppercase;
-        }
-
-        /* --- Panel de Edición --- */
+        /* --- Panel de Edición (Izquierda) --- */
         .editor-panel {
             background: var(--card);
             padding: 30px;
@@ -72,20 +58,8 @@
             border: 1px solid var(--border);
         }
 
-        .section-title {
-            font-family: 'Lora', serif;
-            font-size: 20px;
-            margin-bottom: 25px;
-            display: block;
-        }
-
-        .input-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
+        .section-title { font-family: 'Lora', serif; font-size: 20px; margin-bottom: 25px; display: block; }
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .field { display: flex; flex-direction: column; gap: 8px; }
         label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
         
@@ -97,37 +71,47 @@
             border-radius: 6px;
             font-size: 14px;
             transition: all 0.2s;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--accent);
-            background: #252d3d;
-        }
-
-        .btn {
-            cursor: pointer;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 14px;
-            transition: 0.2s;
-        }
-
-        .btn-fetch {
             width: 100%;
-            background: #2d364a;
-            color: white;
-            margin-bottom: 30px;
+            box-sizing: border-box;
         }
+        input:focus { outline: none; border-color: var(--accent); background: #252d3d; }
 
+        /* Botones */
+        .btn { cursor: pointer; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;}
+        .btn-fetch { width: 100%; background: #2d364a; color: white; margin-bottom: 30px; padding: 12px; }
         .btn-fetch:hover { background: #374158; }
-
         .btn-save { background: var(--accent); color: white; }
         .btn-lib { background: transparent; color: white; border: 1px solid var(--border); }
+        .btn-text { background: transparent; color: var(--muted); padding: 5px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;}
+        .btn-text:hover { color: white; }
 
-        /* --- Panel de Previsualización (Editorial) --- */
+        /* --- Lista de Canciones --- */
+        .tracks-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            margin-top: 30px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        #tracks { display: flex; flex-direction: column; gap: 10px; }
+
+        .track-row {
+            display: grid;
+            grid-template-columns: 30px 1fr 80px 30px;
+            gap: 10px;
+            align-items: center;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .track-num { color: var(--muted); font-size: 12px; text-align: center; }
+        .track-score { text-align: center; font-weight: bold; color: var(--accent); }
+        .btn-del { color: var(--danger); background: transparent; font-size: 18px; padding: 0; cursor: pointer; opacity: 0.5; }
+        .btn-del:hover { opacity: 1; }
+
+        /* --- Panel de Previsualización (Derecha) --- */
         .preview-panel {
             position: sticky;
             top: 20px;
@@ -143,74 +127,22 @@
         }
 
         #prevCover {
-            width: 100%;
-            aspect-ratio: 1/1;
-            background: #111;
-            border-radius: 4px;
-            object-fit: cover;
-            margin-bottom: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            width: 100%; aspect-ratio: 1/1; background: #111; border-radius: 4px; object-fit: cover; margin-bottom: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
-        .score-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--muted);
-            margin-bottom: 10px;
-        }
-
-        #prevScore {
-            font-family: 'Lora', serif;
-            font-size: 110px;
-            font-weight: 700;
-            line-height: 0.9;
-            margin-bottom: 30px;
-            /* El color se asigna por JS */
-        }
-
-        .meta-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            color: var(--muted);
-            margin-top: 15px;
-            letter-spacing: 1px;
-        }
-
-        .meta-value {
-            font-family: 'Lora', serif;
-            font-size: 18px;
-            margin-top: 4px;
-        }
-
-        .meta-sub {
-            font-size: 13px;
-            color: var(--muted);
-            margin-top: 8px;
-        }
-
-        .meta-ranker {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border);
-            width: 100%;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--accent);
-        }
+        .score-label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 10px; }
+        #prevScore { font-family: 'Lora', serif; font-size: 110px; font-weight: 700; line-height: 0.9; margin-bottom: 30px; }
+        
+        .meta-label { font-size: 10px; text-transform: uppercase; color: var(--muted); margin-top: 15px; letter-spacing: 1px; }
+        .meta-value { font-family: 'Lora', serif; font-size: 18px; margin-top: 4px; }
+        .meta-sub { font-size: 13px; color: var(--muted); margin-top: 8px; }
+        .meta-ranker { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); width: 100%; font-size: 13px; font-weight: 500; color: var(--accent); }
 
         /* Toast */
-        #toast {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: #10b981; color: white; padding: 12px 24px; border-radius: 50px;
-            font-size: 14px; font-weight: 600; display: none; z-index: 1000;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-        }
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 600; display: none; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
 
-        @media (max-width: 950px) {
-            .app-container { grid-template-columns: 1fr; }
-            .preview-panel { position: static; }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 950px) { .app-container { grid-template-columns: 1fr; } .preview-panel { position: static; } }
     </style>
 </head>
 <body>
@@ -224,7 +156,7 @@
                 <span class="version-badge">Editorial V7.2</span>
             </div>
             <div style="display:flex; gap:12px;">
-                <select id="langSwitch" style="padding: 5px 10px; background: transparent; border: 1px solid var(--border);">
+                <select id="langSwitch" style="padding: 5px 10px; background: var(--input-bg); color: white; border: 1px solid var(--border); border-radius: 4px;">
                     <option value="en">English</option>
                     <option value="es">Español</option>
                 </select>
@@ -239,11 +171,11 @@
             <div class="input-row">
                 <div class="field">
                     <label id="lblArtist">Artist</label>
-                    <input type="text" id="inArtist" placeholder="e.g. Ichiko Aoba">
+                    <input type="text" id="inArtist" placeholder="Artist Name">
                 </div>
                 <div class="field">
                     <label id="lblAlbum">Album</label>
-                    <input type="text" id="inAlbum" placeholder="e.g. Luminescent Creatures">
+                    <input type="text" id="inAlbum" placeholder="Album Title">
                 </div>
             </div>
             
@@ -252,7 +184,7 @@
             <div class="input-row">
                 <div class="field">
                     <label id="lblYear">Release Year</label>
-                    <input type="text" id="inYear" placeholder="2025">
+                    <input type="text" id="inYear" placeholder="2024">
                 </div>
                 <div class="field">
                     <label id="lblRanker">Ranked By</label>
@@ -260,7 +192,15 @@
                 </div>
             </div>
 
-            <div id="tracksContainer">
+            <div class="tracks-toolbar">
+                <span class="section-title" style="margin:0; font-size:16px;">Tracklist & Scores</span>
+                <div>
+                    <button class="btn btn-text" id="btnAddTrack">+ Add Track</button>
+                    <button class="btn btn-text" id="btnClearScores" style="color:var(--danger)">Clear Scores</button>
+                </div>
+            </div>
+
+            <div id="tracks">
                 </div>
         </main>
 
@@ -277,7 +217,7 @@
             <div class="meta-value" id="resAlbum">—</div>
             
             <div class="meta-sub">
-                <span id="resYear"></span> • <span id="resLength">0 min</span>
+                <span id="resYear"></span> • <span id="resTrackCount">0 tracks</span>
             </div>
             
             <div class="meta-ranker" id="resRanker"></div>
@@ -288,7 +228,6 @@
     <script src="library.v7.2.js"></script>
 
     <script>
-        // --- APP CORE LOGIC ---
         window.AlbumApp = {
             state: {
                 lang: localStorage.getItem('albumrater_lang') || 'en',
@@ -297,7 +236,7 @@
                 released: '',
                 rankedby: '',
                 cover: '',
-                tracks: [] // Cada track: { name: '', score: null, duration: '' }
+                tracks: [] // Array de objetos { name: '', score: '' }
             },
 
             translations: {
@@ -307,46 +246,48 @@
                     lblAlbum: "Album",
                     lblYear: "Release Year",
                     lblRanker: "Ranked By",
-                    lblOverall: "Overall Score"
+                    lblOverall: "Overall Score",
+                    btnAdd: "+ Add Track",
+                    btnClear: "Clear Scores"
                 },
                 es: {
                     lblMetadata: "Metadatos del Álbum",
                     lblArtist: "Artista",
                     lblAlbum: "Álbum",
-                    lblYear: "Año de Lanzamiento",
+                    lblYear: "Año Lanzamiento",
                     lblRanker: "Rankeado Por",
-                    lblOverall: "Puntaje General"
+                    lblOverall: "Puntaje General",
+                    btnAdd: "+ Agregar Pista",
+                    btnClear: "Limpiar Puntos"
                 }
             },
 
             init() {
-                // Sincronizar select de idioma
+                // 1. Configurar Idioma
                 const langSw = document.getElementById('langSwitch');
                 langSw.value = this.state.lang;
                 langSw.addEventListener('change', (e) => this.setLanguage(e.target.value));
 
-                // Escuchar cambios en inputs para tiempo real
+                // 2. Listeners de Inputs Metadatos
                 ['inArtist', 'inAlbum', 'inYear', 'inRanker'].forEach(id => {
                     document.getElementById(id).addEventListener('input', () => this.syncInputs());
                 });
 
+                // 3. Listeners de Botones de Tracks
+                document.getElementById('btnAddTrack').addEventListener('click', () => this.addTrackRow());
+                document.getElementById('btnClearScores').addEventListener('click', () => this.clearScores());
+
+                // 4. Inicializar UI
+                this.ensureRows(10); // Empezar con 10 filas por defecto
                 this.updateUI();
                 this.renderPreview();
             },
 
+            // --- GESTIÓN DE ESTADO ---
             setLanguage(lang) {
                 this.state.lang = lang;
                 localStorage.setItem('albumrater_lang', lang);
                 this.updateUI();
-            },
-
-            updateUI() {
-                const t = this.translations[this.state.lang];
-                for (let id in t) {
-                    const el = document.getElementById(id);
-                    if (el) el.textContent = t[id];
-                }
-                this.renderPreview(); // Actualiza textos en la previsualización
             },
 
             syncInputs() {
@@ -357,25 +298,106 @@
                 this.renderPreview();
             },
 
+            // Llamado por autofill y library
             setState(newState) {
                 this.state = { ...this.state, ...newState };
-                // Reflejar en inputs
+                
+                // Rellenar inputs
                 document.getElementById('inArtist').value = this.state.artist || '';
                 document.getElementById('inAlbum').value = this.state.album || '';
                 document.getElementById('inYear').value = this.state.released || '';
                 document.getElementById('inRanker').value = this.state.rankedby || '';
+
+                // Si hay tracks en el estado nuevo, reconstruir la tabla
+                if (newState.tracks && newState.tracks.length > 0) {
+                    const container = document.getElementById('tracks');
+                    container.innerHTML = '';
+                    newState.tracks.forEach(t => this.addTrackRow(t.name, t.score));
+                }
+
                 this.renderPreview();
             },
 
-            getState() { return this.state; },
+            getState() {
+                // Antes de guardar, asegurarnos de que el estado tenga los tracks actuales de la UI
+                this.harvestTracks();
+                return this.state;
+            },
 
+            // --- GESTIÓN DE TRACKS ---
+            ensureRows(count) {
+                const current = document.getElementById('tracks').children.length;
+                for (let i = current; i < count; i++) {
+                    this.addTrackRow();
+                }
+            },
+
+            addTrackRow(name = '', score = '') {
+                const container = document.getElementById('tracks');
+                const idx = container.children.length + 1;
+                
+                const row = document.createElement('div');
+                row.className = 'track-row';
+                row.innerHTML = `
+                    <span class="track-num">${idx}</span>
+                    <input type="text" class="t-name" placeholder="Track Title" value="${name}">
+                    <input type="number" class="t-score track-score" placeholder="-" step="0.1" value="${score}">
+                    <button class="btn-del">×</button>
+                `;
+
+                // Eventos de la fila
+                const inName = row.querySelector('.t-name');
+                const inScore = row.querySelector('.t-score');
+                const btnDel = row.querySelector('.btn-del');
+
+                inName.addEventListener('input', () => this.renderPreview()); // Solo actualiza datos si es necesario
+                inScore.addEventListener('input', () => this.renderPreview());
+                btnDel.addEventListener('click', () => {
+                    row.remove();
+                    this.renumberRows();
+                    this.renderPreview();
+                });
+
+                container.appendChild(row);
+            },
+
+            renumberRows() {
+                const rows = document.querySelectorAll('.track-row');
+                rows.forEach((row, index) => {
+                    row.querySelector('.track-num').textContent = index + 1;
+                });
+            },
+
+            harvestTracks() {
+                // Lee el DOM y actualiza this.state.tracks
+                const rows = document.querySelectorAll('.track-row');
+                this.state.tracks = Array.from(rows).map(row => ({
+                    name: row.querySelector('.t-name').value,
+                    score: row.querySelector('.t-score').value
+                })).filter(t => t.name || t.score); // Filtrar filas vacías si quieres
+            },
+
+            clearScores() {
+                document.querySelectorAll('.t-score').forEach(input => input.value = '');
+                this.renderPreview();
+            },
+
+            // --- LÓGICA DE CÁLCULO Y VISUALIZACIÓN ---
             computeAvg() {
-                if (!this.state.tracks || this.state.tracks.length === 0) return "0.0";
-                const scores = this.state.tracks
-                    .map(t => parseFloat(t.score))
-                    .filter(s => !isNaN(s));
-                if (scores.length === 0) return "0.0";
-                return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                const inputs = document.querySelectorAll('.t-score');
+                let sum = 0;
+                let count = 0;
+
+                inputs.forEach(inp => {
+                    const val = parseFloat(inp.value);
+                    if (!isNaN(val)) {
+                        sum += val;
+                        count++;
+                    }
+                });
+
+                if (count === 0) return "0.0";
+                return (sum / count).toFixed(1);
             },
 
             getColor(score) {
@@ -387,32 +409,62 @@
                 return "#555";
             },
 
+            updateUI() {
+                const t = this.translations[this.state.lang];
+                if (!t) return;
+                
+                // Actualizar textos fijos
+                const map = {
+                    lblMetadata: t.lblMetadata,
+                    lblArtist: t.lblArtist,
+                    lblAlbum: t.lblAlbum,
+                    lblYear: t.lblYear,
+                    lblRanker: t.lblRanker,
+                    lblOverall: t.lblOverall,
+                    btnAddTrack: t.btnAdd,
+                    btnClearScores: t.btnClear
+                };
+
+                for (const [id, text] of Object.entries(map)) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = text;
+                }
+                
+                this.renderPreview();
+            },
+
             renderPreview() {
-                // Textos
+                // 1. Textos básicos
                 document.getElementById('resArtist').textContent = this.state.artist || "—";
                 document.getElementById('resAlbum').textContent = this.state.album || "—";
                 document.getElementById('resYear').textContent = this.state.released || "";
                 
+                // 2. Ranker
                 const rankerText = this.state.lang === 'es' ? 'Reseña por' : 'Review by';
                 document.getElementById('resRanker').textContent = this.state.rankedby ? `${rankerText} ${this.state.rankedby}` : "";
 
-                // Imagen
+                // 3. Imagen
                 const img = document.getElementById('prevCover');
-                if (this.state.cover) {
-                    img.src = this.state.cover;
-                } else {
-                    img.src = "https://via.placeholder.com/600?text=No+Cover";
-                }
+                img.src = this.state.cover || "https://via.placeholder.com/600?text=No+Cover";
 
-                // Puntaje
+                // 4. Conteo de Tracks
+                const trackCount = document.querySelectorAll('.track-row').length;
+                document.getElementById('resTrackCount').textContent = `${trackCount} tracks`;
+
+                // 5. CÁLCULO DEL PUNTAJE
                 const avg = parseFloat(this.computeAvg());
                 const scoreEl = document.getElementById('prevScore');
+                
+                // Animación simple de actualización
                 scoreEl.textContent = avg > 0 ? avg.toFixed(1) : "0.0";
                 scoreEl.style.color = this.getColor(avg);
+
+                // Guardar tracks en estado para exportación/librería
+                this.harvestTracks();
             }
         };
 
-        // Iniciar
+        // Arrancar la app
         document.addEventListener('DOMContentLoaded', () => window.AlbumApp.init());
     </script>
 </body>
