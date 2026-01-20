@@ -4,14 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Album Rater Editorial</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Lora:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Lora:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0f141e;
-            --card: #1a2130;
+            --bg: #0b0f15;
+            --card: #161b26;
+            --input-bg: #1f2633;
             --text: #ffffff;
-            --muted: #a0a0a0;
+            --muted: #8a94a6;
             --accent: #3b82f6;
+            --border: rgba(255, 255, 255, 0.08);
         }
 
         body {
@@ -26,7 +28,7 @@
 
         .app-container {
             display: grid;
-            grid-template-columns: 1fr 380px;
+            grid-template-columns: 1fr 400px;
             gap: 30px;
             max-width: 1200px;
             width: 100%;
@@ -37,90 +39,175 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 0 30px 0;
         }
 
-        /* --- Panel Izquierdo: Inputs --- */
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-area h1 {
+            font-family: 'Lora', serif;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .version-badge {
+            font-size: 9px;
+            letter-spacing: 1px;
+            border: 1px solid var(--muted);
+            padding: 2px 6px;
+            border-radius: 4px;
+            opacity: 0.6;
+            text-transform: uppercase;
+        }
+
+        /* --- Panel de Edición --- */
         .editor-panel {
             background: var(--card);
             padding: 30px;
-            border-radius: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
         }
 
-        .input-group { margin-bottom: 20px; }
-        label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .section-title {
+            font-family: 'Lora', serif;
+            font-size: 20px;
+            margin-bottom: 25px;
+            display: block;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .field { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
+        
         input, select {
-            width: 100%;
-            background: #2a3140;
-            border: 1px solid #3f4759;
+            background: var(--input-bg);
+            border: 1px solid transparent;
             color: white;
             padding: 12px;
-            border-radius: 8px;
-            box-sizing: border-box;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
         }
 
-        /* --- Panel Derecho: Preview --- */
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: #252d3d;
+        }
+
+        .btn {
+            cursor: pointer;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        .btn-fetch {
+            width: 100%;
+            background: #2d364a;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .btn-fetch:hover { background: #374158; }
+
+        .btn-save { background: var(--accent); color: white; }
+        .btn-lib { background: transparent; color: white; border: 1px solid var(--border); }
+
+        /* --- Panel de Previsualización (Editorial) --- */
         .preview-panel {
             position: sticky;
             top: 20px;
             background: var(--card);
-            border-radius: 16px;
-            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 40px 30px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 40px 20px;
             text-align: center;
             height: fit-content;
         }
 
         #prevCover {
-            width: 280px;
-            height: 280px;
-            border-radius: 8px;
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: #111;
+            border-radius: 4px;
             object-fit: cover;
-            background: #2a3140;
-            margin-bottom: 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
-        #prevOverallScore {
+        .score-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        #prevScore {
             font-family: 'Lora', serif;
-            font-size: 100px;
+            font-size: 110px;
             font-weight: 700;
-            margin: 0;
-            line-height: 1;
-            /* Eliminado el degradado por petición del usuario */
+            line-height: 0.9;
+            margin-bottom: 30px;
+            /* El color se asigna por JS */
         }
 
-        .prev-label { font-size: 12px; color: var(--muted); margin-top: 20px; text-transform: uppercase; }
-        .prev-artist { font-size: 18px; font-weight: 600; margin-top: 5px; }
-        .prev-album { font-size: 16px; opacity: 0.9; margin-top: 2px; }
-        .prev-meta { font-size: 13px; color: var(--muted); margin-top: 10px; }
-        .prev-ranker { font-size: 13px; color: var(--accent); margin-top: 15px; font-weight: 600; }
-
-        /* Botones */
-        .btn {
-            cursor: pointer;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: 0.2s;
+        .meta-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-top: 15px;
+            letter-spacing: 1px;
         }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { opacity: 0.9; }
+
+        .meta-value {
+            font-family: 'Lora', serif;
+            font-size: 18px;
+            margin-top: 4px;
+        }
+
+        .meta-sub {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+
+        .meta-ranker {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+            width: 100%;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--accent);
+        }
 
         /* Toast */
         #toast {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: #23be32; color: white; padding: 10px 20px; border-radius: 50px;
-            display: none; z-index: 1000;
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #10b981; color: white; padding: 12px 24px; border-radius: 50px;
+            font-size: 14px; font-weight: 600; display: none; z-index: 1000;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
         }
 
-        /* Responsive */
-        @media (max-width: 900px) {
+        @media (max-width: 950px) {
             .app-container { grid-template-columns: 1fr; }
             .preview-panel { position: static; }
         }
@@ -132,40 +219,42 @@
 
     <div class="app-container">
         <header>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <h2 style="margin:0; font-family:'Lora', serif;">Album Rater</h2>
-                <span style="font-size:10px; opacity:0.5; border:1px solid; padding:2px 4px; border-radius:4px;">EDITORIAL V7.2</span>
+            <div class="logo-area">
+                <h1>Album Rater</h1>
+                <span class="version-badge">Editorial V7.2</span>
             </div>
-            <div style="display:flex; gap:10px;">
-                <select id="langSwitch" style="width: auto; padding: 5px;">
+            <div style="display:flex; gap:12px;">
+                <select id="langSwitch" style="padding: 5px 10px; background: transparent; border: 1px solid var(--border);">
                     <option value="en">English</option>
                     <option value="es">Español</option>
                 </select>
-                <button id="btnLibrary" class="btn" style="background:rgba(255,255,255,0.1); color:white;">Library</button>
-                <button id="btnSaveLibrary" class="btn btn-primary">Save Album</button>
+                <button id="btnLibrary" class="btn btn-lib">Library</button>
+                <button id="btnSaveLibrary" class="btn btn-save">Save Album</button>
             </div>
         </header>
 
         <main class="editor-panel">
-            <div class="input-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div>
+            <span class="section-title" id="lblMetadata">Album Metadata</span>
+            
+            <div class="input-row">
+                <div class="field">
                     <label id="lblArtist">Artist</label>
                     <input type="text" id="inArtist" placeholder="e.g. Ichiko Aoba">
                 </div>
-                <div>
+                <div class="field">
                     <label id="lblAlbum">Album</label>
                     <input type="text" id="inAlbum" placeholder="e.g. Luminescent Creatures">
                 </div>
             </div>
             
-            <button id="btnFetch" class="btn" style="width:100%; background:#3f4759; color:white; margin-bottom:20px;">Fetch Info (MusicBrainz/iTunes)</button>
+            <button id="btnFetch" class="btn btn-fetch">Fetch Info (MusicBrainz/iTunes)</button>
 
-            <div class="input-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div>
+            <div class="input-row">
+                <div class="field">
                     <label id="lblYear">Release Year</label>
                     <input type="text" id="inYear" placeholder="2025">
                 </div>
-                <div>
+                <div class="field">
                     <label id="lblRanker">Ranked By</label>
                     <input type="text" id="inRanker" placeholder="Your Name">
                 </div>
@@ -176,51 +265,91 @@
         </main>
 
         <aside class="preview-panel">
-            <img id="prevCover" src="" alt="Album Cover">
+            <img id="prevCover" src="https://via.placeholder.com/600?text=No+Cover" alt="Cover">
             
-            <div class="prev-label" id="lblOverall">Overall Score</div>
-            <div id="prevOverallScore">0.0</div>
+            <div class="score-label" id="lblOverall">Overall Score</div>
+            <div id="prevScore">0.0</div>
             
-            <div class="prev-artist" id="resArtist">—</div>
-            <div class="prev-album" id="resAlbum">—</div>
-            <div class="prev-meta">
+            <div class="meta-label">Artist</div>
+            <div class="meta-value" id="resArtist">—</div>
+            
+            <div class="meta-label">Album</div>
+            <div class="meta-value" id="resAlbum">—</div>
+            
+            <div class="meta-sub">
                 <span id="resYear"></span> • <span id="resLength">0 min</span>
             </div>
-            <div class="prev-ranker" id="resRanker"></div>
+            
+            <div class="meta-ranker" id="resRanker"></div>
         </aside>
     </div>
 
     <script src="autofill.v7.2.js"></script>
     <script src="library.v7.2.js"></script>
+
     <script>
-        /* --- Lógica Core de la App --- */
+        // --- APP CORE LOGIC ---
         window.AlbumApp = {
             state: {
-                lang: 'en',
-                artist: '', album: '', released: '', rankedby: '', cover: '',
-                tracks: []
+                lang: localStorage.getItem('albumrater_lang') || 'en',
+                artist: '',
+                album: '',
+                released: '',
+                rankedby: '',
+                cover: '',
+                tracks: [] // Cada track: { name: '', score: null, duration: '' }
             },
 
             translations: {
-                en: { lblArtist: "Artist", lblAlbum: "Album", lblYear: "Release Year", lblRanker: "Ranked By", lblOverall: "Overall Score", toastSave: "Saved to Library ✅" },
-                es: { lblArtist: "Artista", lblAlbum: "Álbum", lblYear: "Año de Lanzamiento", lblRanker: "Rankeado por", lblOverall: "Puntaje General", toastSave: "Guardado en la Librería ✅" }
+                en: {
+                    lblMetadata: "Album Metadata",
+                    lblArtist: "Artist",
+                    lblAlbum: "Album",
+                    lblYear: "Release Year",
+                    lblRanker: "Ranked By",
+                    lblOverall: "Overall Score"
+                },
+                es: {
+                    lblMetadata: "Metadatos del Álbum",
+                    lblArtist: "Artista",
+                    lblAlbum: "Álbum",
+                    lblYear: "Año de Lanzamiento",
+                    lblRanker: "Rankeado Por",
+                    lblOverall: "Puntaje General"
+                }
             },
 
             init() {
-                // Binding de inputs
-                document.querySelectorAll('input').forEach(el => {
-                    el.addEventListener('input', () => this.syncState());
-                });
+                // Sincronizar select de idioma
+                const langSw = document.getElementById('langSwitch');
+                langSw.value = this.state.lang;
+                langSw.addEventListener('change', (e) => this.setLanguage(e.target.value));
 
-                document.getElementById('langSwitch').addEventListener('change', (e) => {
-                    this.state.lang = e.target.value;
-                    this.updateUI();
+                // Escuchar cambios en inputs para tiempo real
+                ['inArtist', 'inAlbum', 'inYear', 'inRanker'].forEach(id => {
+                    document.getElementById(id).addEventListener('input', () => this.syncInputs());
                 });
 
                 this.updateUI();
+                this.renderPreview();
             },
 
-            syncState() {
+            setLanguage(lang) {
+                this.state.lang = lang;
+                localStorage.setItem('albumrater_lang', lang);
+                this.updateUI();
+            },
+
+            updateUI() {
+                const t = this.translations[this.state.lang];
+                for (let id in t) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = t[id];
+                }
+                this.renderPreview(); // Actualiza textos en la previsualización
+            },
+
+            syncInputs() {
                 this.state.artist = document.getElementById('inArtist').value;
                 this.state.album = document.getElementById('inAlbum').value;
                 this.state.released = document.getElementById('inYear').value;
@@ -230,6 +359,7 @@
 
             setState(newState) {
                 this.state = { ...this.state, ...newState };
+                // Reflejar en inputs
                 document.getElementById('inArtist').value = this.state.artist || '';
                 document.getElementById('inAlbum').value = this.state.album || '';
                 document.getElementById('inYear').value = this.state.released || '';
@@ -239,50 +369,51 @@
 
             getState() { return this.state; },
 
-            updateUI() {
-                const t = this.translations[this.state.lang];
-                for (let key in t) {
-                    const el = document.getElementById(key);
-                    if (el) el.textContent = t[key];
-                }
-            },
-
-            renderPreview() {
-                document.getElementById('resArtist').textContent = this.state.artist || '—';
-                document.getElementById('resAlbum').textContent = this.state.album || '—';
-                document.getElementById('resYear').textContent = this.state.released || '';
-                document.getElementById('resRanker').textContent = this.state.rankedby ? `Review by ${this.state.rankedby}` : '';
-                
-                const img = document.getElementById('prevCover');
-                if (this.state.cover) {
-                    img.src = this.state.cover;
-                    img.style.display = 'block';
-                }
-
-                // Lógica de color del score
-                const scoreEl = document.getElementById('prevOverallScore');
-                const avg = this.computeAvg();
-                scoreEl.textContent = avg;
-                scoreEl.style.color = this.getColor(parseFloat(avg));
-            },
-
             computeAvg() {
-                if (this.state.tracks.length === 0) return "0.0";
-                const scores = this.state.tracks.map(t => parseFloat(t.score)).filter(s => !isNaN(s));
+                if (!this.state.tracks || this.state.tracks.length === 0) return "0.0";
+                const scores = this.state.tracks
+                    .map(t => parseFloat(t.score))
+                    .filter(s => !isNaN(s));
                 if (scores.length === 0) return "0.0";
                 return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
             },
 
             getColor(score) {
-                if (score >= 9) return "#2e47ee";
-                if (score >= 8) return "#0285c6";
-                if (score >= 7) return "#23be32";
-                if (score >= 6) return "#f0ca15";
-                return "#e12928";
+                if (score >= 9.0) return "#2e47ee"; // Azul Premium
+                if (score >= 8.0) return "#0285c6"; // Azul Claro
+                if (score >= 7.0) return "#23be32"; // Verde
+                if (score >= 6.0) return "#f0ca15"; // Amarillo
+                if (score >= 1.0) return "#e12928"; // Rojo
+                return "#555";
+            },
+
+            renderPreview() {
+                // Textos
+                document.getElementById('resArtist').textContent = this.state.artist || "—";
+                document.getElementById('resAlbum').textContent = this.state.album || "—";
+                document.getElementById('resYear').textContent = this.state.released || "";
+                
+                const rankerText = this.state.lang === 'es' ? 'Reseña por' : 'Review by';
+                document.getElementById('resRanker').textContent = this.state.rankedby ? `${rankerText} ${this.state.rankedby}` : "";
+
+                // Imagen
+                const img = document.getElementById('prevCover');
+                if (this.state.cover) {
+                    img.src = this.state.cover;
+                } else {
+                    img.src = "https://via.placeholder.com/600?text=No+Cover";
+                }
+
+                // Puntaje
+                const avg = parseFloat(this.computeAvg());
+                const scoreEl = document.getElementById('prevScore');
+                scoreEl.textContent = avg > 0 ? avg.toFixed(1) : "0.0";
+                scoreEl.style.color = this.getColor(avg);
             }
         };
 
-        window.AlbumApp.init();
+        // Iniciar
+        document.addEventListener('DOMContentLoaded', () => window.AlbumApp.init());
     </script>
 </body>
 </html>
