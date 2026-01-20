@@ -1,95 +1,104 @@
 /* ----------------------------------------------------------
    autofill.v7.2.js — ITUNES API FETCH
-   - Conecta con iTunes Search API.
-   - Obtiene Carátula High-Res (600x600).
-   - Extrae el Año de Lanzamiento.
-   - Actualiza el estado global de window.AlbumApp.
+   - Conecta el botón "Buscar Álbum" con la API de iTunes.
+   - Requiere que en el HTML el botón tenga id="btnFetch".
 ---------------------------------------------------------- */
 
 (function () {
-  // Helper para seleccionar elementos por ID
-  const $ = (id) => document.getElementById(id);
+  console.log("🔧 Autofill Script: Iniciado.");
 
-  // Esperar a que el DOM esté listo para evitar errores de elementos nulos
   document.addEventListener("DOMContentLoaded", () => {
-    const btn = $("btnFetch");
+    
+    // 1. SELECCIÓN DE ELEMENTOS
+    // Asegúrate que en tu HTML los IDs sean exactamente estos:
+    const btn = document.getElementById("btnFetch");
+    const inputArtist = document.getElementById("inArtist");
+    const inputAlbum = document.getElementById("inAlbum");
 
-    // Si por alguna razón el botón no existe, salimos
-    if (!btn) return;
+    // Si el botón no existe, detenemos el script para evitar errores
+    if (!btn) {
+      console.error("❌ ERROR CRÍTICO: No se encontró el botón con id='btnFetch' en el HTML.");
+      return;
+    }
 
+    // 2. LÓGICA DEL CLICK
     btn.addEventListener("click", async () => {
-      // Leer valores actuales
-      const artistVal = $("inArtist").value.trim();
-      const albumVal = $("inAlbum").value.trim();
-      
-      // Detectar idioma actual desde la App
-      const lang = window.AlbumApp?.state.lang || "en";
+      console.log("🖱️ Click detectado en Buscar Álbum.");
 
-      // 1. Validación básica
+      // Leer valores de los inputs
+      const artistVal = inputArtist ? inputArtist.value.trim() : "";
+      const albumVal = inputAlbum ? inputAlbum.value.trim() : "";
+
+      // Validar que no estén vacíos
       if (!artistVal || !albumVal) {
-        alert(lang === "es"
-          ? "Por favor, ingresa el Artista y el nombre del Álbum."
-          : "Please enter both Artist and Album names.");
+        alert("⚠️ Por favor ingresa el Artista y el nombre del Álbum antes de buscar.");
         return;
       }
 
-      // 2. Feedback visual (Botón en estado de carga)
+      // Guardar texto original del botón ("Buscar Álbum") para restaurarlo luego
       const originalText = btn.textContent;
-      btn.textContent = lang === "es" ? "Buscando..." : "Searching...";
+      
+      // Cambiar estado visual del botón (Feedback de carga)
+      btn.textContent = "⏳ Buscando...";
       btn.disabled = true;
       btn.style.opacity = "0.7";
       btn.style.cursor = "wait";
 
       try {
-        // 3. Petición a la API de iTunes
+        // 3. PETICIÓN A LA API (iTunes)
+        // Usamos encodeURIComponent para manejar espacios y caracteres especiales
         const query = encodeURIComponent(`${artistVal} ${albumVal}`);
-        // limit=1 para obtener la coincidencia más relevante
         const url = `https://itunes.apple.com/search?term=${query}&entity=album&limit=1`;
+        
+        console.log(`🌐 Consultando API: ${url}`);
 
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.results && data.results.length > 0) {
-          const result = data.results[0];
-
-          // 4. Procesar Datos
-          
-          // Truco para High-Res: iTunes devuelve 100x100, cambiamos a 600x600 o 1000x1000
-          // "bb" asegura fondo negro/borde si es necesario, jpg formato standard
-          const highResCover = result.artworkUrl100
-            ? result.artworkUrl100.replace("100x100bb", "600x600bb")
-            : "";
-
-          // Año: iTunes devuelve formato ISO (2023-01-01T...), cortamos los primeros 4 chars
-          const year = result.releaseDate
-            ? result.releaseDate.substring(0, 4)
-            : "";
-
-          // 5. Actualizar Estado Global de la App
-          // Esto disparará automáticamente el renderPreview() en index.html
-          window.AlbumApp.setState({
-            artist: result.artistName,
-            album: result.collectionName, // Nombre oficial del álbum
-            released: year,
-            cover: highResCover
-          });
-
-          console.log(`✅ Autofill success: ${result.collectionName}`);
-
-        } else {
-          // No se encontraron resultados
-          alert(lang === "es"
-            ? "No se encontraron resultados en iTunes."
-            : "No results found on iTunes.");
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Error de red: ${response.status}`);
         }
 
-      } catch (err) {
-        console.error("Autofill Error:", err);
-        alert(lang === "es" 
-          ? "Error de conexión con el servicio de búsqueda." 
-          : "Connection error with search service.");
+        const data = await response.json();
+
+        // 4. PROCESAR RESULTADOS
+        if (data.results && data.results.length > 0) {
+          const result = data.results[0];
+          console.log("✅ Álbum encontrado:", result.collectionName);
+
+          // Obtener carátula en Alta Resolución (Hack de iTunes)
+          // Cambiamos "100x100bb" por "1000x1000bb"
+          let highResCover = "";
+          if (result.artworkUrl100) {
+            highResCover = result.artworkUrl100.replace("100x100bb", "1000x1000bb");
+          }
+
+          // Extraer solo el año (YYYY) de la fecha completa
+          const year = result.releaseDate ? result.releaseDate.substring(0, 4) : "";
+
+          // 5. ACTUALIZAR LA APP
+          // Enviamos los datos a la lógica principal (window.AlbumApp)
+          if (window.AlbumApp && typeof window.AlbumApp.setState === 'function') {
+            window.AlbumApp.setState({
+              artist: result.artistName,
+              album: result.collectionName,
+              released: year,
+              cover: highResCover
+            });
+          } else {
+            console.warn("⚠️ window.AlbumApp no está listo. Los datos se obtuvieron pero no se pudieron pintar.");
+          }
+
+        } else {
+          // Si iTunes devuelve una lista vacía
+          alert("❌ No se encontraron resultados en iTunes para esa búsqueda. Revisa si el nombre está bien escrito.");
+        }
+
+      } catch (error) {
+        console.error("❌ Error en el proceso de Autofill:", error);
+        alert("Ocurrió un error al intentar conectar con el servicio de búsqueda.");
       } finally {
-        // 6. Restaurar Botón
+        // 6. RESTAURAR BOTÓN
+        // Pase lo que pase (éxito o error), devolvemos el botón a la normalidad
         btn.textContent = originalText;
         btn.disabled = false;
         btn.style.opacity = "1";
@@ -97,5 +106,4 @@
       }
     });
   });
-
 })();
