@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Album Rater - Editorial V7.2</title>
     
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="favicon.png">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -14,7 +17,7 @@
         :root {
             --bg-dark: #0b0f15;
             --bg-card: #161b26;
-            --accent: #3b82f6; /* Azul Editorial */
+            --accent: #3b82f6;
             --text-main: #ffffff;
             --text-muted: #8a94a6;
             --border: rgba(255, 255, 255, 0.1);
@@ -75,20 +78,14 @@
             margin-left: 10px;
             transition: all 0.2s;
         }
-
         .header-actions button:hover {
             background: rgba(255,255,255,0.05);
             border-color: white;
         }
-
         .header-actions button.primary {
             background: var(--accent);
             border-color: var(--accent);
             font-weight: 600;
-        }
-
-        .header-actions button.primary:hover {
-            opacity: 0.9;
         }
 
         /* GRID LAYOUT */
@@ -150,11 +147,9 @@
             transition: border-color 0.2s;
         }
 
-        input:focus {
-            border-color: var(--accent);
-        }
+        input:focus { border-color: var(--accent); }
 
-        /* BOTÓN FETCH (Estilo especial) */
+        /* BOTÓN FETCH */
         #btnFetch {
             width: 100%;
             background: rgba(255,255,255,0.05);
@@ -167,102 +162,47 @@
             font-size: 13px;
             transition: 0.2s;
         }
-        #btnFetch:hover {
-            background: rgba(255,255,255,0.1);
-            border-color: white;
-        }
+        #btnFetch:hover { background: rgba(255,255,255,0.1); border-color: white; }
 
         /* TRACKLIST EDITOR */
-        .track-editor {
-            margin-top: 20px;
-        }
-        .track-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 8px;
-            align-items: center;
-        }
-        .track-num {
-            width: 30px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 12px;
-        }
-        .btn-remove {
-            background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px;
-        }
+        .track-editor { margin-top: 20px; }
+        .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+        .track-num { width: 30px; text-align: center; color: var(--text-muted); font-size: 12px; }
+        .btn-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; }
 
-        /* PREVIEW CARD (La parte visual derecha) */
-        .preview-wrapper {
-            position: sticky;
-            top: 20px;
-        }
-
+        /* PREVIEW CARD */
+        .preview-wrapper { position: sticky; top: 20px; }
         .card-editorial {
-            background: #000; /* Fondo negro puro o extraído de la imagen */
+            background: #000;
             border-radius: 12px;
             padding: 30px;
             text-align: center;
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             border: 1px solid var(--border);
         }
-
         .cover-container {
-            width: 100%;
-            aspect-ratio: 1/1;
-            background: #1a1a1a;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 20px;
-            position: relative;
+            width: 100%; aspect-ratio: 1/1; background: #1a1a1a;
+            border-radius: 4px; overflow: hidden; margin-bottom: 20px;
         }
-
-        .cover-img {
-            width: 100%; height: 100%; object-fit: cover;
-        }
-
+        .cover-img { width: 100%; height: 100%; object-fit: cover; }
         .big-score {
-            font-family: 'Inter', sans-serif;
-            font-weight: 700;
-            font-size: 64px;
-            line-height: 1;
-            margin: 10px 0;
+            font-family: 'Inter', sans-serif; font-weight: 700; font-size: 64px;
+            line-height: 1; margin: 10px 0;
             background: linear-gradient(135deg, #fff, #a5b4fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-
-        .meta-preview {
-            margin-bottom: 30px;
-        }
+        .meta-preview { margin-bottom: 30px; }
         .meta-artist { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
         .meta-album { font-family: 'Lora', serif; font-size: 22px; font-weight: 400; color: #fff; }
         .meta-details { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
-
-        /* Tracklist Preview */
-        .track-list-preview {
-            text-align: left;
-            margin-top: 20px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 20px;
-        }
-        .p-track {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            font-size: 13px;
-        }
-        .score-badge {
-            font-weight: 700;
-        }
-
-        /* Toast Notification */
+        .track-list-preview { text-align: left; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+        .p-track { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px; }
+        
+        /* TOAST */
         #toast {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: white; color: black; padding: 10px 20px;
-            border-radius: 30px; font-weight: 600; display: none; z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-radius: 30px; font-weight: 600; display: none; z-index: 9999;
         }
     </style>
 </head>
@@ -270,7 +210,7 @@
 
     <div class="app-container">
         <header>
-            <h1>Album Rater <span class="badge">EDITORIAL V7.2</span></h1>
+            <h1>Album Rater <span class="badge">V7.2</span></h1>
             <div class="header-actions">
                 <button id="btnLibrary">Library</button>
                 <button id="btnSaveLibrary" class="primary">Save Album</button>
@@ -280,8 +220,7 @@
         <div class="main-grid">
             <div class="editor-col">
                 <div class="panel">
-                    <h2>Album Metadata</h2>
-                    
+                    <h2>Metadata</h2>
                     <div class="input-row">
                         <div class="input-group">
                             <label>Artist</label>
@@ -292,9 +231,7 @@
                             <input type="text" id="inAlbum" placeholder="Album Title">
                         </div>
                     </div>
-
-                    <button id="btnFetch">Buscar Álbum (Auto-Fill)</button>
-
+                    <button id="btnFetch">Buscar Álbum</button>
                     <div class="input-row">
                         <div class="input-group">
                             <label>Year</label>
@@ -312,206 +249,90 @@
                         <h2>Tracklist</h2>
                         <button onclick="window.AlbumApp.addTrack()" style="background:none; border:1px solid #333; color:white; padding:4px 10px; cursor:pointer; border-radius:4px;">+ Add Track</button>
                     </div>
-                    <div id="trackEditor" class="track-editor">
-                        </div>
+                    <div id="trackEditor" class="track-editor"></div>
                 </div>
             </div>
 
             <div class="preview-col">
                 <div class="preview-wrapper">
                     <div class="card-editorial" id="cardExport">
-                        
                         <div class="cover-container">
                             <img id="prevCover" src="https://via.placeholder.com/600x600/111/333?text=Cover" class="cover-img">
                         </div>
-
                         <div style="font-size: 11px; letter-spacing: 1px; color: #888; text-transform: uppercase;">Overall Score</div>
                         <div id="prevScore" class="big-score">0.0</div>
-
                         <div class="meta-preview">
-                            <div id="prevArtist" class="meta-artist">Artist Name</div>
-                            <div id="prevAlbum" class="meta-album">Album Title</div>
-                            <div id="prevDetails" class="meta-details">2024 • 0 Tracks</div>
+                            <div id="prevArtist" class="meta-artist">Artist</div>
+                            <div id="prevAlbum" class="meta-album">Album</div>
+                            <div id="prevDetails" class="meta-details">2024 • Ranked by You</div>
                         </div>
-
-                        <div id="prevTracks" class="track-list-preview">
-                            </div>
-
+                        <div id="prevTracks" class="track-list-preview"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
     <div id="toast">Saved!</div>
 
     <script>
-        // Declaramos AlbumApp globalmente para que los otros scripts lo vean
         window.AlbumApp = (function() {
-            // Estado Inicial
-            let state = {
-                artist: "", album: "", released: "", rankedby: "",
-                cover: "",
-                tracks: [
-                    { name: "", score: "" },
-                    { name: "", score: "" },
-                    { name: "", score: "" }
-                ],
-                lang: "en"
-            };
+            let state = { artist: "", album: "", released: "", rankedby: "", cover: "", tracks: [{ name: "", score: "" }, { name: "", score: "" }, { name: "", score: "" }], lang: "en" };
+            const dom = { inArtist: document.getElementById("inArtist"), inAlbum: document.getElementById("inAlbum"), inYear: document.getElementById("inYear"), inRanker: document.getElementById("inRanker"), trackEditor: document.getElementById("trackEditor"), pCover: document.getElementById("prevCover"), pScore: document.getElementById("prevScore"), pArtist: document.getElementById("prevArtist"), pAlbum: document.getElementById("prevAlbum"), pDetails: document.getElementById("prevDetails"), pTracks: document.getElementById("prevTracks") };
 
-            // Referencias DOM
-            const dom = {
-                inArtist: document.getElementById("inArtist"),
-                inAlbum: document.getElementById("inAlbum"),
-                inYear: document.getElementById("inYear"),
-                inRanker: document.getElementById("inRanker"),
-                trackEditor: document.getElementById("trackEditor"),
-                
-                // Preview
-                pCover: document.getElementById("prevCover"),
-                pScore: document.getElementById("prevScore"),
-                pArtist: document.getElementById("prevArtist"),
-                pAlbum: document.getElementById("prevAlbum"),
-                pDetails: document.getElementById("prevDetails"),
-                pTracks: document.getElementById("prevTracks")
-            };
-
-            // --- FUNCIONES DE CÁLCULO ---
-            function getColor(score) {
-                const s = parseFloat(score);
-                if (!s && s !== 0) return "#555";
-                if (s >= 9) return "#3b82f6"; // Azul (Masterpiece)
-                if (s >= 8) return "#38bdf8"; // Celeste
-                if (s >= 7) return "#4ade80"; // Verde
-                if (s >= 6) return "#facc15"; // Amarillo
-                if (s >= 4) return "#fb923c"; // Naranja
-                return "#ef4444"; // Rojo
-            }
-
-            function computeAvg() {
-                let total = 0;
-                let count = 0;
-                state.tracks.forEach(t => {
-                    const s = parseFloat(t.score);
-                    if (!isNaN(s)) {
-                        total += s;
-                        count++;
-                    }
-                });
-                return count === 0 ? "0.0" : (total / count).toFixed(1);
-            }
-
-            // --- RENDERIZADO ---
+            function getColor(s) { s = parseFloat(s); if(!s && s!==0)return"#555"; if(s>=9)return"#3b82f6"; if(s>=8)return"#38bdf8"; if(s>=7)return"#4ade80"; if(s>=6)return"#facc15"; if(s>=4)return"#fb923c"; return"#ef4444"; }
+            function computeAvg() { let t=0,c=0; state.tracks.forEach(x=>{const s=parseFloat(x.score); if(!isNaN(s)){t+=s;c++;}}); return c===0?"0.0":(t/c).toFixed(1); }
+            
             function render() {
-                // 1. Inputs (Solo si no están enfocados para evitar saltos)
-                if (document.activeElement !== dom.inArtist) dom.inArtist.value = state.artist;
-                if (document.activeElement !== dom.inAlbum) dom.inAlbum.value = state.album;
-                if (document.activeElement !== dom.inYear) dom.inYear.value = state.released;
-                if (document.activeElement !== dom.inRanker) dom.inRanker.value = state.rankedby;
+                if(document.activeElement!==dom.inArtist) dom.inArtist.value=state.artist;
+                if(document.activeElement!==dom.inAlbum) dom.inAlbum.value=state.album;
+                if(document.activeElement!==dom.inYear) dom.inYear.value=state.released;
+                if(document.activeElement!==dom.inRanker) dom.inRanker.value=state.rankedby;
 
-                // 2. Preview Card
                 dom.pArtist.textContent = state.artist || "Artist Name";
                 dom.pAlbum.textContent = state.album || "Album Title";
-                dom.pDetails.textContent = `${state.released || "Year"} • ${state.rankedby || "Ranker"}`;
-                
-                if (state.cover) dom.pCover.src = state.cover;
-                
-                const avg = computeAvg();
-                dom.pScore.textContent = avg;
-                dom.pScore.style.background = `linear-gradient(135deg, #fff, ${getColor(avg)})`;
-                dom.pScore.style.webkitBackgroundClip = "text";
+                dom.pDetails.textContent = `${state.released||"Year"} • ${state.rankedby||"Ranker"}`;
+                if(state.cover) dom.pCover.src=state.cover;
 
-                // 3. Tracklist Preview
-                dom.pTracks.innerHTML = "";
-                state.tracks.forEach((t, i) => {
-                    if (!t.name) return; // No mostrar vacíos en preview
-                    const div = document.createElement("div");
-                    div.className = "p-track";
-                    const color = getColor(t.score);
-                    div.innerHTML = `
-                        <span style="color:#aaa; margin-right:10px;">${i+1}</span>
-                        <span>${t.name}</span>
-                        <span class="score-badge" style="color:${color}">${t.score || "-"}</span>
-                    `;
-                    dom.pTracks.appendChild(div);
+                const avg=computeAvg();
+                dom.pScore.textContent=avg;
+                dom.pScore.style.background=`linear-gradient(135deg, #fff, ${getColor(avg)})`;
+                dom.pScore.style.webkitBackgroundClip="text";
+
+                dom.pTracks.innerHTML="";
+                state.tracks.forEach((t,i)=>{
+                    if(!t.name)return;
+                    const d=document.createElement("div"); d.className="p-track";
+                    d.innerHTML=`<span style="color:#aaa;margin-right:10px;">${i+1}</span><span>${t.name}</span><span style="font-weight:700;color:${getColor(t.score)}">${t.score||"-"}</span>`;
+                    dom.pTracks.appendChild(d);
                 });
 
-                // 4. Editor de Tracks (Solo regenerar si cambió longitud para no perder foco)
-                const currentInputs = document.querySelectorAll(".track-input-name");
-                if (currentInputs.length !== state.tracks.length) {
-                    renderTrackEditor();
-                }
+                const inputs=document.querySelectorAll(".track-input-name");
+                if(inputs.length!==state.tracks.length) renderEditor();
             }
 
-            function renderTrackEditor() {
-                dom.trackEditor.innerHTML = "";
-                state.tracks.forEach((t, i) => {
-                    const row = document.createElement("div");
-                    row.className = "track-row";
-                    row.innerHTML = `
-                        <span class="track-num">${i+1}</span>
-                        <input type="text" class="track-input-name" value="${t.name}" placeholder="Track Title" oninput="window.AlbumApp.updateTrack(${i}, 'name', this.value)" style="flex:1;">
-                        <input type="number" value="${t.score}" placeholder="0-10" oninput="window.AlbumApp.updateTrack(${i}, 'score', this.value)" style="width:60px; text-align:center;">
-                        <button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>
-                    `;
-                    dom.trackEditor.appendChild(row);
+            function renderEditor(){
+                dom.trackEditor.innerHTML="";
+                state.tracks.forEach((t,i)=>{
+                    const r=document.createElement("div"); r.className="track-row";
+                    r.innerHTML=`<span class="track-num">${i+1}</span><input class="track-input-name" type="text" value="${t.name}" oninput="window.AlbumApp.updateTrack(${i},'name',this.value)" style="flex:1;" placeholder="Track"><input type="number" value="${t.score}" oninput="window.AlbumApp.updateTrack(${i},'score',this.value)" style="width:50px;text-align:center;" placeholder="0"><button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>`;
+                    dom.trackEditor.appendChild(r);
                 });
             }
 
-            // --- PUBLIC METHODS ---
+            function setState(s){ state={...state,...s}; if(s.tracks) renderEditor(); render(); }
             
-            function setState(newState) {
-                // Fusionar estado
-                state = { ...state, ...newState };
-                
-                // Si vienen tracks nuevos (ej. de libreria), forzar render editor
-                if (newState.tracks) renderTrackEditor();
-                
-                render();
-            }
+            // Listeners
+            dom.inArtist.addEventListener("input",e=>setState({artist:e.target.value}));
+            dom.inAlbum.addEventListener("input",e=>setState({album:e.target.value}));
+            dom.inYear.addEventListener("input",e=>setState({released:e.target.value}));
+            dom.inRanker.addEventListener("input",e=>setState({rankedby:e.target.value}));
 
-            function updateTrack(index, field, value) {
-                state.tracks[index][field] = value;
-                render(); // Re-render preview only
-            }
-
-            function addTrack() {
-                state.tracks.push({ name: "", score: "" });
-                renderTrackEditor();
-            }
-
-            function removeTrack(index) {
-                state.tracks.splice(index, 1);
-                renderTrackEditor();
-                render();
-            }
-
-            // Listeners para Inputs principales
-            dom.inArtist.addEventListener("input", (e) => setState({ artist: e.target.value }));
-            dom.inAlbum.addEventListener("input", (e) => setState({ album: e.target.value }));
-            dom.inYear.addEventListener("input", (e) => setState({ released: e.target.value }));
-            dom.inRanker.addEventListener("input", (e) => setState({ rankedby: e.target.value }));
-
-            // Init
-            renderTrackEditor();
-            render();
-
-            return {
-                state,
-                setState,
-                getState: () => state,
-                computeAvg,
-                getColor,
-                updateTrack,
-                addTrack,
-                removeTrack
-            };
-
+            renderEditor(); render();
+            return { setState, getState:()=>state, computeAvg, getColor, updateTrack:(i,f,v)=>{state.tracks[i][f]=v; render();}, addTrack:()=>{state.tracks.push({name:"",score:""}); renderEditor();}, removeTrack:(i)=>{state.tracks.splice(i,1); renderEditor(); render();} };
         })();
     </script>
 
-    <script src="autofill.v7.2.js"></script>
+    <script src="autofillAlbum.v7.2.js"></script>
 
     <script src="library.v7.2.js"></script>
 
