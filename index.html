@@ -3,24 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Album Rater - Ultimate Edition</title>
+    <title>ARA - Album Rater App | V9.0 Visual Update</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-    
+
     <style>
+        /* --- ESTILOS GENERALES (Dark Aesthetic) --- */
         :root { --bg-dark: #0b0f15; --bg-card: #161b26; --accent: #3b82f6; --text-main: #ffffff; --text-muted: #8a94a6; --border: rgba(255, 255, 255, 0.1); }
-        body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; min-height: 100vh; }
-        .app-container { width: 100%; max-width: 1200px; padding: 20px; }
+        body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; min-height: 100vh; overflow-x: hidden; }
+        .app-container { width: 100%; max-width: 1400px; padding: 20px; }
         header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
         h1 { font-family: 'Lora', serif; font-size: 24px; margin: 0; }
         .badge { font-family: 'Inter', sans-serif; font-size: 10px; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; vertical-align: middle; margin-left: 10px; color: var(--text-muted); }
         .header-actions button { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-left: 10px; transition: 0.2s; }
         .header-actions button:hover { background: rgba(255,255,255,0.05); border-color: white; }
         .header-actions button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
-        .main-grid { display: grid; grid-template-columns: 1fr 420px; gap: 40px; }
-        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+        
+        /* GRID LAYOUT (IZQ: Editor, DER: Preview+Graph) */
+        .main-grid { display: grid; grid-template-columns: 1fr 500px; gap: 40px; }
+        @media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr; } }
+
+        /* PANEL INPUTS */
         .panel { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); }
         h2 { font-family: 'Lora', serif; margin-top: 0; font-size: 20px; margin-bottom: 20px; }
         .input-row { display: flex; gap: 15px; margin-bottom: 15px; }
@@ -29,47 +34,51 @@
         input[type="text"], input[type="number"] { background: #0b0f15; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; }
         input:focus { border-color: var(--accent); }
         
-        /* BOTONES Y ACCIONES */
-        #btnFetch { width: 100%; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px dashed rgba(59, 130, 246, 0.4); padding: 12px; cursor: pointer; margin-bottom: 20px; border-radius: 6px; font-size: 13px; font-weight: 600; transition: 0.2s; }
-        #btnFetch:hover { background: rgba(59, 130, 246, 0.25); border-color: #60a5fa; }
+        /* FETCH BUTTON */
+        #btnFetch { width: 100%; background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px dashed rgba(59, 130, 246, 0.3); padding: 12px; cursor: pointer; margin-bottom: 20px; border-radius: 6px; font-size: 13px; font-weight: 600; transition: 0.2s; }
+        #btnFetch:hover { background: rgba(59, 130, 246, 0.2); border-color: #60a5fa; }
         #btnFetch:disabled { opacity: 0.5; cursor: wait; }
+
+        /* COVER ACTIONS */
         .cover-actions { display: flex; gap: 10px; margin-bottom: 15px; }
         .btn-small { flex: 1; padding: 8px; font-size: 12px; background: #222; border: 1px solid #444; color: #ddd; border-radius: 4px; cursor: pointer; }
         .btn-small:hover { background: #333; }
         .btn-danger { color: #ef4444; border-color: #552222; }
         .btn-danger:hover { background: #331111; }
 
-        /* TRACKS */
+        /* TRACKS (Editor Izquierdo) */
         .track-editor { margin-top: 10px; }
         .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
         .track-num { width: 25px; text-align: center; color: var(--text-muted); font-size: 12px; }
         .btn-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; padding: 0 5px; }
 
-        /* PREVIEW AREA */
-        .preview-wrapper { position: sticky; top: 20px; }
-        .card-editorial { background: #050505; border-radius: 16px; padding: 35px; text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,0.6); border: 1px solid #222; }
+        /* --- COLUMNA DERECHA (Preview Card + Graph) --- */
+        .preview-wrapper { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .card-editorial { background: #050505; border-radius: 16px; padding: 35px; text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,0.6); border: 1px solid #222; overflow: hidden; }
+        
         .cover-container { width: 100%; aspect-ratio: 1/1; background: #1a1a1a; border-radius: 6px; overflow: hidden; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); position: relative; }
         .cover-img { width: 100%; height: 100%; object-fit: cover; }
+        
         .big-score { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 80px; line-height: 1; margin: 20px 0 10px 0; color: white; letter-spacing: -3px; }
         .meta-artist { font-weight: 700; font-size: 18px; color: white; margin-bottom: 5px; letter-spacing: -0.5px; }
         .meta-album { font-family: 'Lora', serif; font-size: 26px; font-style: italic; color: #e2e8f0; margin-bottom: 12px; line-height: 1.2; }
-        .meta-details { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; }
+        .meta-details { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+        /* --- NUEVO ESTILO DE GRÁFICA INTERACTIVA --- */
+        .graph-panel { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); padding: 20px; padding-bottom: 10px; width: 100%; box-sizing: border-box; }
+        .graph-header { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 1px; margin-bottom: 15px; text-align: center; }
+        .graph-container { width: 100%; height: 280px; position: relative; }
         
-        .track-list-preview { text-align: left; margin-top: 20px; border-top: 1px solid #222; padding-top: 20px; }
-        .p-header { display: flex; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; padding-bottom: 10px; margin-bottom: 5px; }
-        .p-track { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px; }
-        .col-dur { width: 50px; color: #666; font-variant-numeric: tabular-nums; font-size: 12px; }
-        .col-num { width: 30px; color: #444; text-align: center; margin-right: 15px; font-weight: 600; }
-        .col-name { flex: 1; font-weight: 500; color: #eee; padding-right: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .col-score { width: 45px; display: flex; justify-content: flex-end; }
-        .score-badge { display: inline-flex; justify-content: center; align-items: center; width: 40px; height: 24px; border-radius: 4px; font-weight: 700; color: white; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        /* Ocultamos la tracklist de texto antigua de la derecha para ahorrar espacio */
+        .track-list-preview { display: none; }
     </style>
 </head>
 <body>
 
     <div class="app-container">
         <header>
-            <h1>Album Rater <span class="badge">V8.0 Hybrid</span></h1>
+            <h1>Album Rater <span class="badge">V9.0 Visual Rating</span></h1>
             <div class="header-actions">
                 <button onclick="window.print()">Export PDF</button>
                 <button id="btnSaveLibrary" class="primary">Save Image</button>
@@ -98,7 +107,7 @@
                             <label>Cover Art (Manual / Leaks)</label>
                             <div class="cover-actions">
                                 <input type="file" id="fileInput" accept="image/*" style="display: none;">
-                                <button class="btn-small" onclick="document.getElementById('fileInput').click()">📂 Subir Imagen Local</button>
+                                <button class="btn-small" onclick="document.getElementById('fileInput').click()">📂 Subir Imagen</button>
                                 <button class="btn-small btn-danger" onclick="window.AlbumApp.removeCover()">× Borrar</button>
                             </div>
                         </div>
@@ -131,27 +140,27 @@
 
             <div class="preview-col">
                 <div class="preview-wrapper">
+                    
                     <div class="card-editorial" id="cardExport">
                         <div class="cover-container">
-                            <img id="prevCover" src="https://via.placeholder.com/800x800/111/333?text=No+Cover" alt="Album Cover" class="cover-img">
+                            <img id="prevCover" src="https://via.placeholder.com/800x800/111/333?text=ARA" alt="Album Cover" class="cover-img">
                         </div>
                         <div style="font-size: 10px; letter-spacing: 2px; color: #555; text-transform: uppercase; font-weight:700; margin-top:10px;">Overall Score</div>
                         <div id="prevScore" class="big-score">0.0</div>
                         <div class="meta-preview">
                             <div id="prevArtist" class="meta-artist">Artist</div>
                             <div id="prevAlbum" class="meta-album">Album</div>
-                            <div id="prevDetails" class="meta-details">Year • Ranked by You</div>
-                        </div>
-                        <div class="track-list-preview">
-                            <div class="p-header">
-                                <div class="col-dur">Time</div>
-                                <div class="col-num">#</div>
-                                <div class="col-name">Track Title</div>
-                                <div class="col-score">Rate</div>
-                            </div>
-                            <div id="prevTracks"></div>
+                            <div id="prevDetails" class="meta-details">Year • Ranked by...</div>
                         </div>
                     </div>
+
+                    <div class="graph-panel">
+                        <div class="graph-header">Gráfica de Votación (Arrastra los puntos)</div>
+                        <div class="graph-container">
+                            <canvas id="ratingChart"></canvas>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -159,7 +168,368 @@
     
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     
-    <script src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.3/dist/chartjs-plugin-dragdata.min.js"></script>
 
+    <script>
+        // ---------------------------------------------------------
+        // APP LOGIC (SINGLE SCRIPT V9.0: COORDINATED & VISUAL)
+        // ---------------------------------------------------------
+        window.AlbumApp = (function() {
+            // Variables globales de la Gráfica
+            let ratingChart = null;
+            let chartCanvas = null;
+
+            // Estado de la App
+            let state = { 
+                artist: "", album: "", released: "", rankedby: "", cover: "", 
+                tracks: [{ name: "", duration: "", score: "" }, { name: "", duration: "", score: "" }, { name: "", duration: "", score: "" }]
+            };
+
+            const dom = {
+                inArtist: document.getElementById("inArtist"),
+                inAlbum: document.getElementById("inAlbum"),
+                inYear: document.getElementById("inYear"),
+                inRanker: document.getElementById("inRanker"),
+                trackEditor: document.getElementById("trackEditor"),
+                pCover: document.getElementById("prevCover"),
+                pScore: document.getElementById("prevScore"),
+                pArtist: document.getElementById("prevArtist"),
+                pAlbum: document.getElementById("prevAlbum"),
+                pDetails: document.getElementById("prevDetails"),
+                fileInput: document.getElementById("fileInput"),
+                btnFetch: document.getElementById("btnFetch")
+            };
+
+            // --- AUXILIAR: FORMATO TIEMPO MS -> M:SS ---
+            function msToTime(duration) {
+                if (!duration) return "--:--";
+                let seconds = Math.floor((duration / 1000) % 60);
+                let minutes = Math.floor((duration / (1000 * 60)));
+                return `${minutes}:${seconds < 10 ? "0" + seconds : seconds}`;
+            }
+
+            // --- MOTORES DE BÚSQUEDA (iTunes / MusicBrainz) ---
+            async function searchITunes(artist, album) {
+                try {
+                    const query = encodeURIComponent(`${artist} ${album}`);
+                    const res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=album&limit=1`);
+                    const data = await res.json();
+                    if (!data.results || data.results.length === 0) return null;
+                    const result = data.results[0];
+                    
+                    const lookupRes = await fetch(`https://itunes.apple.com/lookup?id=${result.collectionId}&entity=song&limit=200`);
+                    const lookupData = await lookupRes.json();
+                    const tracksRaw = lookupData.results.filter(x => x.wrapperType === 'track');
+
+                    return {
+                        source: "iTunes",
+                        artist: result.artistName,
+                        album: result.collectionName,
+                        released: result.releaseDate ? result.releaseDate.substring(0, 4) : "",
+                        cover: result.artworkUrl100 ? result.artworkUrl100.replace("100x100bb", "1000x1000bb") : "",
+                        tracks: tracksRaw.map(t => ({ name: t.trackName, duration: msToTime(t.trackTimeMillis), score: "" }))
+                    };
+                } catch(e) { return null; }
+            }
+
+            async function searchMusicBrainz(artist, album) {
+                try {
+                    const query = encodeURIComponent(`release:${album} AND artist:${artist} AND status:official`);
+                    const res = await fetch(`https://musicbrainz.org/ws/2/release/?query=${query}&fmt=json`);
+                    const data = await res.json();
+                    if (!data.releases || data.releases.length === 0) return null;
+
+                    const release = data.releases[0];
+                    const detailsRes = await fetch(`https://musicbrainz.org/ws/2/release/${release.id}?inc=recordings+media&fmt=json`);
+                    const detailsData = await detailsRes.json();
+
+                    let mbTracks = [];
+                    if (detailsData.media) {
+                        detailsData.media.forEach(medium => {
+                            if (medium.tracks) medium.tracks.forEach(t => mbTracks.push({ name: t.title, duration: msToTime(t.length), score: "" }));
+                        });
+                    }
+
+                    let coverUrl = "";
+                    try {
+                        const cRes = await fetch(`https://coverartarchive.org/release/${release.id}/front`);
+                        if (cRes.ok) coverUrl = cRes.url;
+                    } catch (e) {}
+
+                    return {
+                        source: "MusicBrainz",
+                        artist: release['artist-credit'] ? release['artist-credit'][0].name : artist,
+                        album: release.title,
+                        released: release.date ? release.date.substring(0, 4) : "",
+                        cover: coverUrl,
+                        tracks: mbTracks
+                    };
+                } catch(e) { return null; }
+            }
+
+            // --- ESCUCHA DEL BOTÓN BÚSQUEDA ---
+            dom.btnFetch.addEventListener("click", async () => {
+                const art = dom.inArtist.value.trim();
+                const alb = dom.inAlbum.value.trim();
+                if(!art || !alb) { alert("Ingresa Artista y Álbum primero."); return; }
+
+                const originalTxt = dom.btnFetch.textContent;
+                dom.btnFetch.textContent = "⏳ Buscando en Bases de Datos...";
+                dom.btnFetch.disabled = true;
+
+                // Lógica Híbrida Inteligente
+                let res = await searchITunes(art, alb);
+                if (!res) res = await searchMusicBrainz(art, alb);
+
+                if (res) {
+                    setState({
+                        artist: res.artist,
+                        album: res.album,
+                        released: res.released,
+                        cover: res.cover || state.cover, 
+                        tracks: res.tracks
+                    });
+                } else {
+                    alert("❌ No encontrado. Es posible que sea muy nuevo o un leak.\n\n👉 Usa 'Subir Imagen' y llena los tracks manualmente.");
+                }
+
+                dom.btnFetch.textContent = originalTxt;
+                dom.btnFetch.disabled = false;
+            });
+
+            // --- LÓGICA DE CÁLCULO Y RENDERIZADO GENERAL ---
+            function getBadgeColor(s) {
+                const v = parseFloat(s);
+                if (isNaN(v)) return "#333";
+                if (v >= 9.0) return "#3b82f6"; // Azul Blue
+                if (v >= 8.0) return "#06b6d4"; // Cyan
+                if (v >= 7.0) return "#22c55e"; // Green
+                if (v >= 6.0) return "#eab308"; // Yellow
+                if (v >= 4.0) return "#f97316"; // Orange
+                return "#ef4444"; // Red
+            }
+
+            function computeAvg() {
+                let t=0, c=0; 
+                state.tracks.forEach(x => { const s = parseFloat(x.score); if(!isNaN(s)){ t+=s; c++; } }); 
+                return c===0 ? "0.0" : (t/c).toFixed(1);
+            }
+            
+            function render() {
+                // Sincronizar inputs de texto principales
+                if(document.activeElement!==dom.inArtist) dom.inArtist.value=state.artist;
+                if(document.activeElement!==dom.inAlbum) dom.inAlbum.value=state.album;
+                if(document.activeElement!==dom.inYear) dom.inYear.value=state.released;
+                if(document.activeElement!==dom.inRanker) dom.inRanker.value=state.rankedby;
+
+                // Actualizar Metadata en Preview Editorial
+                dom.pArtist.textContent = state.artist || "Artist";
+                dom.pAlbum.textContent = state.album || "Album Title";
+                dom.pDetails.textContent = `${state.released || "Year"} • ${state.rankedby || "Ranked by You"}`;
+                
+                // Actualizar Portada
+                dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
+                
+                // Actualizar Puntuación General Grande
+                const avg = computeAvg();
+                dom.pScore.textContent = avg;
+
+                // Actualizar Editor de Tracks (solo si cambia el número de tracks)
+                if(document.querySelectorAll(".track-input-name").length !== state.tracks.length) {
+                    renderEditor();
+                } else {
+                    // Sincronizar inputs de puntuación numéricos existentes
+                    state.tracks.forEach((t, i) => {
+                        const input = document.getElementById(`inScore-${i}`);
+                        if(input && document.activeElement !== input) input.value = t.score;
+                    });
+                }
+                
+                // --- COORDINACIÓN IMPORTANTE: ACTUALIZAR GRÁFICA ---
+                updateChartData();
+            }
+
+            function renderEditor(){
+                dom.trackEditor.innerHTML = "";
+                state.tracks.forEach((t,i) => {
+                    const row = document.createElement("div"); row.className = "track-row";
+                    row.innerHTML = `
+                        <span class="track-num">${i+1}</span>
+                        <input type="text" value="${t.duration||''}" oninput="window.AlbumApp.updateTrack(${i},'duration',this.value)" style="width:45px;text-align:center;color:#888;font-size:12px;padding:12px 6px;" placeholder="m:ss">
+                        <input class="track-input-name" type="text" value="${t.name}" oninput="window.AlbumApp.updateTrack(${i},'name',this.value)" style="flex:1;" placeholder="Track Title">
+                        <input type="number" id="inScore-${i}" step="0.1" min="0" max="10" value="${t.score}" oninput="window.AlbumApp.updateTrackFromInput(${i},this.value)" style="width:50px;text-align:center;font-weight:bold;color:white; -moz-appearance: textfield;" placeholder="-">
+                        <button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>
+                    `;
+                    dom.trackEditor.appendChild(row);
+                });
+            }
+
+            // --- Lógica de Manejo de Archivos Manuales (Cover Art) ---
+            dom.fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = e => setState({ cover: e.target.result });
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Guardar Imagen Editorial (Exportación)
+            document.getElementById("btnSaveLibrary").addEventListener("click", () => {
+                const card = document.getElementById("cardExport");
+                html2canvas(card, { scale: 2, backgroundColor: "#050505", logging: false }).then(canvas => {
+                    const link = document.createElement("a");
+                    link.download = `${state.artist||'Artist'}-${state.album||'Album'}-Votacion.png`;
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                });
+            });
+
+
+            // =========================================================
+            // LÓGICA DE LA GRÁFICA INTERACTIVA (Chart.js + Drag Plugin)
+            // =========================================================
+            function updateChartData() {
+                if(!ratingChart) return;
+                
+                const labels = state.tracks.map((t, i) => i + 1);
+                const dataPoints = state.tracks.map(t => t.score === "" ? 0 : parseFloat(t.score));
+                
+                // Actualizar los datos de la gráfica de manera directa y eficiente
+                ratingChart.data.labels = labels;
+                ratingChart.data.datasets[0].data = dataPoints;
+                ratingChart.update('none'); // Update sin animación para mejor feeling al arrastrar
+            }
+
+            function initInteractiveChart() {
+                chartCanvas = document.getElementById('ratingChart').getContext('2d');
+                
+                const labels = state.tracks.map((t, i) => i + 1);
+                const dataPoints = state.tracks.map(t => t.score === "" ? 0 : parseFloat(t.score));
+
+                ratingChart = new Chart(chartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Puntuación visual',
+                            data: dataPoints,
+                            backgroundColor: 'rgba(59, 130, 246, 0.3)', // Accent color transparente
+                            borderColor: '#3b82f6', // Accent color sólido
+                            borderWidth: 3,
+                            pointBackgroundColor: '#ffffff',
+                            pointBorderColor: '#3b82f6',
+                            pointRadius: 6,
+                            pointHoverRadius: 9,
+                            tension: 0.1, // Curvatura suave
+                            fill: true, // Rellenar debajo de la línea
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: { top: 20, bottom: 0, left: 10, right: 10 } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                enabled: true,
+                                callbacks: {
+                                    title: (context) => `Track ${context[0].label}`,
+                                    label: (context) => `Score: ${context.parsed.y.toFixed(1)}` // Forzar decimal en tooltip
+                                }
+                            },
+                            // --- LÓGICA DEL PLUGIN DE ARRASTRE ---
+                            dragData: {
+                                round: 1, // Redondear a 1 decimal (0.1) al arrastrar
+                                showTooltip: true,
+                                onDrag: (e, datasetIndex, index, value) => {
+                                    // Feedback visual suave opcional (cambiar el color del cursor, etc)
+                                    e.target.style.cursor = 'grabbing';
+                                },
+                                onDragEnd: (e, datasetIndex, index, value) => {
+                                    // Restaurar cursor
+                                    e.target.style.cursor = 'default';
+                                    
+                                    // --- COORDINACIÓN CRÍTICA GRÁFICA -> INPUTS ---
+                                    // Actualizamos el estado de manera silenciosa (para no reconstruir la gráfica)
+                                    state.tracks[index].score = value.toFixed(1); 
+                                    
+                                    // Actualizamos solo el input numérico correspondiente en el editor
+                                    const input = document.getElementById(`inScore-${index}`);
+                                    if(input) input.value = state.tracks[index].score;
+                                    
+                                    // Recalculamos el promedio y renderizamos solo la tarjeta editorial
+                                    const avg = computeAvg();
+                                    dom.pScore.textContent = avg;
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                min: 0,
+                                max: 10,
+                                grid: { color: 'rgba(255,255,255,0.05)', borderColor: '#222' },
+                                ticks: { color: '#666', font: { size: 10, weight: 600 } }
+                            },
+                            x: {
+                                grid: { display: false, borderColor: '#222' },
+                                ticks: { color: '#666', font: { size: 10, weight: 600 } }
+                            }
+                        },
+                        interaction: { intersect: false, mode: 'nearest' }
+                    }
+                });
+            }
+
+
+            // --- MÉTODOS PÚBLICOS DE LA API DE LA APP ---
+            function setState(newState){ 
+                // Fusionar estado antiguo con nuevo
+                state = {...state, ...newState}; 
+                // Si la actualización trae tracks nuevos (de autofill, añadir, borrar), reconstruir editor
+                if(newState.tracks) renderEditor();
+                render(); 
+            }
+            
+            function updateTrack(i, field, val) { state.tracks[i][field] = val; render(); }
+            
+            // Método específico para el input numérico para coordinar con la gráfica
+            function updateTrackFromInput(index, val) {
+                // Sincronización silenciosa Input -> Gráfica
+                state.tracks[index].score = val;
+                
+                // Forzar actualización de la gráfica (sin animación)
+                const dataPoints = state.tracks.map(t => t.score === "" ? 0 : parseFloat(t.score));
+                ratingChart.data.datasets[0].data = dataPoints;
+                ratingChart.update('none');
+                
+                // Actualizar puntuación general grande
+                dom.pScore.textContent = computeAvg();
+            }
+
+            function addTrack() { state.tracks.push({name:"", duration:"", score:""}); renderEditor(); updateChartData(); }
+            function removeTrack(i) { state.tracks.splice(i,1); renderEditor(); render(); }
+            function clearScores() { state.tracks.forEach(t => t.score = ""); renderEditor(); render(); }
+            function removeCover() { setState({ cover: "" }); dom.fileInput.value = ""; }
+
+            // Listeners de Inputs de Texto principales
+            dom.inArtist.addEventListener("input", e => setState({artist: e.target.value}));
+            dom.inAlbum.addEventListener("input", e => setState({album: e.target.value}));
+            dom.inYear.addEventListener("input", e => setState({released: e.target.value}));
+            dom.inRanker.addEventListener("input", e => setState({rankedby: e.target.value}));
+
+            // Inicialización al cargar la página
+            document.addEventListener('DOMContentLoaded', () => {
+                initInteractiveChart();
+                renderEditor(); 
+                render();
+            });
+
+            // Retornar métodos públicos
+            return { setState, updateTrack, updateTrackFromInput, addTrack, removeTrack, clearScores, removeCover };
+        })();
+    </script>
 </body>
 </html>
