@@ -3,6 +3,8 @@
 ![Version](https://img.shields.io/badge/Version-9.1_Visual-blue.svg)
 ![Tech](https://img.shields.io/badge/Tech-Vanilla_JS_%7C_HTML_%7C_CSS-yellow.svg)
 
+### **[👉 ¡PRUEBA LA APP EN VIVO AQUÍ! 👈](https://opesqueraa-ok.github.io/album-ranking/)**
+
 **Album Rater App** es una herramienta web interactiva diseñada para amantes de la música, críticos y entusiastas que desean rankear álbumes pista por pista y generar una tarjeta editorial visualmente atractiva para compartir en redes sociales.
 
 ---
