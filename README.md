@@ -1,87 +1,41 @@
-# 💿 Album Rater — v7.2
-A fast, local, and fully offline web application for scoring music albums track by track.
+# 🎵 Album Rater App (ARA)
 
-Try the latest version: https://opesqueraa-ok.github.io/album-ranking/?v7.2
+![Version](https://img.shields.io/badge/Version-9.1_Visual-blue.svg)
+![Tech](https://img.shields.io/badge/Tech-Vanilla_JS_%7C_HTML_%7C_CSS-yellow.svg)
 
-Core Features (Local-First Design)
-This version is focused on stability and self-sufficiency, working entirely as a Local-First tool.
+**Album Rater App** es una herramienta web interactiva diseñada para amantes de la música, críticos y entusiastas que desean rankear álbumes pista por pista y generar una tarjeta editorial visualmente atractiva para compartir en redes sociales.
 
-Track-by-Track Scoring: Rate tracks with an integer + decimal system (5.0–10.0) or mark them as "Unscored" (—).
+---
 
-Live Analysis: Instantly view the Average Score and the Enjoyment Timeline chart.
+## ✨ Características Principales
 
-Autofill: Quickly fetch album metadata, tracklists, and cover art using MusicBrainz (with iTunes fallback).
+* 📊 **Gráfica Interactiva (Drag-to-Rate):** Olvídate de teclear números. Arrastra los puntos en la gráfica para establecer la calificación de cada canción (escala de 5.0 a 10.0). ¡Siente la forma del álbum!
+* 🔍 **Auto-Fill Inteligente:** Integración con las APIs de **iTunes** y **MusicBrainz** para obtener instantáneamente la portada, año y la lista completa de canciones con sus duraciones.
+* 🎨 **Color-Coding Dinámico:** Las calificaciones de las pistas se colorean automáticamente en el resumen final según su puntaje (Azul para 9+, Celeste para 8+, Verde para 7+, etc.).
+* 📸 **Exportación a Imagen:** Convierte tu review en una elegante tarjeta "Editorial" en formato PNG con un solo clic, lista para compartir en X (Twitter), Instagram o Reddit.
+* 📱 **Soporte PWA (Progressive Web App):** Instálala en tu teléfono móvil directamente desde el navegador gracias a su `manifest.webmanifest`.
+* 💿 **Soporte para Leaks/Mixtapes:** ¿El álbum no está en las bases de datos? Sube la portada manualmente y añade las pistas a tu gusto.
 
-Local Library: Permanently store, load, and manage your rated albums locally within your browser's localStorage.
+---
 
-Data Utilities: Includes clear tools for managing your data:
+## 🚀 Cómo Usarlo
 
-Export/Import data (JSON).
+1. **Busca el Álbum:** Ingresa el nombre del Artista y el Álbum en la sección de *Metadata* y presiona el botón de *Auto-Fill*.
+2. **Ajusta los Detalles:** Agrega tu nombre en "Ranked By" para darle el crédito a tu review.
+3. **Califica visualmente:** Usa la gráfica interactiva para subir o bajar el puntaje de cada canción. El promedio general se calculará en tiempo real.
+4. **Exporta:** Haz clic en **Save Image** en la esquina superior derecha para descargar tu tarjeta de calificación final.
 
-Clear All fields / Clear Scores.
+---
 
-Sort Top 10 tracks toggle.
+## 🛠️ Tecnologías y Librerías Utilizadas
 
-Language selection (English/Spanish).
+Este proyecto fue construido utilizando **HTML5, CSS3 y JavaScript Vanilla**, sin frameworks pesados, para garantizar la máxima velocidad.
 
-PWA Ready: Installable on mobile and desktop for guaranteed offline use.
+Librerías externas implementadas:
+* [Chart.js](https://www.chartjs.org/) - Para la renderización de la gráfica visual.
+* [chartjs-plugin-dragdata](https://github.com/chrispahm/chartjs-plugin-dragdata) - Para permitir la manipulación de datos arrastrando los puntos en el canvas.
+* [html2canvas](https://html2canvas.hertzen.com/) - Para renderizar el DOM y exportar la tarjeta final como imagen.
 
-Technology Stack
-Built for speed, lightness, and minimal dependencies.
+---
 
-Frontend: Plain HTML, CSS, & JavaScript (Vanilla JS).
-
-Data Sources: MusicBrainz + Cover Art Archive (with iTunes fallback).
-
-Offline: Service Worker for asset caching (PWA).
-
-Persistence: Local storage via localStorage.
-
-Development & Privacy
-To run the app, simply open index.html locally or serve it with any static web server.
-
-Privacy: All your album data is stored locally in your browser. There is no cloud sync or tracking.
-
-💿 Album Rater — v7.2
-Una aplicación web rápida, local y totalmente desconectada para puntuar álbumes musicales canción por canción.
-
-Prueba la última versión: https://opesqueraa-ok.github.io/album-ranking/?v7.2
-
-Funcionalidades Clave (Diseño Local-First)
-Esta versión se centra en la estabilidad y la autosuficiencia, funcionando completamente como una herramienta Local-First.
-
-Puntuación por Canción: Califica cada track con entero + decimal (5.0–10.0) o déjalo "Sin puntuar" (—).
-
-Análisis en Vivo: Consulta al instante el Promedio de Puntaje y el gráfico Enjoyment Timeline.
-
-Autocompletado: Obtén rápidamente metadatos del álbum, lista de canciones y portada usando MusicBrainz (con fallback a iTunes).
-
-Biblioteca Local: Almacena, carga y gestiona permanentemente tus álbumes calificados de forma local en el localStorage de tu navegador.
-
-Herramientas de Gestión de Datos: Incluye utilidades claras para manejar tus datos:
-
-Exportar/Importar datos (JSON).
-
-Borrar Todos los campos / Borrar Puntajes.
-
-Alternar Orden Top 10 de canciones.
-
-Selección de Idioma (Inglés/Español).
-
-Lista para PWA: Se puede instalar en móvil y escritorio para garantizar su uso offline.
-
-Pila Tecnológica
-Construida para ser rápida, ligera y con dependencias mínimas.
-
-Frontend: HTML, CSS, & JavaScript puro (Vanilla JS).
-
-Fuentes de Datos: MusicBrainz + Cover Art Archive (con fallback a iTunes).
-
-Offline: Service Worker para caché de assets (PWA).
-
-Persistencia: Almacenamiento local mediante localStorage.
-
-Desarrollo y Privacidad
-Para ejecutar la aplicación, simplemente abre index.html localmente o sírvela con cualquier servidor web estático.
-
-Privacidad: Todos tus datos de álbumes se guardan localmente en tu navegador. No hay sincronización en la nube ni seguimiento.
+*Diseñado y programado con pasión por la música.* 🎧
