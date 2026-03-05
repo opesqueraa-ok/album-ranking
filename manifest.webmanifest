@@ -1,7 +1,7 @@
 {
-  "name": "Album Rater Editorial",
-  "short_name": "Rater V7.2",
-  "start_url": "index.html",
+  "name": "Album Rater Ultimate",
+  "short_name": "Rater V8.0",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#0b0f15",
   "theme_color": "#0b0f15",
