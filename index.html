@@ -469,9 +469,16 @@
             function removeCover() { setState({ cover: "" }); dom.fileInput.value = ""; }
 
             document.addEventListener('DOMContentLoaded', () => {
-                initInteractiveChart();
-                renderEditor(); 
-                render();
+    // Estos "listeners" conectan lo que escribes con la tarjeta visual
+    dom.inArtist.addEventListener('input', e => setState({ artist: e.target.value }));
+    dom.inAlbum.addEventListener('input', e => setState({ album: e.target.value }));
+    dom.inYear.addEventListener('input', e => setState({ released: e.target.value }));
+    dom.inRanker.addEventListener('input', e => setState({ rankedby: e.target.value }));
+
+    initInteractiveChart();
+    renderEditor(); 
+    render();
+});
             });
 
             return { setState, updateTrack, updateTrackFromInput, addTrack, removeTrack, clearScores, removeCover };
