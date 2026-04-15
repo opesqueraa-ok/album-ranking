@@ -70,7 +70,7 @@
         .preview-track-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; color: #eee; }
         .col-time { width: 50px; color: #888; font-size: 12px; }
         .col-num { width: 30px; color: #888; font-size: 12px; }
-        .col-name { flex: 1; font-weight: 700; letter-spacing: 0.5px; } /* REMOVIDO EL UPPERCASE DE AQUÍ */
+        .col-name { flex: 1; font-weight: 700; letter-spacing: 0.5px; } 
         .col-rate { width: 50px; text-align: right; }
         .preview-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: 800; color: white; min-width: 32px; text-align: center; font-size: 13px; }
     </style>
@@ -236,69 +236,149 @@
                 return `${m}:${s < 10 ? "0" + s : s}`;
             }
 
-            // --- MOTOR DE BÚSQUEDA ---
+            // --- MOTOR DE BÚSQUEDA MULTIFUENTE ---
             async function openSearchSelector() {
                 const art = dom.inArtist.value.trim();
                 const alb = dom.inAlbum.value.trim();
-                if(!art || !alb) { alert("Ingresa Artista y Álbum."); return; }
-                
-                dom.btnFetch.textContent = "⏳ Buscando...";
+                if (!art || !alb) { alert("Ingresa Artista y Álbum."); return; }
+
+                dom.btnFetch.textContent = "⏳ Buscando en bases de datos...";
                 dom.btnFetch.disabled = true;
 
                 try {
-                    // Intento 1: Búsqueda exacta (combinada) sin filtros agresivos
-                    let query = encodeURIComponent(`${art} ${alb}`);
-                    let res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=album&limit=15`);
-                    let data = await res.json();
-                    
-                    // Fallback: Si no encuentra por artista + álbum, busca solo por álbum
-                    if (!data.results || data.results.length === 0) {
-                        query = encodeURIComponent(alb);
-                        res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=album&limit=15`);
-                        data = await res.json();
+                    let results = [];
+
+                    // 1. INTENTO: iTunes API 
+                    results = await searchItunes(art, alb);
+
+                    // 2. INTENTO: MusicBrainz (Si iTunes falla por completo)
+                    if (results.length === 0) {
+                        console.log("iTunes falló, intentando con MusicBrainz...");
+                        results = await searchMusicBrainz(art, alb);
                     }
 
-                    if (!data.results || data.results.length === 0) {
-                        alert("No se encontró nada en la base de datos. Intenta con un nombre más corto o revisa la escritura.");
+                    // SI TODO FALLA
+                    if (results.length === 0) {
+                        alert("No se encontró el álbum en ninguna base de datos gratuita. Intenta con un nombre más corto.");
                         resetFetchBtn();
                         return;
                     }
 
-                    const list = document.getElementById("searchResultsList");
-                    list.innerHTML = "";
-                    document.getElementById("searchModal").style.display = "flex";
+                    renderSearchResults(results);
 
-                    data.results.forEach(item => {
-                        const div = document.createElement("div");
-                        div.className = "search-item";
-                        const coverUrl = item.artworkUrl100.replace("100x100bb", "600x600bb");
-                        const year = item.releaseDate ? item.releaseDate.substring(0,4) : "----";
-                        
-                        div.innerHTML = `
-                            <img src="${coverUrl}" style="width:50px; height:50px; border-radius:4px;">
-                            <div style="overflow:hidden;">
-                                <div style="font-size:12px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.collectionName}</div>
-                                <div style="font-size:11px; color:#888;">${item.artistName} (${year})</div>
-                            </div>
-                        `;
-                        div.onclick = () => loadAlbumDetails(item.collectionId, item.artistName, item.collectionName, year, coverUrl);
-                        list.appendChild(div);
-                    });
-                } catch (e) { alert("Error de conexión con iTunes API."); }
+                } catch (e) { 
+                    console.error(e);
+                    alert("Ocurrió un error de conexión."); 
+                }
                 resetFetchBtn();
             }
 
-            async function loadAlbumDetails(id, artist, album, year, cover) {
+            async function searchItunes(artist, album) {
+                const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim(); 
+                
+                let res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + album)}&entity=album&limit=10`);
+                let data = await res.json();
+
+                if (!data.results || data.results.length === 0) {
+                    res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + cleanAlb)}&entity=album&limit=10`);
+                    data = await res.json();
+                }
+
+                if (!data.results) return [];
+
+                return data.results.map(item => ({
+                    source: 'itunes',
+                    id: item.collectionId,
+                    albumName: item.collectionName,
+                    artistName: item.artistName,
+                    year: item.releaseDate ? item.releaseDate.substring(0, 4) : "----",
+                    coverUrl: item.artworkUrl100.replace("100x100bb", "600x600bb")
+                }));
+            }
+
+            async function searchMusicBrainz(artist, album) {
+                const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
+                const query = encodeURIComponent(`release:${cleanAlb} AND artist:${artist}`);
+                
+                const res = await fetch(`https://musicbrainz.org/ws/2/release?query=${query}&fmt=json`);
+                const data = await res.json();
+
+                if (!data.releases) return [];
+
+                return data.releases.slice(0, 10).map(item => ({
+                    source: 'musicbrainz',
+                    id: item.id,
+                    albumName: item.title,
+                    artistName: item["artist-credit"] ? item["artist-credit"][0].name : artist,
+                    year: item.date ? item.date.substring(0, 4) : "----",
+                    coverUrl: `https://coverartarchive.org/release/${item.id}/front-250` 
+                }));
+            }
+
+            function renderSearchResults(results) {
+                const list = document.getElementById("searchResultsList");
+                list.innerHTML = "";
+                document.getElementById("searchModal").style.display = "flex";
+
+                results.forEach(item => {
+                    const div = document.createElement("div");
+                    div.className = "search-item";
+                    
+                    div.innerHTML = `
+                        <img src="${item.coverUrl}" onerror="this.src='https://via.placeholder.com/50?text=No+Cover'" style="width:50px; height:50px; border-radius:4px; object-fit: cover;">
+                        <div style="overflow:hidden; width: 100%;">
+                            <div style="font-size:12px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.albumName}</div>
+                            <div style="font-size:11px; color:#888;">${item.artistName} (${item.year}) - 🗄️ ${item.source}</div>
+                        </div>
+                    `;
+                    
+                    div.onclick = () => fetchTracks(item);
+                    list.appendChild(div);
+                });
+            }
+
+            async function fetchTracks(item) {
                 document.getElementById("searchModal").style.display = "none";
                 dom.btnFetch.textContent = "⏳ Cargando tracks...";
+                dom.btnFetch.disabled = true;
+
                 try {
-                    const res = await fetch(`https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200`);
-                    const data = await res.json();
-                    const tracks = data.results.filter(x => x.wrapperType === 'track').map(t => ({
-                        name: t.trackName, duration: msToTime(t.trackTimeMillis), score: ""
-                    }));
-                    setState({ artist, album, released: year, cover, tracks });
-                } catch(e) { alert("Error al cargar canciones."); }
+                    let tracks = [];
+
+                    if (item.source === 'itunes') {
+                        const res = await fetch(`https://itunes.apple.com/lookup?id=${item.id}&entity=song&limit=200`);
+                        const data = await res.json();
+                        tracks = data.results.filter(x => x.wrapperType === 'track').map(t => ({
+                            name: t.trackName, 
+                            duration: msToTime(t.trackTimeMillis), 
+                            score: ""
+                        }));
+                    } 
+                    else if (item.source === 'musicbrainz') {
+                        const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`);
+                        const data = await res.json();
+                        
+                        if (data.media && data.media.length > 0) {
+                            tracks = data.media.flatMap(m => m.tracks).map(t => ({
+                                name: t.recording.title,
+                                duration: t.length ? msToTime(t.length) : "??:??",
+                                score: ""
+                            }));
+                        }
+                    }
+
+                    setState({ 
+                        artist: item.artistName, 
+                        album: item.albumName, 
+                        released: item.year, 
+                        cover: item.coverUrl, 
+                        tracks: tracks.length > 0 ? tracks : [{name: "", duration: "", score: ""}]
+                    });
+
+                } catch(e) { 
+                    console.error(e);
+                    alert("Error al cargar canciones."); 
+                }
                 resetFetchBtn();
             }
 
