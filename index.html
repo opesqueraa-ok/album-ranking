@@ -3,101 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARA - Album Rater App | V11.0 Fix</title>
+    <title>ARA - Album Rater App | V11.0 Pro</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
     <style>
-        /* --- ESTILOS GENERALES --- */
         :root { --bg-dark: #0b0f15; --bg-card: #161b26; --accent: #3b82f6; --text-main: #ffffff; --text-muted: #8a94a6; --border: rgba(255, 255, 255, 0.1); }
         body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; min-height: 100vh; }
-        .app-container { width: 100%; max-width: 1400px; padding: 20px; }
+        .app-container { width: 100%; max-width: 1300px; padding: 20px; }
+        
         header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
         h1 { font-family: 'Lora', serif; font-size: 24px; margin: 0; }
-        .badge { font-family: 'Inter', sans-serif; font-size: 10px; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; vertical-align: middle; margin-left: 10px; color: var(--text-muted); }
-        
-        .main-grid { display: grid; grid-template-columns: 1fr 500px; gap: 40px; }
+        .badge { font-family: 'Inter', sans-serif; font-size: 10px; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; color: var(--text-muted); }
+
+        .main-grid { display: grid; grid-template-columns: 1fr 480px; gap: 40px; }
         @media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr; } }
 
-        .panel { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); }
+        .panel { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        h2 { font-family: 'Lora', serif; margin-top: 0; font-size: 18px; margin-bottom: 20px; color: var(--accent); }
+        
         .input-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .input-group { flex: 1; display: flex; flex-direction: column; }
-        label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; }
+        label { font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; }
         input { background: #0b0f15; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; outline: none; }
-        
-        #btnFetch { width: 100%; background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px dashed rgba(59, 130, 246, 0.3); padding: 12px; cursor: pointer; border-radius: 6px; font-weight: 600; margin-bottom: 20px; }
+        input:focus { border-color: var(--accent); }
 
-        /* PREVIEW CARD */
-        .card-editorial { background: #050505; border-radius: 16px; padding: 35px; text-align: center; border: 1px solid #222; }
-        .cover-container { width: 100%; aspect-ratio: 1/1; background: #1a1a1a; border-radius: 6px; overflow: hidden; margin-bottom: 25px; }
+        #btnFetch { width: 100%; background: #1e293b; color: #60a5fa; border: 1px solid #334155; padding: 12px; cursor: pointer; border-radius: 6px; font-weight: 700; margin-bottom: 20px; }
+
+        /* EDITOR DE TRACKS */
+        .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+        .track-num { width: 20px; font-size: 12px; color: var(--text-muted); }
+        .track-input-score { width: 55px; text-align: center; font-weight: 800; background: #050505 !important; border-color: #333; }
+
+        /* GRAFICA */
+        .graph-container { width: 100%; height: 250px; margin-top: 10px; }
+
+        /* CARD EXPORT */
+        .card-editorial { background: #050505; border-radius: 16px; padding: 30px; text-align: center; border: 1px solid #222; }
+        .cover-container { width: 220px; height: 220px; margin: 0 auto 20px; border-radius: 8px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
         .cover-img { width: 100%; height: 100%; object-fit: cover; }
-        .big-score { font-weight: 800; font-size: 80px; margin: 10px 0; color: white; letter-spacing: -3px; }
+        .big-score { font-size: 70px; font-weight: 800; margin: 10px 0; letter-spacing: -2px; }
+        .meta-artist { font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+        .meta-album { font-family: 'Lora', serif; font-size: 22px; font-style: italic; margin-bottom: 15px; }
         
-        /* FIX: ELIMINADO UPPERCASE DE LOS TÍTULOS */
-        .col-name { flex: 1; font-weight: 700; letter-spacing: 0.5px; text-align: left; }
-        .preview-track-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; color: #eee; }
-        .col-time, .col-num { width: 40px; color: #666; font-size: 11px; }
-        .preview-badge { padding: 4px 8px; border-radius: 4px; font-weight: 800; min-width: 32px; display: inline-block; text-align: center; }
+        /* PREVIEW TRACKLIST */
+        .track-list-preview { text-align: left; margin-top: 25px; border-top: 1px solid #111; padding-top: 20px; }
+        .preview-track-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
+        .col-num { width: 25px; color: #555; font-size: 11px; }
+        .col-name { flex: 1; font-weight: 600; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .col-rate { width: 45px; text-align: right; }
+        .preview-badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 800; color: white; }
 
         /* MODAL */
-        #searchModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center; }
-        .modal-content { background:#161b26; width:90%; max-width:500px; border-radius:12px; padding:20px; }
-        .search-item { background:#0b0f15; padding:10px; margin-bottom:10px; border-radius:8px; cursor:pointer; display:flex; gap:15px; align-items:center; }
+        #searchModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center; backdrop-filter: blur(5px); }
+        .modal-content { background:#161b26; width:90%; max-width:500px; border-radius:12px; overflow:hidden; }
+        .modal-body { padding:15px; max-height:60vh; overflow-y:auto; }
+        .search-item { display:flex; gap:15px; padding:10px; border-bottom:1px solid #222; cursor:pointer; align-items:center; }
+        .search-item:hover { background: #1e293b; }
 
-        .graph-container { width: 100%; height: 250px; margin-bottom: 20px; }
-        .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+        .btn-main { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div class="app-container">
         <header>
-            <h1>ARA <span class="badge">V11.0 LIVE SYNC</span></h1>
-            <div class="header-actions">
-                <button id="btnSaveLibrary" style="background:var(--accent); border:none; color:white; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Guardar Imagen</button>
+            <h1>ARA <span class="badge">V11.0 SMART SYNC</span></h1>
+            <div>
+                <button class="btn-main" id="btnSave">Save Image</button>
             </div>
         </header>
 
         <div class="main-grid">
             <div class="editor-col">
                 <div class="panel">
+                    <h2>Album Information</h2>
                     <div class="input-row">
-                        <div class="input-group"><label>Artista</label><input type="text" id="inArtist"></div>
-                        <div class="input-group"><label>Álbum</label><input type="text" id="inAlbum"></div>
+                        <div class="input-group">
+                            <label>Artist</label>
+                            <input type="text" id="inArtist" placeholder="Ej. Kendrick Lamar">
+                        </div>
+                        <div class="input-group">
+                            <label>Album</label>
+                            <input type="text" id="inAlbum" placeholder="Ej. DAMN.">
+                        </div>
                     </div>
-                    <button id="btnFetch">🔍 Buscar Álbum Real</button>
+                    <button id="btnFetch">🔍 Search Album & Tracks</button>
+                    
                     <div class="input-row">
-                        <div class="input-group"><label>Año</label><input type="text" id="inYear"></div>
-                        <div class="input-group"><label>Ranker</label><input type="text" id="inRanker"></div>
+                        <div class="input-group">
+                            <label>Year</label>
+                            <input type="text" id="inYear">
+                        </div>
+                        <div class="input-group">
+                            <label>Ranked By</label>
+                            <input type="text" id="inRanker">
+                        </div>
                     </div>
                 </div>
 
-                <div class="panel" style="margin-top:20px;">
-                    <div id="trackEditor"></div>
-                </div>
-            </div>
-
-            <div class="preview-col">
-                <div class="panel" style="margin-bottom:20px;">
+                <div class="panel">
+                    <h2>Rating Graph</h2>
                     <div class="graph-container">
                         <canvas id="ratingChart"></canvas>
                     </div>
                 </div>
 
+                <div class="panel">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                        <h2>Tracklist</h2>
+                        <button onclick="window.AlbumApp.addTrack()" style="background:#222; color:white; border:1px solid #444; padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer;">+ Add Track</button>
+                    </div>
+                    <div id="trackEditor"></div>
+                </div>
+            </div>
+
+            <div class="preview-col">
                 <div class="card-editorial" id="cardExport">
-                    <div class="cover-container"><img id="prevCover" src="" class="cover-img"></div>
+                    <div class="cover-container">
+                        <img id="prevCover" src="https://via.placeholder.com/600?text=NO+COVER" crossorigin="anonymous" class="cover-img">
+                    </div>
+                    <div style="font-size:10px; letter-spacing:2px; color:#444; font-weight:700;">OVERALL RATING</div>
                     <div id="prevScore" class="big-score">0.0</div>
-                    <div id="prevArtist" style="font-weight:bold;">Artista</div>
-                    <div id="prevAlbum" style="font-family:'Lora'; font-style:italic; font-size:20px;">Álbum</div>
-                    <div id="prevTracklistContainer" style="margin-top:20px;"></div>
+                    
+                    <div id="prevArtist" class="meta-artist">ARTIST NAME</div>
+                    <div id="prevAlbum" class="meta-album">Album Title</div>
+                    <div id="prevDetails" style="font-size:11px; color:#555; font-weight:700; text-transform:uppercase;">YEAR • BY USER</div>
+
+                    <div class="track-list-preview" id="prevTracklist">
+                        </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="searchModal"><div class="modal-content"><div id="searchResultsList"></div></div></div>
+    <div id="searchModal">
+        <div class="modal-content">
+            <div style="padding:15px; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
+                <h3 style="margin:0">Select Album</h3>
+                <button onclick="document.getElementById('searchModal').style.display='none'" style="background:none; border:none; color:white; cursor:pointer; font-size:20px;">&times;</button>
+            </div>
+            <div id="searchResults" class="modal-body"></div>
+        </div>
+    </div>
 
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
@@ -105,179 +155,240 @@
 
     <script>
         window.AlbumApp = (function() {
-            let ratingChart = null;
-            let state = { 
-                artist: "", album: "", released: "", rankedby: "", cover: "", 
-                tracks: [{ name: "Track 1", duration: "3:00", score: "8.0" }] 
+            let chart = null;
+            let state = {
+                artist: "", album: "", year: "", ranker: "", cover: "",
+                tracks: [
+                    { name: "Track 1", score: 7.0 },
+                    { name: "Track 2", score: 8.5 },
+                    { name: "Track 3", score: 6.0 }
+                ]
             };
 
             const dom = {
                 inArtist: document.getElementById("inArtist"),
                 inAlbum: document.getElementById("inAlbum"),
                 trackEditor: document.getElementById("trackEditor"),
-                pScore: document.getElementById("prevScore"),
-                pTracklist: document.getElementById("prevTracklistContainer")
+                prevTracklist: document.getElementById("prevTracklist"),
+                prevScore: document.getElementById("prevScore"),
+                prevCover: document.getElementById("prevCover")
             };
 
-            // --- BUSCADOR MEJORADO ---
-            async function searchAlbum() {
-                const art = dom.inArtist.value;
-                const alb = dom.inAlbum.value;
-                if(!art) return alert("Pon al menos el artista");
-                
-                // Buscamos con un término más amplio para encontrar lanzamientos recientes
-                const query = encodeURIComponent(`${art} ${alb}`);
-                const res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=album&limit=5`);
-                const data = await res.json();
-                
-                const list = document.getElementById("searchResultsList");
-                list.innerHTML = "<h3>Selecciona el correcto:</h3>";
-                document.getElementById("searchModal").style.display = "flex";
-
-                data.results.forEach(item => {
-                    const div = document.createElement("div");
-                    div.className = "search-item";
-                    div.innerHTML = `<img src="${item.artworkUrl100}" width="50"> <div><b>${item.collectionName}</b><br>${item.artistName}</div>`;
-                    div.onclick = () => loadTracks(item);
-                    list.appendChild(div);
-                });
-            }
-
-            async function loadTracks(album) {
-                document.getElementById("searchModal").style.display = "none";
-                const res = await fetch(`https://itunes.apple.com/lookup?id=${album.collectionId}&entity=song`);
-                const data = await res.json();
-                const tracks = data.results.filter(x => x.wrapperType === 'track').map(t => ({
-                    name: t.trackName, 
-                    duration: Math.floor(t.trackTimeMillis/60000) + ":" + String(Math.floor((t.trackTimeMillis%60000)/1000)).padStart(2,'0'),
-                    score: "7.0"
-                }));
-
-                state.artist = album.artistName;
-                state.album = album.collectionName;
-                state.released = album.releaseDate.substring(0,4);
-                state.cover = album.artworkUrl100.replace("100x100bb", "1000x1000bb");
-                state.tracks = tracks;
-
-                dom.inArtist.value = state.artist;
-                dom.inAlbum.value = state.album;
-                document.getElementById("inYear").value = state.released;
-                
-                renderEditor();
+            // --- Lógica de Sincronización ---
+            function updateStateFromInputs() {
+                state.artist = dom.inArtist.value;
+                state.album = dom.inAlbum.value;
+                state.year = document.getElementById("inYear").value;
+                state.ranker = document.getElementById("inRanker").value;
                 renderPreview();
-                updateChart();
             }
 
-            // --- RENDER ---
-            function getBadgeColor(v) {
-                if (v >= 9) return "#3b82f6";
-                if (v >= 7.5) return "#22c55e";
-                if (v >= 6) return "#eab308";
-                return "#ef4444";
+            function syncTrackScore(index, value) {
+                let val = parseFloat(value);
+                if (isNaN(val)) val = 0;
+                if (val > 10) val = 10;
+                state.tracks[index].score = val;
+                
+                // Actualizar gráfica sin redibujar todo el editor para no perder el foco
+                chart.data.datasets[0].data[index] = val;
+                chart.update('none');
+                renderPreview();
             }
 
+            // --- Renderizado ---
             function renderEditor() {
                 dom.trackEditor.innerHTML = "";
                 state.tracks.forEach((t, i) => {
                     const div = document.createElement("div");
                     div.className = "track-row";
                     div.innerHTML = `
-                        <span style="width:20px">${i+1}</span>
-                        <input type="text" value="${t.name}" style="flex:1" oninput="AlbumApp.updateTrackName(${i}, this.value)">
-                        <input type="number" id="score-input-${i}" value="${t.score}" step="0.1" style="width:60px" oninput="AlbumApp.updateTrackScore(${i}, this.value)">
+                        <span class="track-num">${i+1}</span>
+                        <input type="text" value="${t.name}" style="flex:1" oninput="window.AlbumApp.updateTrackName(${i}, this.value)">
+                        <input type="number" step="0.1" class="track-input-score" value="${t.score}" 
+                               oninput="window.AlbumApp.syncTrackScore(${i}, this.value)">
+                        <button onclick="window.AlbumApp.removeTrack(${i})" style="background:none; border:none; color:#ef4444; cursor:pointer;">&times;</button>
                     `;
                     dom.trackEditor.appendChild(div);
                 });
             }
 
             function renderPreview() {
-                document.getElementById("prevCover").src = state.cover;
-                document.getElementById("prevArtist").textContent = state.artist;
-                document.getElementById("prevAlbum").textContent = state.album;
+                document.getElementById("prevArtist").textContent = state.artist || "ARTIST NAME";
+                document.getElementById("prevAlbum").textContent = state.album || "Album Title";
+                document.getElementById("prevDetails").textContent = `${state.year || '202X'} • BY ${state.ranker || 'USER'}`;
+                dom.prevCover.src = state.cover || "https://via.placeholder.com/600?text=NO+COVER";
                 
-                let total = 0;
-                dom.pTracklist.innerHTML = "";
+                // Calcular Promedio
+                const avg = state.tracks.length > 0 
+                    ? (state.tracks.reduce((a, b) => a + (parseFloat(b.score)||0), 0) / state.tracks.length).toFixed(1)
+                    : "0.0";
+                dom.prevScore.textContent = avg;
+
+                // Tracklist Preview (Sin Uppercase forzado)
+                dom.prevTracklist.innerHTML = "";
                 state.tracks.forEach((t, i) => {
-                    const s = parseFloat(t.score) || 0;
-                    total += s;
-                    dom.pTracklist.innerHTML += `
+                    const color = getScoreColor(t.score);
+                    dom.prevTracklist.innerHTML += `
                         <div class="preview-track-row">
-                            <span class="col-num">${i+1}</span>
-                            <span class="col-name">${t.name}</span>
-                            <span class="preview-badge" id="badge-${i}" style="background:${getBadgeColor(s)}">${s.toFixed(1)}</span>
+                            <span class="col-num">${String(i+1).padStart(2, '0')}</span>
+                            <span class="col-name">${t.name || 'Untitled'}</span>
+                            <span class="col-rate"><span class="preview-badge" style="background:${color}">${parseFloat(t.score).toFixed(1)}</span></span>
                         </div>
                     `;
                 });
-                dom.pScore.textContent = (total / state.tracks.length).toFixed(1);
             }
 
-            // --- CHART LOGIC ---
+            function getScoreColor(s) {
+                if (s >= 9) return "#3b82f6";
+                if (s >= 7.5) return "#10b981";
+                if (s >= 6) return "#f59e0b";
+                return "#ef4444";
+            }
+
+            // --- Motor de Búsqueda ---
+            async function searchAlbum() {
+                const query = `${dom.inArtist.value} ${dom.inAlbum.value}`.trim();
+                if (!query) return alert("Escribe artista o álbum");
+
+                document.getElementById("btnFetch").textContent = "Searching...";
+                
+                try {
+                    // Intento 1: Búsqueda exacta
+                    let response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=album&limit=5`);
+                    let data = await response.json();
+
+                    // Fallback: Si no hay resultados, busca solo el álbum
+                    if (data.results.length === 0) {
+                        response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(dom.inAlbum.value)}&entity=album&limit=5`);
+                        data = await response.json();
+                    }
+
+                    const resultsDiv = document.getElementById("searchResults");
+                    resultsDiv.innerHTML = "";
+                    
+                    data.results.forEach(album => {
+                        const div = document.createElement("div");
+                        div.className = "search-item";
+                        div.innerHTML = `
+                            <img src="${album.artworkUrl100}" width="50">
+                            <div>
+                                <div style="font-weight:700">${album.collectionName}</div>
+                                <div style="font-size:12px; color:#888">${album.artistName}</div>
+                            </div>
+                        `;
+                        div.onclick = () => loadFullAlbum(album);
+                        resultsDiv.appendChild(div);
+                    });
+                    document.getElementById("searchModal").style.display = "flex";
+                } catch (e) {
+                    alert("Error en la búsqueda");
+                }
+                document.getElementById("btnFetch").textContent = "🔍 Search Album & Tracks";
+            }
+
+            async function loadFullAlbum(album) {
+                document.getElementById("searchModal").style.display = "none";
+                state.artist = album.artistName;
+                state.album = album.collectionName;
+                state.year = album.releaseDate.substring(0, 4);
+                state.cover = album.artworkUrl100.replace("100x100bb", "600x600bb");
+
+                // Cargar Tracks
+                try {
+                    const res = await fetch(`https://itunes.apple.com/lookup?id=${album.collectionId}&entity=song`);
+                    const data = await res.json();
+                    state.tracks = data.results
+                        .filter(i => i.wrapperType === "track")
+                        .map(t => ({ name: t.trackName, score: 5.0 }));
+                    
+                    dom.inArtist.value = state.artist;
+                    dom.inAlbum.value = state.album;
+                    document.getElementById("inYear").value = state.year;
+                    
+                    initChart();
+                    renderEditor();
+                    renderPreview();
+                } catch (e) { console.error(e); }
+            }
+
+            // --- Gráfica Interactiva ---
             function initChart() {
+                if (chart) chart.destroy();
                 const ctx = document.getElementById('ratingChart').getContext('2d');
-                ratingChart = new Chart(ctx, {
+                chart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: state.tracks.map((_, i) => i + 1),
                         datasets: [{
-                            data: state.tracks.map(t => parseFloat(t.score)),
-                            borderColor: '#3b82f6', tension: 0.3, fill: true, backgroundColor: 'rgba(59,130,246,0.1)', pointRadius: 5
+                            data: state.tracks.map(t => t.score),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#fff'
                         }]
                     },
                     options: {
-                        scales: { y: { min: 0, max: 10 } },
+                        responsive: true,
+                        maintainAspectRatio: false,
                         plugins: {
+                            legend: { display: false },
                             dragData: {
                                 round: 1,
-                                onDrag: (e, datasetIndex, index, value) => {
-                                    // SYNC EN TIEMPO REAL
-                                    const val = Math.max(0, Math.min(10, value)).toFixed(1);
-                                    state.tracks[index].score = val;
-                                    
-                                    // Actualizar input del editor
-                                    const input = document.getElementById(`score-input-${index}`);
-                                    if(input) input.value = val;
-                                    
-                                    // Actualizar badge del preview
-                                    const badge = document.getElementById(`badge-${index}`);
-                                    if(badge) {
-                                        badge.textContent = val;
-                                        badge.style.background = getBadgeColor(val);
-                                    }
-                                    
-                                    // Actualizar promedio
-                                    let total = 0;
-                                    state.tracks.forEach(tr => total += parseFloat(tr.score));
-                                    dom.pScore.textContent = (total / state.tracks.length).toFixed(1);
+                                onDragEnd: (e, datasetIndex, index, value) => {
+                                    // Sincronizar con el estado y el input visual
+                                    state.tracks[index].score = value;
+                                    const inputs = document.querySelectorAll(".track-input-score");
+                                    if(inputs[index]) inputs[index].value = value;
+                                    renderPreview();
                                 }
                             }
+                        },
+                        scales: {
+                            y: { min: 0, max: 10, grid: { color: '#222' }, ticks: { color: '#555' } },
+                            x: { grid: { display: false }, ticks: { color: '#555' } }
                         }
                     }
                 });
             }
 
-            function updateChart() {
-                ratingChart.data.labels = state.tracks.map((_, i) => i + 1);
-                ratingChart.data.datasets[0].data = state.tracks.map(t => parseFloat(t.score));
-                ratingChart.update();
-            }
+            // --- Inicialización ---
+            document.addEventListener('DOMContentLoaded', () => {
+                renderEditor();
+                initChart();
+                renderPreview();
+                
+                dom.inArtist.oninput = updateStateFromInputs;
+                dom.inAlbum.oninput = updateStateFromInputs;
+                document.getElementById("inYear").oninput = updateStateFromInputs;
+                document.getElementById("inRanker").oninput = updateStateFromInputs;
+                document.getElementById("btnFetch").onclick = searchAlbum;
+                
+                document.getElementById("btnSave").onclick = () => {
+                    const card = document.getElementById("cardExport");
+                    html2canvas(card, { 
+                        scale: 2, 
+                        backgroundColor: "#050505",
+                        useCORS: true 
+                    }).then(canvas => {
+                        const link = document.createElement("a");
+                        link.download = `ARA-${state.album}.png`;
+                        link.href = canvas.toDataURL();
+                        link.click();
+                    });
+                };
+            });
 
             return {
-                init: () => { renderEditor(); renderPreview(); initChart(); document.getElementById("btnFetch").onclick = searchAlbum; },
+                syncTrackScore,
                 updateTrackName: (i, v) => { state.tracks[i].name = v; renderPreview(); },
-                updateTrackScore: (i, v) => { state.tracks[i].score = v; renderPreview(); updateChart(); }
+                addTrack: () => { state.tracks.push({name: "New Track", score: 5.0}); initChart(); renderEditor(); renderPreview(); },
+                removeTrack: (i) => { state.tracks.splice(i, 1); initChart(); renderEditor(); renderPreview(); }
             };
         })();
-
-        AlbumApp.init();
-
-        document.getElementById("btnSaveLibrary").onclick = () => {
-            html2canvas(document.getElementById("cardExport"), { scale: 2, backgroundColor: "#050505" }).then(canvas => {
-                const link = document.createElement("a");
-                link.download = "ARA-Rating.png";
-                link.href = canvas.toDataURL();
-                link.click();
-            });
-        };
     </script>
 </body>
 </html>
