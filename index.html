@@ -273,27 +273,31 @@
                 resetFetchBtn();
             }
 
+            // --- BÚSQUEDA ITUNES CON CASCADA ---
             async function searchItunes(artist, album) {
-                const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim(); 
+                const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
                 
-                let res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + album)}&entity=album&limit=10`);
-                let data = await res.json();
+                const attempts = [
+                    `${artist} ${album}`,       // Intento 1: nombre completo
+                    `${artist} ${cleanAlb}`,    // Intento 2: sin "(Deluxe)"
+                    artist                      // Intento 3: solo artista
+                ];
 
-                if (!data.results || data.results.length === 0) {
-                    res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + cleanAlb)}&entity=album&limit=10`);
-                    data = await res.json();
+                for (const term of attempts) {
+                    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=15`);
+                    const data = await res.json();
+                    if (data.results && data.results.length > 0) {
+                        return data.results.map(item => ({
+                            source: 'itunes',
+                            id: item.collectionId,
+                            albumName: item.collectionName,
+                            artistName: item.artistName,
+                            year: item.releaseDate ? item.releaseDate.substring(0, 4) : "----",
+                            coverUrl: item.artworkUrl100.replace("100x100bb", "600x600bb")
+                        }));
+                    }
                 }
-
-                if (!data.results) return [];
-
-                return data.results.map(item => ({
-                    source: 'itunes',
-                    id: item.collectionId,
-                    albumName: item.collectionName,
-                    artistName: item.artistName,
-                    year: item.releaseDate ? item.releaseDate.substring(0, 4) : "----",
-                    coverUrl: item.artworkUrl100.replace("100x100bb", "600x600bb")
-                }));
+                return [];
             }
 
             async function searchMusicBrainz(artist, album) {
@@ -551,42 +555,55 @@
                 if(ns.album !== undefined) dom.inAlbum.value = state.album;
                 if(ns.released !== undefined) dom.inYear.value = state.released;
                 if(ns.rankedby !== undefined) dom.inRanker.value = state.rankedby;
-                render(); 
+                render(true);
             }
 
-            document.addEventListener('DOMContentLoaded', () => {
-                dom.inArtist.addEventListener('input', e => setState({ artist: e.target.value }));
-                dom.inAlbum.addEventListener('input', e => setState({ album: e.target.value }));
-                dom.inYear.addEventListener('input', e => setState({ released: e.target.value }));
-                dom.inRanker.addEventListener('input', e => setState({ rankedby: e.target.value }));
-                
-                dom.btnFetch.onclick = openSearchSelector;
-                initInteractiveChart();
-                render();
-            });
+            // --- INICIALIZACIÓN Y EXPOSICIÓN GLOBAL ---
+            return {
+                addTrack: () => { state.tracks.push({name:"", duration:"", score:""}); render(true); },
+                removeTrack: (i) => { state.tracks.splice(i,1); render(true); },
+                updateTrack: (i, field, val) => { state.tracks[i][field] = val; render(); },
+                updateTrackFromInput: (i, val) => { state.tracks[i].score = val; render(); },
+                clearScores: () => { state.tracks.forEach(t => t.score = ""); render(true); },
+                changeMode: (m) => { state.mode = m; render(true); },
+                removeCover: () => { state.cover = ""; render(); },
+                init: () => {
+                    initInteractiveChart();
 
-            return { 
-                setState, 
-                changeMode: (m) => { state.mode = m; render(); },
-                updateTrack: (i, f, v) => { state.tracks[i][f] = v; render(); },
-                updateTrackFromInput: (i, v) => { state.tracks[i].score = v; render(); },
-                addTrack: () => { state.tracks.push({name:"", duration:"", score:""}); render(); },
-                removeTrack: (i) => { state.tracks.splice(i,1); render(); },
-                clearScores: () => { state.tracks.forEach(t => t.score = ""); render(); },
-                removeCover: () => setState({ cover: "" })
+                    // Listeners UI
+                    dom.btnFetch.addEventListener("click", openSearchSelector);
+                    dom.inArtist.addEventListener("input", e => { state.artist = e.target.value; render(); });
+                    dom.inAlbum.addEventListener("input", e => { state.album = e.target.value; render(); });
+                    dom.inYear.addEventListener("input", e => { state.released = e.target.value; render(); });
+                    dom.inRanker.addEventListener("input", e => { state.rankedby = e.target.value; render(); });
+
+                    // Listener para imagen
+                    dom.fileInput.addEventListener("change", e => {
+                        const file = e.target.files[0];
+                        if(file) {
+                            const reader = new FileReader();
+                            reader.onload = ev => { state.cover = ev.target.result; render(); };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+
+                    // Botón para exportar canvas
+                    document.getElementById("btnSaveLibrary").addEventListener("click", () => {
+                        html2canvas(document.getElementById("cardExport"), { backgroundColor: "#050505", scale: 2 }).then(canvas => {
+                            const link = document.createElement('a');
+                            link.download = `${state.artist || 'Artist'} - ${state.album || 'Album'} Score.png`;
+                            link.href = canvas.toDataURL();
+                            link.click();
+                        });
+                    });
+
+                    render(true);
+                }
             };
         })();
 
-        // --- EXPORTAR IMAGEN ---
-        document.getElementById("btnSaveLibrary").addEventListener("click", () => {
-            const card = document.getElementById("cardExport");
-            html2canvas(card, { scale: 2, backgroundColor: "#050505", useCORS: true }).then(canvas => {
-                const link = document.createElement("a");
-                link.download = "ARA-Rating.png";
-                link.href = canvas.toDataURL("image/png");
-                link.click();
-            });
-        });
+        // Inicializar la app al cargar la ventana
+        window.onload = window.AlbumApp.init;
     </script>
 </body>
 </html>
