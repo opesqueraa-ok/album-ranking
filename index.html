@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARA - Album Rater App | V10.1 Smart Search & Ranking</title>
+    <title>ARA - Album Rater App</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,7 +79,7 @@
 
     <div class="app-container">
         <header>
-            <h1>Album Rater <span class="badge">V10.1 Smart & Ranking</span></h1>
+            <h1>Album Rater <span class="badge">V1.0.1</span></h1>
             <div class="header-actions">
                 <button onclick="window.print()">Export PDF</button>
                 <button id="btnSaveLibrary" class="primary">Save Image</button>
@@ -205,7 +205,7 @@
             let dragSrcEl = null;
 
             let state = { 
-                mode: "rating", // rating or ranking
+                mode: "rating",
                 artist: "", album: "", released: "", rankedby: "", cover: "", 
                 tracks: [{ name: "", duration: "", score: "" }, { name: "", duration: "", score: "" }, { name: "", duration: "", score: "" }]
             };
@@ -248,16 +248,12 @@
                 try {
                     let results = [];
 
-                    // 1. INTENTO: iTunes API 
                     results = await searchItunes(art, alb);
 
-                    // 2. INTENTO: MusicBrainz (Si iTunes falla por completo)
                     if (results.length === 0) {
-                        console.log("iTunes falló, intentando con MusicBrainz...");
                         results = await searchMusicBrainz(art, alb);
                     }
 
-                    // SI TODO FALLA
                     if (results.length === 0) {
                         alert("No se encontró el álbum en ninguna base de datos gratuita. Intenta con un nombre más corto.");
                         resetFetchBtn();
@@ -273,14 +269,14 @@
                 resetFetchBtn();
             }
 
-            // --- BÚSQUEDA ITUNES CON CASCADA ---
+            // --- BÚSQUEDA ITUNES CON CASCADA (fix Deluxe editions) ---
             async function searchItunes(artist, album) {
                 const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
                 
                 const attempts = [
-                    `${artist} ${album}`,       // Intento 1: nombre completo
-                    `${artist} ${cleanAlb}`,    // Intento 2: sin "(Deluxe)"
-                    artist                      // Intento 3: solo artista
+                    `${artist} ${album}`,    // Intento 1: nombre completo
+                    `${artist} ${cleanAlb}`, // Intento 2: sin "(Deluxe)" etc.
+                    artist                   // Intento 3: solo artista (muestra toda su discografía)
                 ];
 
                 for (const term of attempts) {
@@ -327,7 +323,6 @@
                 results.forEach(item => {
                     const div = document.createElement("div");
                     div.className = "search-item";
-                    
                     div.innerHTML = `
                         <img src="${item.coverUrl}" onerror="this.src='https://via.placeholder.com/50?text=No+Cover'" style="width:50px; height:50px; border-radius:4px; object-fit: cover;">
                         <div style="overflow:hidden; width: 100%;">
@@ -335,7 +330,6 @@
                             <div style="font-size:11px; color:#888;">${item.artistName} (${item.year}) - 🗄️ ${item.source}</div>
                         </div>
                     `;
-                    
                     div.onclick = () => fetchTracks(item);
                     list.appendChild(div);
                 });
@@ -357,11 +351,9 @@
                             duration: msToTime(t.trackTimeMillis), 
                             score: ""
                         }));
-                    } 
-                    else if (item.source === 'musicbrainz') {
+                    } else if (item.source === 'musicbrainz') {
                         const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`);
                         const data = await res.json();
-                        
                         if (data.media && data.media.length > 0) {
                             tracks = data.media.flatMap(m => m.tracks).map(t => ({
                                 name: t.recording.title,
@@ -391,7 +383,7 @@
                 dom.btnFetch.disabled = false;
             }
 
-            // --- LÓGICA DE DRAG & DROP (RANKING) ---
+            // --- DRAG & DROP (RANKING MODE) ---
             function handleDragStart(e) {
                 dragSrcEl = this;
                 e.dataTransfer.effectAllowed = 'move';
@@ -410,7 +402,7 @@
                     let toIndex = parseInt(this.dataset.index);
                     let track = state.tracks.splice(fromIndex, 1)[0];
                     state.tracks.splice(toIndex, 0, track);
-                    render(true); // Forzamos el redibujado
+                    render(true);
                 }
                 return false;
             }
@@ -418,7 +410,7 @@
                 this.classList.remove('dragging');
             }
 
-            // --- LÓGICA DE RENDER ---
+            // --- RENDER ---
             function getBadgeColor(s) {
                 const v = parseFloat(s);
                 if (isNaN(v)) return "#333";
@@ -441,7 +433,6 @@
                 dom.pDetails.textContent = `${state.released || "Year"} • Ranked by ${state.rankedby || "You"}`;
                 dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
                 
-                // Activar / Desactivar vistas según el modo
                 if (state.mode === 'ranking') {
                     dom.graphContainer.style.display = 'none';
                     dom.lblScore.style.display = 'none';
@@ -455,14 +446,12 @@
                     dom.pHeaderRow.innerHTML = `<span class="col-time">TIME</span><span class="col-num">#</span><span class="col-name">TRACK TITLE</span><span class="col-rate">RATE</span>`;
                 }
 
-                // Render Editor Update (para no romper la escritura)
                 let needsRebuild = forceRebuildEditor || (document.querySelectorAll(".track-row").length !== state.tracks.length) || (lastRenderedMode !== state.mode);
                 
                 if (needsRebuild) {
                     renderEditor();
                     lastRenderedMode = state.mode;
                 } else {
-                    // Solo inyectar valores en los inputs si han cambiado por la gráfica
                     document.querySelectorAll(".track-input-name").forEach((inp, i) => { if(inp.value !== state.tracks[i].name && document.activeElement !== inp) inp.value = state.tracks[i].name; });
                     document.querySelectorAll(".track-input-duration").forEach((inp, i) => { if(inp.value !== state.tracks[i].duration && document.activeElement !== inp) inp.value = state.tracks[i].duration; });
                     if(state.mode === 'rating') {
@@ -470,7 +459,6 @@
                     }
                 }
 
-                // Render Tracklist Preview
                 dom.pTracklist.innerHTML = "";
                 state.tracks.forEach((t, i) => {
                     let rateHTML = "";
@@ -480,7 +468,6 @@
                         let color = !isNaN(scoreVal) ? getBadgeColor(scoreVal) : "#333";
                         rateHTML = `<span class="col-rate"><span class="preview-badge" style="background-color: ${color};">${scoreText}</span></span>`;
                     }
-
                     dom.pTracklist.innerHTML += `
                         <div class="preview-track-row">
                             <span class="col-time">${t.duration || '--:--'}</span>
@@ -558,7 +545,6 @@
                 render(true);
             }
 
-            // --- INICIALIZACIÓN Y EXPOSICIÓN GLOBAL ---
             return {
                 addTrack: () => { state.tracks.push({name:"", duration:"", score:""}); render(true); },
                 removeTrack: (i) => { state.tracks.splice(i,1); render(true); },
@@ -570,14 +556,12 @@
                 init: () => {
                     initInteractiveChart();
 
-                    // Listeners UI
                     dom.btnFetch.addEventListener("click", openSearchSelector);
                     dom.inArtist.addEventListener("input", e => { state.artist = e.target.value; render(); });
                     dom.inAlbum.addEventListener("input", e => { state.album = e.target.value; render(); });
                     dom.inYear.addEventListener("input", e => { state.released = e.target.value; render(); });
                     dom.inRanker.addEventListener("input", e => { state.rankedby = e.target.value; render(); });
 
-                    // Listener para imagen
                     dom.fileInput.addEventListener("change", e => {
                         const file = e.target.files[0];
                         if(file) {
@@ -587,7 +571,6 @@
                         }
                     });
 
-                    // Botón para exportar canvas
                     document.getElementById("btnSaveLibrary").addEventListener("click", () => {
                         html2canvas(document.getElementById("cardExport"), { backgroundColor: "#050505", scale: 2 }).then(canvas => {
                             const link = document.createElement('a');
@@ -602,7 +585,6 @@
             };
         })();
 
-        // Inicializar la app al cargar la ventana
         window.onload = window.AlbumApp.init;
     </script>
 </body>
