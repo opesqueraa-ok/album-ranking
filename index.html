@@ -174,7 +174,7 @@
             font-weight: 800; color: white; min-width: 32px; text-align: center; font-size: 13px;
         }
 
-        /* ===== LIBRARY TAB - REDISEÑO REQUERIDO ===== */
+        /* ===== LIBRARY TAB ===== */
         .library-toolbar {
             display: flex; gap: 12px; align-items: center;
             margin-bottom: 25px; flex-wrap: wrap;
@@ -198,7 +198,7 @@
         .library-empty h3 { font-family: 'Lora', serif; font-size: 22px; color: white; margin-bottom: 10px; }
         .library-empty p { font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
 
-        /* Ajustado a una cuadrícula compacta de 5 columnas en resoluciones de escritorio */
+        /* LIBRARY GRID: 5 Columnas y compacta */
         .library-grid {
             display: grid;
             grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -220,7 +220,6 @@
             background: #1a1a1a; display: block;
         }
         
-        /* Ajustes de tamaño interno para encajar en el layout pequeño */
         .lib-card-body { padding: 12px; }
         .lib-card-score {
             position: absolute; top: 8px; right: 8px;
@@ -306,7 +305,7 @@
 
 <div class="app-container">
     <header>
-        <h1>Album Rater <span class="badge">V2.0</span></h1>
+        <h1>Album Rater <span class="badge">V2.0 PRO</span></h1>
         <div class="header-actions">
             <button id="btnLoadLib" title="Cargar tu archivo .ara de biblioteca">📂 Load Library</button>
             <button id="btnSaveLib" class="success" title="Guardar toda la biblioteca como archivo .ara">💾 Save Library</button>
@@ -339,7 +338,7 @@
                         </div>
                     </div>
 
-                    <button id="btnFetch">🔍 Auto-Fill (Smart Search)</button>
+                    <button id="btnFetch">🔍 Fetch Album Info & Tracks</button>
 
                     <div class="input-row" style="margin-bottom: 20px;">
                         <div class="input-group">
@@ -443,7 +442,7 @@
             <button class="lib-sort-btn" data-sort="added" onclick="window.AlbumApp.setSort('added',this)">🕐 Recent</button>
         </div>
 
-        <div id="libraryGrid"></div>
+        <div id="libraryGrid" class="library-grid"></div>
     </div>
 </div>
 
@@ -481,6 +480,7 @@ window.AlbumApp = (function() {
 
     // ===================== STATE =====================
     let ratingChart = null;
+    let lastRenderedMode = null;
     let dragSrcEl = null;
     let libSort = 'score';
     let confirmCallback = null;
@@ -518,6 +518,210 @@ window.AlbumApp = (function() {
         libFilterMode: document.getElementById("libFilterMode"),
     };
 
+    // ===================== MOTOR DE BÚSQUEDA INTEGRADO =====================
+    async function openSearchSelector() {
+        const art = dom.inArtist.value.trim();
+        const alb = dom.inAlbum.value.trim();
+        if (!art || !alb) {
+            alert("Ingresa Artista y Álbum primero para buscar.");
+            return;
+        }
+        const btnFetch = document.getElementById("btnFetch");
+        if (btnFetch) {
+            btnFetch.textContent = "⏳ Buscando...";
+            btnFetch.disabled = true;
+        }
+        try {
+            const resultsArray = await Promise.allSettled([
+                searchDiscogs(art, alb),
+                searchMusicBrainz(art, alb),
+                searchItunes(art, alb)
+            ]);
+            
+            let combined = [];
+            resultsArray.forEach(r => {
+                if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+                    combined = combined.concat(r.value);
+                }
+            });
+
+            if (combined.length === 0) {
+                alert("No se encontraron resultados en ninguna plataforma.");
+            } else {
+                renderSearchResults(combined);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Ocurrió un error general durante la búsqueda.");
+        } finally {
+            if (btnFetch) {
+                btnFetch.textContent = "🔍 Fetch Album Info & Tracks";
+                btnFetch.disabled = false;
+            }
+        }
+    }
+
+    async function searchDiscogs(artist, album) {
+        try {
+            // Credenciales oficiales pasadas por el usuario
+            const key = "RzuSUUssEDbaCqSwTzWC";
+            const secret = "jTOMrfFPOyKtQzavbWrJoJBSFVsoBaqy";
+            const url = `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(album)}&type=release&key=${key}&secret=${secret}&per_page=10`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.results) return [];
+            return data.results.map(item => {
+                let parts = item.title.split(' - ');
+                let artName = parts[0] ? parts[0].trim() : artist;
+                let albName = parts[1] ? parts[1].trim() : item.title;
+                return {
+                    source: 'discogs',
+                    id: item.id,
+                    albumName: albName,
+                    artistName: artName,
+                    year: item.year || "----",
+                    coverUrl: item.cover_image || "https://via.placeholder.com/600x600/111/333?text=No+Cover"
+                };
+            });
+        } catch(e) {
+            console.error("Error Discogs:", e);
+            return [];
+        }
+    }
+
+    async function searchMusicBrainz(artist, album) {
+        try {
+            const url = `https://musicbrainz.org/ws/2/release/?query=artist:${encodeURIComponent(artist)}%20AND%20release:${encodeURIComponent(album)}&fmt=json&limit=10`;
+            const res = await fetch(url, { headers: { 'User-Agent': 'ARA-AlbumRaterApp/2.0 ( contact@example.com )' } });
+            const data = await res.json();
+            if (!data.releases) return [];
+            return data.releases.map(item => {
+                const dateStr = item.date ? item.date.substring(0, 4) : "----";
+                return {
+                    source: 'musicbrainz',
+                    id: item.id,
+                    albumName: item.title,
+                    artistName: item['artist-credit'] ? item['artist-credit'][0].name : artist,
+                    year: dateStr,
+                    coverUrl: `https://coverartarchive.org/release/${item.id}/front`
+                };
+            });
+        } catch(e) {
+            console.error("Error MusicBrainz:", e);
+            return [];
+        }
+    }
+
+    async function searchItunes(artist, album) {
+        try {
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(artist + ' ' + album)}&entity=album&limit=10`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.results) return [];
+            return data.results.map(item => {
+                let highResCover = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb.jpg', '600x600bb.jpg') : "https://via.placeholder.com/600x600/111/333?text=No+Cover";
+                return {
+                    source: 'itunes',
+                    id: item.collectionId,
+                    albumName: item.collectionName,
+                    artistName: item.artistName,
+                    year: item.releaseDate ? item.releaseDate.substring(0, 4) : "----",
+                    coverUrl: highResCover
+                };
+            });
+        } catch(e) {
+            console.error("Error iTunes:", e);
+            return [];
+        }
+    }
+
+    function renderSearchResults(results) {
+        const list = document.getElementById("searchResultsList");
+        if(!list) return;
+        list.innerHTML = "";
+        document.getElementById("searchModal").classList.add('open');
+        
+        results.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "search-item";
+            const safeCover = item.source === 'musicbrainz' ? 'https://via.placeholder.com/600x600/111/333?text=MB+Release' : item.coverUrl;
+            
+            div.innerHTML = `
+                <img src="${safeCover}" onerror="this.src='https://via.placeholder.com/50?text=?'" style="width:50px;height:50px;border-radius:4px;object-fit:cover;">
+                <div style="overflow:hidden;width:100%;">
+                    <div style="font-size:12px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.albumName}</div>
+                    <div style="font-size:11px;color:#888;">${item.artistName} (${item.year}) — 🗄️ ${item.source.toUpperCase()}</div>
+                </div>
+            `;
+            div.onclick = () => fetchSpecificAlbumTracks(item);
+            list.appendChild(div);
+        });
+    }
+
+    async function fetchSpecificAlbumTracks(item) {
+        document.getElementById("searchResultsList").innerHTML = "<div style='grid-column:1/-1; text-align:center; padding:20px;'>⏳ Cargando canciones y detalles finales...</div>";
+        
+        let tracksFetched = [];
+        let year = item.year;
+        let cover = item.coverUrl;
+
+        try {
+            if (item.source === 'discogs') {
+                const key = "RzuSUUssEDbaCqSwTzWC";
+                const secret = "jTOMrfFPOyKtQzavbWrJoJBSFVsoBaqy";
+                const res = await fetch(`https://api.discogs.com/releases/${item.id}?key=${key}&secret=${secret}`);
+                const data = await res.json();
+                if (data.tracklist) {
+                    tracksFetched = data.tracklist
+                        .filter(t => t.type_ === 'track' || !t.type_)
+                        .map(t => ({ name: t.title, duration: t.duration || "", score: "" }));
+                }
+            } else if (item.source === 'musicbrainz') {
+                const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`, { headers: { 'User-Agent': 'ARA-AlbumRaterApp/2.0' } });
+                const data = await res.json();
+                if (data.media && data.media[0] && data.media[0].tracks) {
+                    tracksFetched = data.media[0].tracks.map(t => {
+                        let ms = t.length || 0;
+                        let m = Math.floor(ms / 60000);
+                        let s = Math.floor((ms % 60000) / 1000);
+                        let durStr = ms > 0 ? `${m}:${s < 10 ? "0" + s : s}` : "";
+                        return { name: t.title, duration: durStr, score: "" };
+                    });
+                }
+            } else if (item.source === 'itunes') {
+                const res = await fetch(`https://itunes.apple.com/lookup?id=${item.id}&entity=song`);
+                const data = await res.json();
+                if (data.results && data.results.length > 1) {
+                    const songs = data.results.slice(1);
+                    tracksFetched = songs.map(t => {
+                        let sec = Math.floor((t.trackTimeMillis || 0) / 1000);
+                        let m = Math.floor(sec / 60);
+                        let s = sec % 60;
+                        return { name: t.trackName, duration: `${m}:${s < 10 ? "0" + s : s}`, score: "" };
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error obteniendo tracklist específico:", err);
+        }
+
+        state.artist = item.artistName;
+        state.album = item.albumName;
+        state.released = year !== "----" ? year : "";
+        state.cover = cover;
+        if (tracksFetched.length > 0) {
+            state.tracks = tracksFetched;
+        }
+
+        dom.inArtist.value = state.artist;
+        dom.inAlbum.value = state.album;
+        dom.inYear.value = state.released;
+
+        document.getElementById("searchModal").classList.remove("open");
+        render(true);
+        saveSession();
+    }
+
     // ===================== PERSISTENCE =====================
 
     function saveSession() {
@@ -536,7 +740,6 @@ window.AlbumApp = (function() {
         } catch(e){}
     }
 
-    // Exportación Modificada: Nombre de descarga fijo a "ARA Library.ara"
     function exportLibrary() {
         const payload = {
             _ara_version: "2.0",
@@ -548,7 +751,7 @@ window.AlbumApp = (function() {
         const a = document.createElement('a');
         a.href = url;
         
-        a.download = `ARA Library.ara`;
+        a.download = `ARA Library.ara`; // Exportación estática
         
         a.click();
         URL.revokeObjectURL(url);
@@ -565,6 +768,7 @@ window.AlbumApp = (function() {
                     showToast(`✅ Biblioteca cargada: ${library.length} álbumes`);
                     renderLibrary();
                     updateLibCount();
+                    saveSession();
                 } else {
                     alert("El archivo no parece ser una biblioteca ARA válida.");
                 }
@@ -592,7 +796,7 @@ window.AlbumApp = (function() {
             id: existingIdx >= 0 ? library[existingIdx].id : Date.now(),
             addedAt: existingIdx >= 0 ? library[existingIdx].addedAt : new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            ...JSON.parse(JSON.stringify(state))
+            ...state
         };
 
         if (existingIdx >= 0) {
@@ -605,25 +809,15 @@ window.AlbumApp = (function() {
 
         updateLibCount();
         saveSession();
-        if (document.querySelector('.tab-btn[data-tab="library"]').classList.contains('active')) {
-            renderLibrary();
-        }
+        renderLibrary();
     }
 
     function editFromLibrary(id) {
         const entry = library.find(a => a.id === id);
         if (!entry) return;
         const { id: _id, addedAt, updatedAt, ...s } = entry;
-        
-        state = JSON.parse(JSON.stringify(s));
-        dom.inArtist.value = state.artist || "";
-        dom.inAlbum.value = state.album || "";
-        dom.inYear.value = state.released || "";
-        dom.inRanker.value = state.rankedby || "";
-        document.getElementById("selMode").value = state.mode || "rating";
-        
+        setState(s);
         switchTab('editor');
-        render(true);
         showToast("📝 Álbum cargado en el editor");
     }
 
@@ -651,376 +845,377 @@ window.AlbumApp = (function() {
         dom.libCount.textContent = library.length;
     }
 
-    // ===================== STATS BAR (Modificado para calcular el Año más Punteado) =====================
-    function updateStatsBar() {
-        if (!dom.libStatsBar) return;
+    // ===================== LIBRARY RENDER =====================
 
-        let total = library.length;
-        let ratingAlbums = library.filter(a => a.mode === 'rating');
-        let avgScore = 0;
+    function renderLibStats() {
+        if (library.length === 0) { dom.libStatsBar.innerHTML = ''; return; }
         
-        if (ratingAlbums.length > 0) {
-            let sum = ratingAlbums.reduce((s, a) => s + (computeScore(a.tracks) || 0), 0);
-            avgScore = (sum / ratingAlbums.length).toFixed(1);
-        } else {
-            avgScore = "0.0";
-        }
-
-        // LÓGICA: Encontrar el año con más álbumes punteados
+        const scores = library.map(a => computeScore(a.tracks)).filter(s => s !== null);
+        const avgAll = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
+        const best = scores.length > 0 ? Math.max(...scores).toFixed(1) : '—';
+        const artists = new Set(library.map(a => a.artist.toLowerCase())).size;
+        
+        // Calcular "Año más punteado"
         const yearCounts = {};
         let topYear = "N/A";
         let maxCount = 0;
-
         library.forEach(a => {
-            let year = (a.released || "").trim();
-            if (year) {
-                yearCounts[year] = (yearCounts[year] || 0) + 1;
-                if (yearCounts[year] > maxCount) {
-                    maxCount = yearCounts[year];
-                    topYear = year;
+            let y = (a.released || "").trim();
+            if(y) {
+                yearCounts[y] = (yearCounts[y] || 0) + 1;
+                if(yearCounts[y] > maxCount) { 
+                    maxCount = yearCounts[y]; 
+                    topYear = y; 
                 }
             }
         });
 
         dom.libStatsBar.innerHTML = `
-            <div class="lib-stat">
-                <div class="lib-stat-val">${total}</div>
-                <div class="lib-stat-label">Total Albums</div>
-            </div>
-            <div class="lib-stat">
-                <div class="lib-stat-val">${avgScore}</div>
-                <div class="lib-stat-label">Average Score</div>
-            </div>
-            <div class="lib-stat">
-                <div class="lib-stat-val">${topYear}</div>
-                <div class="lib-stat-label">Año Más Punteado</div>
-            </div>
+            <div class="lib-stat"><div class="lib-stat-val">${library.length}</div><div class="lib-stat-label">Albums</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${artists}</div><div class="lib-stat-label">Artists</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${avgAll}</div><div class="lib-stat-label">Avg Score</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${best}</div><div class="lib-stat-label">Best Score</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${topYear}</div><div class="lib-stat-label">Año Más Punteado</div></div>
         `;
     }
 
-    // ===================== LIBRARY RENDER =====================
     function renderLibrary() {
         const query = dom.libSearch.value.toLowerCase();
         const modeFilter = dom.libFilterMode.value;
 
         let items = library.filter(a => {
-            const matchQ = !query || (a.artist && a.artist.toLowerCase().includes(query)) || (a.album && a.album.toLowerCase().includes(query));
+            const matchQ = !query || a.artist.toLowerCase().includes(query) || a.album.toLowerCase().includes(query);
             const matchMode = modeFilter === 'all' || a.mode === modeFilter;
             return matchQ && matchMode;
         });
 
-        // Sorting
-        items.sort((a, b) => {
+        // Sort
+        items = [...items].sort((a, b) => {
             if (libSort === 'score') {
-                let sA = computeScore(a.tracks) || 0;
-                let sB = computeScore(b.tracks) || 0;
-                return sB - sA;
-            } else if (libSort === 'year') {
-                let yA = parseInt(a.released) || 0;
-                let yB = parseInt(b.released) || 0;
-                return yB - yA;
-            } else if (libSort === 'artist') {
-                return (a.artist || "").localeCompare(b.artist || "");
-            } else if (libSort === 'added') {
-                return new Date(b.addedAt || 0) - new Date(a.addedAt || 0);
+                const sa = computeScore(a.tracks) ?? -1;
+                const sb = computeScore(b.tracks) ?? -1;
+                return sb - sa;
             }
+            if (libSort === 'year') return (b.released || '0') > (a.released || '0') ? 1 : -1;
+            if (libSort === 'artist') return a.artist.localeCompare(b.artist);
+            if (libSort === 'added') return new Date(b.addedAt) - new Date(a.addedAt);
             return 0;
         });
 
-        updateStatsBar();
+        renderLibStats();
 
         if (items.length === 0) {
-            dom.libGrid.innerHTML = `
-                <div class="library-empty">
-                    <div class="empty-icon">📚</div>
+            dom.libGrid.innerHTML = library.length === 0 ?
+                `<div class="library-empty">
+                    <div class="empty-icon">🎵</div>
                     <h3>Tu biblioteca está vacía</h3>
-                    <p>No se encontraron álbumes. Agrega algunos desde el editor o carga un archivo anterior.</p>
-                </div>
-            `;
+                    <p>Puntea un álbum en el Editor y presiona <strong>"Add to Library"</strong> para empezar a construir tu colección.</p>
+                </div>` :
+                `<div class="library-empty">
+                    <div class="empty-icon">🔍</div>
+                    <h3>Sin resultados</h3>
+                    <p>No hay álbumes que coincidan con tu búsqueda.</p>
+                </div>`;
             return;
         }
 
-        dom.libGrid.innerHTML = "";
-        const gridContainer = document.createElement("div");
-        gridContainer.className = "library-grid";
-
+        dom.libGrid.innerHTML = '';
         items.forEach(a => {
-            const card = document.createElement("div");
-            card.className = "lib-card";
-            
-            let scoreText = "N/A";
-            if (a.mode === 'rating') {
-                let s = computeScore(a.tracks);
-                if (s !== null) scoreText = s.toFixed(1);
-            } else {
-                scoreText = "Rank";
-            }
+            const score = computeScore(a.tracks);
+            const scoreStr = score !== null ? score.toFixed(1) : '—';
+            const scoreColor = score !== null ? getBadgeColor(score) : '#333';
 
+            const card = document.createElement('div');
+            card.className = 'lib-card';
             card.innerHTML = `
-                <img class="lib-card-cover" src="${a.cover || 'https://via.placeholder.com/800x800/111/333?text=ARA'}" alt="Cover">
-                <div class="lib-card-score">${scoreText}</div>
+                <img class="lib-card-cover"
+                     src="${a.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
+                     onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
+                     alt="${a.album}">
+                ${score !== null ? `<div class="lib-card-score" style="border-left: 3px solid ${scoreColor};">${scoreStr}</div>` : ''}
                 <div class="lib-card-body">
                     <div class="lib-card-artist">${a.artist || 'Unknown Artist'}</div>
-                    <div class="lib-card-album" title="${a.album || 'Unknown Album'}">${a.album || 'Unknown Album'}</div>
-                    <div class="lib-card-meta">${a.released || '----'} • ${a.tracks.length} tracks</div>
+                    <div class="lib-card-album">${a.album || 'Unknown Album'}</div>
+                    <div class="lib-card-meta">${a.released || '—'} · ${a.tracks.length} tracks · ${a.mode === 'ranking' ? 'Ranking' : 'Rating'}</div>
                     <div class="lib-card-actions">
-                        <button class="btn-edit" onclick="window.AlbumApp.editFromLibrary(${a.id})">Editar</button>
-                        <button class="btn-del" onclick="window.AlbumApp.deleteFromLibrary(${a.id})">Eliminar</button>
+                        <button class="btn-edit" onclick="window.AlbumApp.editFromLibrary(${a.id})">✏️ Edit</button>
+                        <button class="btn-del" onclick="window.AlbumApp.deleteFromLibrary(${a.id})">🗑️ Delete</button>
                     </div>
-                </div>
-            `;
-            gridContainer.appendChild(card);
-        });
-        dom.libGrid.appendChild(gridContainer);
-    }
-
-    // ===================== EDITOR TRACK RENDERING =====================
-    function renderTrackEditor() {
-        dom.trackEditor.innerHTML = "";
-        state.tracks.forEach((track, idx) => {
-            const row = document.createElement("div");
-            row.className = "track-row";
-            row.setAttribute("draggable", state.mode === "ranking" ? "true" : "false");
-            row.setAttribute("data-index", idx);
-
-            row.innerHTML = `
-                <span class="track-num">${idx + 1}</span>
-                <input type="text" class="track-title-input" value="${track.name || ''}" placeholder="Track Title" style="flex:2;" data-index="${idx}">
-                <input type="text" class="track-duration-input" value="${track.duration || ''}" placeholder="Time" style="width:70px;" data-index="${idx}">
-                ${state.mode === 'rating' ? `
-                    <input type="number" class="track-score-input" value="${track.score !== undefined ? track.score : ''}" placeholder="0-10" min="0" max="10" step="0.1" style="width:65px;" data-index="${idx}">
-                ` : ''}
-                <button class="btn-remove" data-index="${idx}">&times;</button>
-            `;
-
-            row.querySelector(".track-title-input").addEventListener("input", (e) => {
-                state.tracks[idx].name = e.target.value;
-                render(false);
-            });
-            row.querySelector(".track-duration-input").addEventListener("input", (e) => {
-                state.tracks[idx].duration = e.target.value;
-                render(false);
-            });
-            if (state.mode === 'rating') {
-                row.querySelector(".track-score-input").addEventListener("input", (e) => {
-                    let val = parseFloat(e.target.value);
-                    if (isNaN(val)) val = "";
-                    state.tracks[idx].score = val;
-                    render(false);
-                    updateChart();
-                });
-            }
-            row.querySelector(".btn-remove").addEventListener("click", () => {
-                state.tracks.splice(idx, 1);
-                render(true);
-            });
-
-            if (state.mode === "ranking") {
-                row.addEventListener("dragstart", handleDragStart);
-                row.addEventListener("dragover", handleDragOver);
-                row.addEventListener("drop", handleDrop);
-                row.addEventListener("dragend", handleDragEnd);
-            }
-
-            dom.trackEditor.appendChild(row);
+                </div>`;
+            dom.libGrid.appendChild(card);
         });
     }
 
-    // Drag and drop mechanics
+    // ===================== TABS =====================
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tabName}`));
+        if (tabName === 'library') renderLibrary();
+    }
+
+    // ===================== HELPERS =====================
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function confirmAction(title, msg, cb) {
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMsg').textContent = msg;
+        confirmCallback = cb;
+        document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function msToTime(ms) {
+        if (!ms) return "--:--";
+        let s = Math.floor((ms / 1000) % 60);
+        let m = Math.floor(ms / (1000 * 60));
+        return `${m}:${s < 10 ? "0" + s : s}`;
+    }
+
+    function getBadgeColor(s) {
+        const v = parseFloat(s);
+        if (isNaN(v)) return "#333";
+        if (v >= 9.0) return "#3b82f6";
+        if (v >= 8.0) return "#06b6d4";
+        if (v >= 7.0) return "#22c55e";
+        if (v >= 6.0) return "#eab308";
+        return "#ef4444";
+    }
+
+    function computeAvg() {
+        let t=0, c=0;
+        state.tracks.forEach(x => { const s = parseFloat(x.score); if(!isNaN(s)){t+=s;c++;} });
+        return c===0 ? "0.0" : (t/c).toFixed(1);
+    }
+
+    // ===================== DRAG & DROP =====================
+
     function handleDragStart(e) {
         dragSrcEl = this;
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
         this.classList.add('dragging');
     }
-    function handleDragOver(e) { if (e.preventDefault) e.preventDefault(); return false; }
+    function handleDragOver(e) { if(e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
     function handleDrop(e) {
-        if (e.stopPropagation) e.stopPropagation();
-        if (dragSrcEl !== this) {
-            let srcIdx = parseInt(dragSrcEl.getAttribute('data-index'));
-            let targetIdx = parseInt(this.getAttribute('data-index'));
-            const movedTrack = state.tracks.splice(srcIdx, 1)[0];
-            state.tracks.splice(targetIdx, 0, movedTrack);
-            render(true);
+        if(e.stopPropagation) e.stopPropagation();
+        if(dragSrcEl !== this) {
+            let fi = parseInt(dragSrcEl.dataset.index);
+            let ti = parseInt(this.dataset.index);
+            let track = state.tracks.splice(fi,1)[0];
+            state.tracks.splice(ti,0,track);
+            saveSession(); render(true);
         }
         return false;
     }
     function handleDragEnd() { this.classList.remove('dragging'); }
 
-    function renderPreviewTracklist() {
-        dom.pTracklist.innerHTML = "";
-        
-        if (state.mode === "ranking") {
+    // ===================== RENDER =====================
+
+    function render(forceRebuildEditor = false) {
+        dom.pArtist.textContent = state.artist || "Artist";
+        dom.pAlbum.textContent = state.album || "Album Title";
+        dom.pDetails.textContent = `${state.released || "Year"} • Ranked by ${state.rankedby || "You"}`;
+        dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
+
+        if (state.mode === 'ranking') {
+            dom.graphContainer.style.display = 'none';
+            dom.lblScore.style.display = 'none';
+            dom.pScore.style.display = 'none';
             dom.pHeaderRow.innerHTML = `<span class="col-time">TIME</span><span class="col-num">#</span><span class="col-name">TRACK TITLE</span>`;
-            dom.lblScore.style.display = "none";
-            dom.pScore.style.display = "none";
         } else {
+            dom.graphContainer.style.display = 'block';
+            dom.lblScore.style.display = 'block';
+            dom.pScore.style.display = 'block';
+            dom.pScore.textContent = computeAvg();
             dom.pHeaderRow.innerHTML = `<span class="col-time">TIME</span><span class="col-num">#</span><span class="col-name">TRACK TITLE</span><span class="col-rate">RATE</span>`;
-            dom.lblScore.style.display = "block";
-            dom.pScore.style.display = "block";
         }
 
-        state.tracks.forEach((track, idx) => {
-            const tr = document.createElement("div");
-            tr.className = "preview-track-row";
-            
-            let badgeHtml = "";
-            if (state.mode === "rating") {
-                let scoreVal = parseFloat(track.score);
-                let color = "#475569";
-                if (!isNaN(scoreVal)) {
-                    if (scoreVal >= 8) color = "#16a34a";
-                    else if (scoreVal >= 6) color = "#3b82f6";
-                    else if (scoreVal >= 4) color = "#eab308";
-                    else color = "#ef4444";
-                }
-                badgeHtml = `<span class="preview-badge" style="background:${color};">${!isNaN(scoreVal) ? scoreVal.toFixed(1) : '-.-'}</span>`;
-            }
+        const needsRebuild = forceRebuildEditor ||
+            (document.querySelectorAll(".track-row").length !== state.tracks.length) ||
+            (lastRenderedMode !== state.mode);
 
-            tr.innerHTML = `
-                <span class="col-time">${track.duration || '--:--'}</span>
-                <span class="col-num">${idx + 1}</span>
-                <span class="col-name">${track.name || 'Untitled Track'}</span>
-                ${state.mode === 'rating' ? `<span class="col-rate">${badgeHtml}</span>` : ''}
-            `;
-            dom.pTracklist.appendChild(tr);
+        if (needsRebuild) { renderEditor(); lastRenderedMode = state.mode; }
+        else {
+            document.querySelectorAll(".track-input-name").forEach((inp,i) => { if(inp.value!==state.tracks[i].name && document.activeElement!==inp) inp.value=state.tracks[i].name; });
+            document.querySelectorAll(".track-input-duration").forEach((inp,i) => { if(inp.value!==state.tracks[i].duration && document.activeElement!==inp) inp.value=state.tracks[i].duration; });
+            if(state.mode==='rating') document.querySelectorAll(".track-input-score").forEach((inp,i) => { if(inp.value!==state.tracks[i].score && document.activeElement!==inp) inp.value=state.tracks[i].score; });
+        }
+
+        dom.pTracklist.innerHTML = "";
+        state.tracks.forEach((t,i) => {
+            let rateHTML = "";
+            if(state.mode==='rating') {
+                let scoreVal = parseFloat(t.score);
+                let scoreText = !isNaN(scoreVal) ? scoreVal.toFixed(1) : "-";
+                let color = !isNaN(scoreVal) ? getBadgeColor(scoreVal) : "#333";
+                rateHTML = `<span class="col-rate"><span class="preview-badge" style="background-color:${color};">${scoreText}</span></span>`;
+            }
+            dom.pTracklist.innerHTML += `
+                <div class="preview-track-row">
+                    <span class="col-time">${t.duration||'--:--'}</span>
+                    <span class="col-num">${i+1}</span>
+                    <span class="col-name">${t.name||'TRACK TITLE'}</span>
+                    ${rateHTML}
+                </div>`;
+        });
+
+        if(state.mode==='rating') updateChartData();
+    }
+
+    function renderEditor() {
+        dom.trackEditor.innerHTML = "";
+        state.tracks.forEach((t,i) => {
+            const row = document.createElement("div");
+            row.className = "track-row"; row.dataset.index = i;
+            if(state.mode==='ranking') {
+                row.draggable = true;
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('drop', handleDrop);
+                row.addEventListener('dragend', handleDragEnd);
+            }
+            let rightControl = state.mode==='rating' ?
+                `<input class="track-input-score" type="number" step="0.1" min="0" max="10" value="${t.score}" oninput="window.AlbumApp.updateTrackFromInput(${i},this.value)" style="width:70px;text-align:center;font-weight:bold;color:white;background:#0b0f15;border:1px solid #333;border-radius:4px;">` :
+                `<span style="width:50px;text-align:center;color:#888;font-size:18px;cursor:grab;" title="Arrastrar para ordenar">≡</span>`;
+            row.innerHTML = `
+                <span class="track-num">${i+1}</span>
+                <input class="track-input-duration" type="text" value="${t.duration||''}" oninput="window.AlbumApp.updateTrack(${i},'duration',this.value)" style="width:45px;text-align:center;color:#888;font-size:12px;padding:12px 6px;">
+                <input class="track-input-name" type="text" value="${t.name}" oninput="window.AlbumApp.updateTrack(${i},'name',this.value)" style="flex:1;">
+                ${rightControl}
+                <button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>`;
+            dom.trackEditor.appendChild(row);
         });
     }
 
-    // ===================== CHART OPERATIONS =====================
-    function initChart() {
-        const canvas = document.getElementById('ratingChart');
-        if(!canvas) return;
-        const ctx = canvas.getContext('2d');
-        ratingChart = new Chart(ctx, {
+    // ===================== CHART =====================
+
+    function updateChartData() {
+        if(!ratingChart) return;
+        ratingChart.data.labels = state.tracks.map((_,i) => i+1);
+        ratingChart.data.datasets[0].data = state.tracks.map(t => t.score===""?5:parseFloat(t.score));
+        ratingChart.update('none');
+    }
+
+    function initInteractiveChart() {
+        ratingChart = new Chart(document.getElementById('ratingChart').getContext('2d'), {
             type: 'line',
             data: {
-                labels: state.tracks.map((t, idx) => t.name || `Track ${idx + 1}`),
+                labels: state.tracks.map((_,i)=>i+1),
                 datasets: [{
-                    label: 'Rating',
-                    data: state.tracks.map(t => parseFloat(t.score) || 0),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    pointBackgroundColor: '#ffffff',
-                    pointRadius: 6,
-                    pointHoverRadius: 8
+                    data: state.tracks.map(t=>t.score===""?5:parseFloat(t.score)),
+                    backgroundColor:'rgba(59,130,246,0.2)', borderColor:'#3b82f6', borderWidth:3,
+                    pointBackgroundColor:'#fff', pointRadius:6, tension:0.2, fill:true
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { min: 0, max: 10, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a94a6' } },
-                    x: { grid: { display: false }, ticks: { color: '#8a94a6' } }
-                },
+                responsive:true, maintainAspectRatio:false,
                 plugins: {
-                    legend: { display: false },
-                    dragData: {
-                        round: 1,
-                        showTooltip: true,
-                        onDragEnd: function(e, datasetIndex, index, value) {
-                            if (value < 0) value = 0;
-                            if (value > 10) value = 10;
-                            state.tracks[index].score = value;
-                            const input = dom.trackEditor.querySelector(`[data-index="${index}"].track-score-input`);
-                            if (input) input.value = value;
-                            render(false);
-                        }
+                    legend:{display:false},
+                    dragData:{
+                        round:1,
+                        onDragEnd:(e,ds,i,v)=>{ state.tracks[i].score=Math.max(0,Math.min(10,v)).toFixed(1); saveSession(); render(); }
                     }
+                },
+                scales:{
+                    y:{min:0,max:10,ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}},
+                    x:{ticks:{color:'#666'},grid:{display:false}}
                 }
             }
         });
     }
 
-    function updateChart() {
-        if (!ratingChart) return;
-        ratingChart.data.labels = state.tracks.map((t, idx) => t.name || `Track ${idx + 1}`);
-        ratingChart.data.datasets[0].data = state.tracks.map(t => parseFloat(t.score) || 0);
-        ratingChart.update();
-    }
+    // ===================== STATE MANAGEMENT =====================
 
-    function render(rebuildEditor = true) {
-        if (rebuildEditor) renderTrackEditor();
-        renderPreviewTracklist();
-        
-        dom.pArtist.textContent = state.artist || "Artist";
-        dom.pAlbum.textContent = state.album || "Album";
-        dom.pDetails.textContent = `${state.released || 'Year'} • Ranked by ${state.rankedby || '...'}`;
-        dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
-
-        if (state.mode === 'rating') {
-            dom.graphContainer.style.display = "block";
-            let overall = computeScore(state.tracks);
-            dom.pScore.textContent = overall !== null ? overall.toFixed(1) : "0.0";
-            if (!ratingChart) initChart();
-            else updateChart();
-        } else {
-            dom.graphContainer.style.display = "none";
-        }
+    function setState(ns) {
+        state = {...state, ...ns};
+        if(ns.artist!==undefined) dom.inArtist.value = state.artist;
+        if(ns.album!==undefined) dom.inAlbum.value = state.album;
+        if(ns.released!==undefined) dom.inYear.value = state.released;
+        if(ns.rankedby!==undefined) dom.inRanker.value = state.rankedby;
+        if(ns.mode!==undefined) document.getElementById('selMode').value = state.mode;
         saveSession();
+        render(true);
     }
 
-    // ===================== UI INTERACTIONS =====================
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            if (btn.dataset.tab === tabId) btn.classList.add('active');
-            else btn.classList.remove('active');
-        });
-        document.querySelectorAll('.tab-content').forEach(content => {
-            if (content.id === `tab-${tabId}`) content.classList.add('active');
-            else content.classList.remove('active');
-        });
-        if (tabId === 'library') renderLibrary();
-    }
-
-    function confirmAction(title, msg, callback) {
-        document.getElementById("confirmTitle").textContent = title;
-        document.getElementById("confirmMsg").textContent = msg;
-        document.getElementById("confirmModal").classList.add("open");
-        confirmCallback = callback;
-    }
-
-    function showToast(msg) {
-        const t = document.getElementById("toast");
-        t.textContent = msg;
-        t.classList.add("show");
-        setTimeout(() => t.classList.remove("show"), 3000);
-    }
+    // ===================== PUBLIC API =====================
 
     return {
-        init: function() {
+        addTrack: () => { state.tracks.push({name:"",duration:"",score:""}); saveSession(); render(true); },
+        removeTrack: (i) => { state.tracks.splice(i,1); saveSession(); render(true); },
+        updateTrack: (i,field,val) => { state.tracks[i][field]=val; saveSession(); render(); },
+        updateTrackFromInput: (i,val) => { state.tracks[i].score=val; saveSession(); render(); },
+        clearScores: () => { state.tracks.forEach(t=>t.score=""); saveSession(); render(true); },
+        changeMode: (m) => { state.mode=m; saveSession(); render(true); },
+        removeCover: () => { state.cover=""; saveSession(); render(); },
+        setSort: (s, btn) => {
+            libSort = s;
+            document.querySelectorAll('.lib-sort-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            renderLibrary();
+        },
+        editFromLibrary,
+        deleteFromLibrary,
+        renderLibrary,
+        confirmYes: () => {
+            document.getElementById('confirmModal').classList.remove('open');
+            if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+        },
+        confirmCancel: () => {
+            document.getElementById('confirmModal').classList.remove('open');
+            confirmCallback = null;
+        },
+        newSession: () => {
+            confirmAction(
+                "Nueva sesión",
+                "Se borrará el editor actual. Tu biblioteca NO se verá afectada.",
+                () => {
+                    state = DEFAULT_STATE();
+                    saveSession();
+                    dom.inArtist.value = '';
+                    dom.inAlbum.value = '';
+                    dom.inYear.value = '';
+                    dom.inRanker.value = '';
+                    document.getElementById('selMode').value = 'rating';
+                    render(true);
+                    showToast("🆕 Nueva sesión iniciada");
+                }
+            );
+        },
+
+        init: () => {
+            // Restaurar sesión del editor
             loadSession();
-            
-            dom.inArtist.value = state.artist || "";
-            dom.inAlbum.value = state.album || "";
-            dom.inYear.value = state.released || "";
-            dom.inRanker.value = state.rankedby || "";
-            document.getElementById("selMode").value = state.mode || "rating";
+            if (state) { setState({}); }
 
-            dom.inArtist.addEventListener("input", (e) => { state.artist = e.target.value; render(false); });
-            dom.inAlbum.addEventListener("input", (e) => { state.album = e.target.value; render(false); });
-            dom.inYear.addEventListener("input", (e) => { state.released = e.target.value; render(false); });
-            dom.inRanker.addEventListener("input", (e) => { state.rankedby = e.target.value; render(false); });
+            initInteractiveChart();
 
-            dom.fileInput.addEventListener("change", (e) => {
+            // Inputs
+            dom.btnFetch.addEventListener("click", openSearchSelector);
+            dom.inArtist.addEventListener("input", e => { state.artist=e.target.value; saveSession(); render(); });
+            dom.inAlbum.addEventListener("input", e => { state.album=e.target.value; saveSession(); render(); });
+            dom.inYear.addEventListener("input", e => { state.released=e.target.value; saveSession(); render(); });
+            dom.inRanker.addEventListener("input", e => { state.rankedby=e.target.value; saveSession(); render(); });
+
+            // Restaurar selects
+            if (state && state.mode) document.getElementById('selMode').value = state.mode;
+
+            // File upload (cover)
+            dom.fileInput.addEventListener("change", e => {
                 const file = e.target.files[0];
-                if (file) {
+                if(file) {
                     const reader = new FileReader();
-                    reader.onload = function(evt) { state.cover = evt.target.result; render(false); };
+                    reader.onload = ev => { state.cover=ev.target.result; saveSession(); render(); };
                     reader.readAsDataURL(file);
                 }
             });
 
-            dom.btnFetch.addEventListener("click", () => {
-                document.getElementById("searchModal").classList.add("open");
-                document.getElementById("searchResultsList").innerHTML = `
-                    <div class="search-item" onclick="window.AlbumApp.applyMockFetch('Concrete Boys', 'It\\'s Us Vol. 2', '2024')"><strong>Concrete Boys - It's Us Vol. 2 (2024)</strong></div>
-                    <div class="search-item" onclick="window.AlbumApp.applyMockFetch('Radiohead', 'OK Computer', '1997')"><strong>Radiohead - OK Computer (1997)</strong></div>
-                    <div class="search-item" onclick="window.AlbumApp.applyMockFetch('Kendrick Lamar', 'To Pimp a Butterfly', '2015')"><strong>Kendrick Lamar - To Pimp a Butterfly (2015)</strong></div>
-                `;
-            });
-
+            // Save image
             document.getElementById("btnSaveImage").addEventListener("click", () => {
                 html2canvas(document.getElementById("cardExport"), {backgroundColor:"#050505",scale:2}).then(canvas => {
                     const link = document.createElement('a');
@@ -1029,54 +1224,32 @@ window.AlbumApp = (function() {
                 });
             });
 
+            // Add to library
             document.getElementById("btnAddToLib").addEventListener("click", addCurrentToLibrary);
+
+            // Save library to file
             document.getElementById("btnSaveLib").addEventListener("click", exportLibrary);
-            document.getElementById("btnLoadLib").addEventListener("click", () => document.getElementById('libFileInput').click());
-            
+
+            // Load library from file
+            document.getElementById("btnLoadLib").addEventListener("click", () => {
+                document.getElementById('libFileInput').click();
+            });
             document.getElementById("libFileInput").addEventListener("change", e => {
                 const file = e.target.files[0];
                 if(file) importLibrary(file);
-                e.target.value = '';
+                e.target.value = ''; // reset so same file can be reloaded
             });
 
+            // Tabs
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', () => switchTab(btn.dataset.tab));
             });
 
             updateLibCount();
             render(true);
-        },
-        changeMode: function(val) { state.mode = val; render(true); },
-        clearScores: function() { state.tracks.forEach(t => { if (state.mode === 'rating') t.score = ""; }); render(true); },
-        newSession: function() {
-            confirmAction("Nueva Sesión", "¿Quieres limpiar los campos del editor? Perderás cambios no guardados.", () => {
-                state = DEFAULT_STATE();
-                dom.inArtist.value = ""; dom.inAlbum.value = ""; dom.inYear.value = ""; dom.inRanker.value = "";
-                document.getElementById("selMode").value = "rating";
-                render(true);
-                showToast("✨ Nueva sesión iniciada");
-            });
-        },
-        addTrack: function() { state.tracks.push({name: "", duration: "", score: state.mode === 'rating' ? "" : undefined}); render(true); },
-        renderLibrary: renderLibrary,
-        setSort: function(type, element) {
-            libSort = type;
-            document.querySelectorAll('.lib-sort-btn').forEach(b => b.classList.remove('active'));
-            element.classList.add('active');
-            renderLibrary();
-        },
-        confirmYes: function() { document.getElementById("confirmModal").classList.remove("open"); if (confirmCallback) confirmCallback(); confirmCallback = null; },
-        confirmCancel: function() { document.getElementById("confirmModal").classList.remove("open"); confirmCallback = null; },
-        editFromLibrary: editFromLibrary,
-        deleteFromLibrary: deleteFromLibrary,
-        removeCover: function() { state.cover = ""; render(false); },
-        applyMockFetch: function(artist, album, year) {
-            state.artist = artist; state.album = album; state.released = year;
-            dom.inArtist.value = artist; dom.inAlbum.value = album; dom.inYear.value = year;
-            document.getElementById("searchModal").classList.remove("open");
-            render(true);
         }
     };
+
 })();
 
 window.onload = window.AlbumApp.init;
