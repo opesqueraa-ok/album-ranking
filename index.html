@@ -311,7 +311,6 @@
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
     </div>
 
-    <!-- ===== TAB: EDITOR ===== -->
     <div class="tab-content active" id="tab-editor">
         <div class="save-to-lib-bar">
             <span>✅ Cuando termines de puntear un álbum, agrégalo a tu biblioteca para guardarlo.</span>
@@ -421,7 +420,6 @@
         </div>
     </div>
 
-    <!-- ===== TAB: LIBRARY ===== -->
     <div class="tab-content" id="tab-library">
         <div class="lib-stats-bar" id="libStatsBar"></div>
 
@@ -442,7 +440,6 @@
     </div>
 </div>
 
-<!-- SEARCH MODAL -->
 <div class="modal-overlay" id="searchModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -453,7 +450,6 @@
     </div>
 </div>
 
-<!-- CONFIRM MODAL -->
 <div class="confirm-modal" id="confirmModal">
     <div class="confirm-box">
         <h3 id="confirmTitle">¿Estás seguro?</h3>
@@ -465,10 +461,8 @@
     </div>
 </div>
 
-<!-- TOAST -->
 <div id="toast"></div>
 
-<!-- FILE INPUT PARA CARGAR BIBLIOTECA -->
 <input type="file" id="libFileInput" accept=".ara,.json" style="display:none;">
 
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
@@ -777,11 +771,31 @@ window.AlbumApp = (function() {
         dom.btnFetch.textContent = "⏳ Buscando...";
         dom.btnFetch.disabled = true;
         try {
-            let results = await searchItunes(art, alb);
-            if (results.length === 0) results = await searchMusicBrainz(art, alb);
-            if (results.length === 0) { alert("No se encontró el álbum. Intenta con un nombre más corto."); resetFetchBtn(); return; }
-            renderSearchResults(results);
-        } catch(e) { console.error(e); alert("Error de conexión."); }
+            // Motor de búsqueda en paralelo (iTunes, MusicBrainz, Discogs)
+            const resultsArray = await Promise.allSettled([
+                searchItunes(art, alb),
+                searchMusicBrainz(art, alb),
+                searchDiscogs(art, alb)
+            ]);
+            
+            // Unificar todos los resultados obtenidos exitosamente
+            let combinedResults = [];
+            resultsArray.forEach(res => {
+                if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+                    combinedResults = combinedResults.concat(res.value);
+                }
+            });
+
+            if (combinedResults.length === 0) { 
+                alert("No se encontró el álbum. Intenta con un nombre más corto o diferente."); 
+                resetFetchBtn(); 
+                return; 
+            }
+            renderSearchResults(combinedResults);
+        } catch(e) { 
+            console.error(e); 
+            alert("Error de conexión durante la búsqueda."); 
+        }
         resetFetchBtn();
     }
 
@@ -789,33 +803,61 @@ window.AlbumApp = (function() {
         const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
         const attempts = [`${artist} ${album}`, `${artist} ${cleanAlb}`, artist];
         for (const term of attempts) {
-            const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=15`);
-            const data = await res.json();
-            if (data.results && data.results.length > 0) {
-                return data.results.map(item => ({
-                    source: 'itunes', id: item.collectionId,
-                    albumName: item.collectionName, artistName: item.artistName,
-                    year: item.releaseDate ? item.releaseDate.substring(0,4) : "----",
-                    coverUrl: item.artworkUrl100.replace("100x100bb","600x600bb")
-                }));
-            }
+            try {
+                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=10`);
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    return data.results.map(item => ({
+                        source: 'itunes', id: item.collectionId,
+                        albumName: item.collectionName, artistName: item.artistName,
+                        year: item.releaseDate ? item.releaseDate.substring(0,4) : "----",
+                        coverUrl: item.artworkUrl100.replace("100x100bb","600x600bb")
+                    }));
+                }
+            } catch(e) { console.error("Error iTunes:", e); }
         }
         return [];
     }
 
     async function searchMusicBrainz(artist, album) {
-        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
-        const query = encodeURIComponent(`release:${cleanAlb} AND artist:${artist}`);
-        const res = await fetch(`https://musicbrainz.org/ws/2/release?query=${query}&fmt=json`);
-        const data = await res.json();
-        if (!data.releases) return [];
-        return data.releases.slice(0,10).map(item => ({
-            source: 'musicbrainz', id: item.id,
-            albumName: item.title,
-            artistName: item["artist-credit"] ? item["artist-credit"][0].name : artist,
-            year: item.date ? item.date.substring(0,4) : "----",
-            coverUrl: `https://coverartarchive.org/release/${item.id}/front-250`
-        }));
+        try {
+            const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
+            const query = encodeURIComponent(`release:${cleanAlb} AND artist:${artist}`);
+            const res = await fetch(`https://musicbrainz.org/ws/2/release?query=${query}&fmt=json`);
+            const data = await res.json();
+            if (!data.releases) return [];
+            return data.releases.slice(0,10).map(item => ({
+                source: 'musicbrainz', id: item.id,
+                albumName: item.title,
+                artistName: item["artist-credit"] ? item["artist-credit"][0].name : artist,
+                year: item.date ? item.date.substring(0,4) : "----",
+                coverUrl: `https://coverartarchive.org/release/${item.id}/front-250`
+            }));
+        } catch(e) { console.error("Error MusicBrainz:", e); return []; }
+    }
+
+    async function searchDiscogs(artist, album) {
+        try {
+            const key = "RzuSUUssEDbaCqSwTzWC";
+            const secret = "jTOMrfFPOyKtQzavbWrJoJBSFVsoBaqy";
+            const url = `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(album)}&type=release&key=${key}&secret=${secret}&per_page=10`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.results) return [];
+            
+            return data.results.map(item => {
+                let parts = item.title.split(' - ');
+                let artName = parts[0] ? parts[0].trim() : artist;
+                let albName = parts[1] ? parts[1].trim() : item.title;
+                return {
+                    source: 'discogs', id: item.id,
+                    albumName: albName, artistName: artName,
+                    year: item.year || "----",
+                    coverUrl: item.cover_image || "https://via.placeholder.com/600x600/111/333?text=No+Cover"
+                };
+            });
+        } catch(e) { console.error("Error Discogs:", e); return []; }
     }
 
     function renderSearchResults(results) {
@@ -829,7 +871,7 @@ window.AlbumApp = (function() {
                 <img src="${item.coverUrl}" onerror="this.src='https://via.placeholder.com/50?text=?'" style="width:50px;height:50px;border-radius:4px;object-fit:cover;">
                 <div style="overflow:hidden;width:100%;">
                     <div style="font-size:12px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.albumName}</div>
-                    <div style="font-size:11px;color:#888;">${item.artistName} (${item.year}) — 🗄️ ${item.source}</div>
+                    <div style="font-size:11px;color:#888;">${item.artistName} (${item.year}) — 🗄️ ${item.source.toUpperCase()}</div>
                 </div>`;
             div.onclick = () => fetchTracks(item);
             list.appendChild(div);
@@ -854,6 +896,16 @@ window.AlbumApp = (function() {
                 if (data.media && data.media.length > 0) {
                     tracks = data.media.flatMap(m => m.tracks).map(t => ({
                         name: t.recording.title, duration: t.length ? msToTime(t.length) : "??:??", score: ""
+                    }));
+                }
+            } else if (item.source === 'discogs') {
+                const key = "RzuSUUssEDbaCqSwTzWC";
+                const secret = "jTOMrfFPOyKtQzavbWrJoJBSFVsoBaqy";
+                const res = await fetch(`https://api.discogs.com/releases/${item.id}?key=${key}&secret=${secret}`);
+                const data = await res.json();
+                if (data.tracklist && data.tracklist.length > 0) {
+                    tracks = data.tracklist.map(t => ({
+                        name: t.title, duration: t.duration || "??:??", score: ""
                     }));
                 }
             }
@@ -958,8 +1010,9 @@ window.AlbumApp = (function() {
                 row.addEventListener('drop', handleDrop);
                 row.addEventListener('dragend', handleDragEnd);
             }
+            // Ampliado el ancho a width:70px para apreciar completamente los decimales sin cortes
             let rightControl = state.mode==='rating' ?
-                `<input class="track-input-score" type="number" step="0.1" min="0" max="10" value="${t.score}" oninput="window.AlbumApp.updateTrackFromInput(${i},this.value)" style="width:50px;text-align:center;font-weight:bold;color:white;background:#0b0f15;border:1px solid #333;border-radius:4px;">` :
+                `<input class="track-input-score" type="number" step="0.1" min="0" max="10" value="${t.score}" oninput="window.AlbumApp.updateTrackFromInput(${i},this.value)" style="width:70px;text-align:center;font-weight:bold;color:white;background:#0b0f15;border:1px solid #333;border-radius:4px;">` :
                 `<span style="width:50px;text-align:center;color:#888;font-size:18px;cursor:grab;" title="Arrastrar para ordenar">≡</span>`;
             row.innerHTML = `
                 <span class="track-num">${i+1}</span>
