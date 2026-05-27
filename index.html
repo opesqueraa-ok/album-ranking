@@ -726,17 +726,15 @@ window.AlbumApp = (function() {
                          src="${a.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
                          onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
                          alt="${a.album}">
+                    ${score !== null ? `<div class="lib-card-score">${meritHTML}${scoreStr}</div>` : ''}
                 </div>
                 <div class="lib-card-body">
                     <div class="lib-card-artist">${a.artist || 'Unknown Artist'}</div>
                     <div class="lib-card-album" title="${(a.album || '').replace(/"/g, '&quot;')}">${a.album || 'Unknown Album'}</div>
                     <div class="lib-card-meta">${a.released || '—'} · ${trackCount} tracks · ${a.mode === 'ranking' ? 'Ranking' : 'Rating'}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; gap:6px;">
-                        <div style="display:flex; gap:5px; flex:1;">
-                            <button class="btn-edit" onclick="window.AlbumApp.editFromLibrary(${a.id})">✏️ Edit</button>
-                            <button class="btn-del" onclick="window.AlbumApp.deleteFromLibrary(${a.id})">🗑️ Delete</button>
-                        </div>
-                        ${score !== null ? `<div style="font-weight:800; font-size:15px; color:${scoreColor}; letter-spacing:-0.5px; white-space:nowrap;">${meritHTML}${scoreStr}</div>` : ''}
+                    <div class="lib-card-actions">
+                        <button class="btn-edit" onclick="window.AlbumApp.editFromLibrary(${a.id})">✏️ Edit</button>
+                        <button class="btn-del" onclick="window.AlbumApp.deleteFromLibrary(${a.id})">🗑️ Delete</button>
                     </div>
                 </div>`;
             dom.libGrid.appendChild(card);
