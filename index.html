@@ -276,6 +276,41 @@
         .lib-stat-val { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
         .lib-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
 
+        /* Clickable stat */
+        .lib-stat.clickable { cursor: pointer; transition: 0.2s; }
+        .lib-stat.clickable:hover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+        .lib-stat.clickable:hover .lib-stat-label { color: #60a5fa; }
+
+        /* Artists modal */
+        .artists-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 15000; justify-content: center; align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        .artists-modal.open { display: flex; }
+        .artists-modal-box {
+            background: #161b26; border: 1px solid #334155; border-radius: 14px;
+            width: 90%; max-width: 480px; max-height: 75vh;
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        .artists-modal-header {
+            padding: 20px 24px; border-bottom: 1px solid #1e2433;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .artists-modal-header h3 { margin: 0; font-family: 'Lora', serif; font-size: 18px; }
+        .artists-modal-body { overflow-y: auto; padding: 12px 0; }
+        .artist-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 11px 24px; transition: 0.15s;
+        }
+        .artist-row:hover { background: rgba(255,255,255,0.04); }
+        .artist-row-name { font-size: 14px; font-weight: 600; }
+        .artist-row-count {
+            font-size: 12px; font-weight: 700; color: white;
+            background: var(--accent); padding: 3px 9px; border-radius: 12px; min-width: 28px; text-align: center;
+        }
+
         /* TOAST */
         #toast {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
@@ -483,8 +518,18 @@
 </div>
 
 <!-- CONFIRM MODAL -->
-<div class="confirm-modal" id="confirmModal">
-    <div class="confirm-box">
+<!-- ARTISTS MODAL -->
+<div class="artists-modal" id="artistsModal">
+    <div class="artists-modal-box">
+        <div class="artists-modal-header">
+            <h3>🎤 Artists</h3>
+            <button onclick="document.getElementById('artistsModal').classList.remove('open')" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <div class="artists-modal-body" id="artistsModalBody"></div>
+    </div>
+</div>
+
+<div class="confirm-modal" id="confirmModal">    <div class="confirm-box">
         <h3 id="confirmTitle">¿Estás seguro?</h3>
         <p id="confirmMsg">Esta acción no se puede deshacer.</p>
         <div class="confirm-actions">
@@ -714,9 +759,12 @@ window.AlbumApp = (function() {
             const scoreColor = score !== null ? getBadgeColor(score) : '#333';
             const trackCount = a.tracks.length;
 
-            // Merit badge: score >= 8.0 AND tracks >= 20
-            const hasMerit = score !== null && score >= 8.0 && trackCount >= 20;
-            const meritHTML = hasMerit ? `<span class="lib-merit-badge" title="Merit: ${scoreStr} avg across ${trackCount} tracks">🏆</span>` : '';
+            // Merit badge: ⭐ score >= 8.0 AND tracks >= 20 / 🏆 score >= 8.0 AND tracks >= 30
+            let meritHTML = '';
+            if (score !== null && score >= 8.0) {
+                if (trackCount >= 30) meritHTML = `<span class="lib-merit-badge" title="🏆 Merit: ${scoreStr} avg across ${trackCount} tracks">🏆</span>`;
+                else if (trackCount >= 20) meritHTML = `<span class="lib-merit-badge" title="⭐ Merit: ${scoreStr} avg across ${trackCount} tracks">⭐</span>`;
+            }
 
             const card = document.createElement('div');
             card.className = 'lib-card';
@@ -743,12 +791,25 @@ window.AlbumApp = (function() {
 
     function renderLibStats() {
         if (library.length === 0) { dom.libStatsBar.innerHTML = ''; return; }
-        const scores = library.map(a => computeScore(a.tracks)).filter(s => s !== null);
-        const avgAll = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
-        const best = scores.length > 0 ? Math.max(...scores).toFixed(1) : '—';
-        const artists = new Set(library.map(a => a.artist.toLowerCase())).size;
 
-        // "Año de Oro": year with highest average score (only rated albums)
+        // AVG Album Score
+        const scores = library.map(a => computeScore(a.tracks)).filter(s => s !== null);
+        const avgAlbum = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
+
+        // AVG Song Score — every individual rated track across all albums
+        let songTotal = 0, songCount = 0;
+        library.forEach(a => {
+            a.tracks.forEach(t => {
+                const s = parseFloat(t.score);
+                if (!isNaN(s)) { songTotal += s; songCount++; }
+            });
+        });
+        const avgSong = songCount > 0 ? (songTotal / songCount).toFixed(1) : '—';
+
+        // Artists count
+        const artistsCount = new Set(library.map(a => a.artist.toLowerCase())).size;
+
+        // Golden Year
         const yearMap = {};
         library.filter(a => a.mode !== 'ranking' && a.released).forEach(a => {
             const s = computeScore(a.tracks);
@@ -769,11 +830,32 @@ window.AlbumApp = (function() {
 
         dom.libStatsBar.innerHTML = `
             <div class="lib-stat"><div class="lib-stat-val">${library.length}</div><div class="lib-stat-label">Albums</div></div>
-            <div class="lib-stat"><div class="lib-stat-val">${artists}</div><div class="lib-stat-label">Artists</div></div>
-            <div class="lib-stat"><div class="lib-stat-val">${avgAll}</div><div class="lib-stat-label">Avg Score</div></div>
-            <div class="lib-stat"><div class="lib-stat-val">${best}</div><div class="lib-stat-label">Best Score</div></div>
+            <div class="lib-stat clickable" onclick="window.AlbumApp.openArtistsModal()" title="Click to see all artists"><div class="lib-stat-val">${artistsCount}</div><div class="lib-stat-label">Artists →</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${avgAlbum}</div><div class="lib-stat-label">AVG Album Score</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${avgSong}</div><div class="lib-stat-label">AVG Song Score</div></div>
             <div class="lib-stat"><div class="lib-stat-val" style="font-size:20px;">${goldenLabel}</div><div class="lib-stat-label">🏅 Golden Year</div></div>
         `;
+    }
+
+    function openArtistsModal() {
+        // Build artist map sorted alphabetically
+        const artistMap = {};
+        library.forEach(a => {
+            const key = a.artist.trim();
+            if (!key) return;
+            if (!artistMap[key]) artistMap[key] = 0;
+            artistMap[key]++;
+        });
+        const sorted = Object.entries(artistMap).sort((a, b) => a[0].localeCompare(b[0]));
+
+        const body = document.getElementById('artistsModalBody');
+        body.innerHTML = sorted.map(([name, count]) => `
+            <div class="artist-row">
+                <span class="artist-row-name">${name}</span>
+                <span class="artist-row-count">${count}</span>
+            </div>`).join('');
+
+        document.getElementById('artistsModal').classList.add('open');
     }
 
     // ===================== TABS =====================
@@ -1264,6 +1346,7 @@ window.AlbumApp = (function() {
         editFromLibrary,
         deleteFromLibrary,
         renderLibrary,
+        openArtistsModal,
         confirmYes: () => {
             document.getElementById('confirmModal').classList.remove('open');
             if (confirmCallback) { confirmCallback(); confirmCallback = null; }
