@@ -216,14 +216,14 @@
         }
         .lib-card:hover { border-color: rgba(255,255,255,0.18); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
 
-        /* Cover image wrapper — needed to anchor score badge to image, not full card */
+        /* Cover image wrapper */
         .lib-card-cover-wrap { position: relative; width: 100%; }
         .lib-card-cover {
             width: 100%; aspect-ratio: 1/1; object-fit: cover;
             background: #111; display: block;
         }
 
-        /* Score badge — top-right corner of cover, pill style */
+        /* Score badge */
         .lib-card-score {
             position: absolute; top: 9px; right: 9px;
             font-weight: 800; font-size: 14px; color: white;
@@ -276,7 +276,6 @@
         .lib-stat-val { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
         .lib-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
 
-        /* Clickable stat */
         .lib-stat.clickable { cursor: pointer; transition: 0.2s; }
         .lib-stat.clickable:hover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
         .lib-stat.clickable:hover .lib-stat-label { color: #60a5fa; }
@@ -372,6 +371,7 @@
     <div class="tabs-bar">
         <button class="tab-btn active" data-tab="editor">🎵 Editor</button>
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
+        <button class="tab-btn" data-tab="artists">🎤 Artists</button>
     </div>
 
     <!-- ===== TAB: EDITOR ===== -->
@@ -504,6 +504,11 @@
 
         <div id="libraryGrid" class="library-grid"></div>
     </div>
+
+    <!-- ===== TAB: ARTISTS ===== -->
+    <div class="tab-content" id="tab-artists">
+        <div id="artistProfileContainer"></div>
+    </div>
 </div>
 
 <!-- SEARCH MODAL -->
@@ -517,7 +522,6 @@
     </div>
 </div>
 
-<!-- CONFIRM MODAL -->
 <!-- ARTISTS MODAL -->
 <div class="artists-modal" id="artistsModal">
     <div class="artists-modal-box">
@@ -529,7 +533,9 @@
     </div>
 </div>
 
-<div class="confirm-modal" id="confirmModal">    <div class="confirm-box">
+<!-- CONFIRM MODAL -->
+<div class="confirm-modal" id="confirmModal">
+    <div class="confirm-box">
         <h3 id="confirmTitle">¿Estás seguro?</h3>
         <p id="confirmMsg">Esta acción no se puede deshacer.</p>
         <div class="confirm-actions">
@@ -558,8 +564,10 @@ window.AlbumApp = (function() {
     let dragSrcEl = null;
     let libSort = 'score';
     let confirmCallback = null;
-    let sortedByScore = false;        // toggle for Sort by Score in editor
-    let originalTrackOrder = null;    // backup of original order
+    let sortedByScore = false;        
+    let originalTrackOrder = null;    
+    let currentSelectedArtist = null;
+    let artistFavoriteOverrides = {};
 
     const DEFAULT_STATE = () => ({
         mode: "rating",
@@ -568,7 +576,7 @@ window.AlbumApp = (function() {
     });
 
     let state = DEFAULT_STATE();
-    let library = []; // Array de álbumes guardados
+    let library = []; 
 
     const dom = {
         inArtist: document.getElementById("inArtist"),
@@ -610,7 +618,7 @@ window.AlbumApp = (function() {
 
     function exportLibrary() {
         const payload = {
-            _ara_version: "2.0",
+            _ara_version: "2.1",
             _exported: new Date().toISOString(),
             library: library
         };
@@ -634,6 +642,7 @@ window.AlbumApp = (function() {
                     showToast(`✅ Biblioteca cargada: ${library.length} álbumes`);
                     renderLibrary();
                     updateLibCount();
+                    if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
                 } else {
                     alert("El archivo no parece ser una biblioteca ARA válida.");
                 }
@@ -652,7 +661,6 @@ window.AlbumApp = (function() {
             return;
         }
 
-        // Detectar si ya existe el mismo álbum
         const existingIdx = library.findIndex(a =>
             a.artist.toLowerCase() === state.artist.toLowerCase() &&
             a.album.toLowerCase() === state.album.toLowerCase()
@@ -675,6 +683,7 @@ window.AlbumApp = (function() {
 
         updateLibCount();
         renderLibrary();
+        if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
     }
 
     function editFromLibrary(id) {
@@ -694,6 +703,7 @@ window.AlbumApp = (function() {
                 library = library.filter(a => a.id !== id);
                 updateLibCount();
                 renderLibrary();
+                if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
                 showToast("🗑️ Álbum eliminado");
             }
         );
@@ -721,7 +731,6 @@ window.AlbumApp = (function() {
             return matchQ && matchMode;
         });
 
-        // Sort
         items = [...items].sort((a, b) => {
             if (libSort === 'score') {
                 const sa = computeScore(a.tracks) ?? -1;
@@ -734,7 +743,6 @@ window.AlbumApp = (function() {
             return 0;
         });
 
-        // Stats bar
         renderLibStats();
 
         if (items.length === 0) {
@@ -756,10 +764,8 @@ window.AlbumApp = (function() {
         items.forEach(a => {
             const score = computeScore(a.tracks);
             const scoreStr = score !== null ? score.toFixed(1) : '—';
-            const scoreColor = score !== null ? getBadgeColor(score) : '#333';
             const trackCount = a.tracks.length;
 
-            // Merit badge: ⭐ score >= 8.0 AND tracks >= 20 / 🏆 score >= 8.0 AND tracks >= 30
             let meritHTML = '';
             if (score !== null && score >= 8.0) {
                 if (trackCount >= 30) meritHTML = `<span class="lib-merit-badge" title="🏆 Merit: ${scoreStr} avg across ${trackCount} tracks">🏆</span>`;
@@ -792,11 +798,9 @@ window.AlbumApp = (function() {
     function renderLibStats() {
         if (library.length === 0) { dom.libStatsBar.innerHTML = ''; return; }
 
-        // AVG Album Score
         const scores = library.map(a => computeScore(a.tracks)).filter(s => s !== null);
         const avgAlbum = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
 
-        // AVG Song Score — every individual rated track across all albums
         let songTotal = 0, songCount = 0;
         library.forEach(a => {
             a.tracks.forEach(t => {
@@ -806,10 +810,8 @@ window.AlbumApp = (function() {
         });
         const avgSong = songCount > 0 ? (songTotal / songCount).toFixed(1) : '—';
 
-        // Artists count
         const artistsCount = new Set(library.map(a => a.artist.toLowerCase())).size;
 
-        // Golden Year
         const yearMap = {};
         library.filter(a => a.mode !== 'ranking' && a.released).forEach(a => {
             const s = computeScore(a.tracks);
@@ -838,10 +840,9 @@ window.AlbumApp = (function() {
     }
 
     function openArtistsModal() {
-        // Build artist map sorted alphabetically
         const artistMap = {};
         library.forEach(a => {
-            const key = a.artist.trim();
+            const key = a.artist ? a.artist.trim() : '';
             if (!key) return;
             if (!artistMap[key]) artistMap[key] = 0;
             artistMap[key]++;
@@ -850,12 +851,204 @@ window.AlbumApp = (function() {
 
         const body = document.getElementById('artistsModalBody');
         body.innerHTML = sorted.map(([name, count]) => `
-            <div class="artist-row">
+            <div class="artist-row" onclick="window.AlbumApp.selectArtistFromModal('${name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
                 <span class="artist-row-name">${name}</span>
                 <span class="artist-row-count">${count}</span>
             </div>`).join('');
 
         document.getElementById('artistsModal').classList.add('open');
+    }
+
+    // ===================== ARTISTS ECOSYSTEM =====================
+
+    function getArtistCatalog(artistName) {
+        let tracks = [];
+        library
+            .filter(a => a.artist && a.artist.toLowerCase() === artistName.toLowerCase())
+            .forEach(album => {
+                album.tracks.forEach((track, trackIdx) => {
+                    const scoreVal = parseFloat(track.score);
+                    if (!isNaN(scoreVal)) {
+                        tracks.push({
+                            albumId: album.id,
+                            albumTitle: album.album,
+                            albumCover: album.cover,
+                            trackIdx: trackIdx,
+                            name: track.name,
+                            duration: track.duration,
+                            score: scoreVal
+                        });
+                    }
+                });
+            });
+
+        tracks.sort((a, b) => b.score - a.score);
+        return tracks;
+    }
+
+    function renderArtistProfile(artistName) {
+        const container = document.getElementById("artistProfileContainer");
+        if (!container) return;
+
+        const tracks = getArtistCatalog(artistName);
+
+        if (tracks.length === 0) {
+            container.innerHTML = `
+                <div style="margin-bottom:20px;">
+                    <button onclick="window.AlbumApp.renderArtistTab()" style="background:transparent; border:1px solid var(--border); color:var(--text-main); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver a lista de artistas</button>
+                </div>
+                <div style="background:var(--bg-card); padding:25px; border-radius:12px; border:1px solid var(--border);">
+                    <h2>${artistName}</h2>
+                    <p style="color:var(--text-muted);">No hay canciones punteadas para este artista.</p>
+                </div>`;
+            return;
+        }
+
+        const avgScore = (tracks.reduce((acc, t) => acc + t.score, 0) / tracks.length).toFixed(1);
+
+        const topScore = tracks[0].score;
+        const topTracks = tracks.filter(t => t.score === topScore);
+        
+        let favoriteTrack = topTracks[0]; 
+        
+        const overrideKey = `${artistName.toLowerCase()}_fav`;
+        if (topTracks.length > 1 && artistFavoriteOverrides[overrideKey]) {
+            const foundFav = topTracks.find(t => `${t.albumId}_${t.trackIdx}` === artistFavoriteOverrides[overrideKey]);
+            if (foundFav) favoriteTrack = foundFav;
+        }
+
+        container.innerHTML = `
+            <div style="margin-bottom:20px;">
+                <button onclick="window.AlbumApp.renderArtistTab()" style="background:transparent; border:1px solid var(--border); color:var(--text-main); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">← Volver a lista de artistas</button>
+            </div>
+            <div style="background:var(--bg-card); padding:25px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h2 style="margin:0; font-size:28px;">${artistName}</h2>
+                        <p style="color:var(--text-muted); margin:5px 0 0 0;">${tracks.length} canciones punteadas</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:36px; font-weight:800; color:white;">${avgScore}</div>
+                        <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Promedio del Artista</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px; background:#0b0f15; padding:15px; border-radius:8px; border:1px solid rgba(59,130,246,0.3); display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                    <span style="font-size:24px;">⭐</span>
+                    <div style="flex:1;">
+                        <div style="font-size:10px; color:#60a5fa; font-weight:700; text-transform:uppercase;">Canción Favorita</div>
+                        <div style="font-size:16px; font-weight:700; color:white;">${favoriteTrack.name} <span style="font-size:12px; color:var(--text-muted);">(${favoriteTrack.score.toFixed(1)})</span></div>
+                        <div style="font-size:12px; color:var(--text-muted);">${favoriteTrack.albumTitle}</div>
+                    </div>
+                    ${topTracks.length > 1 ? `
+                        <select onchange="window.AlbumApp.setFavoriteOverride('${artistName.replace(/'/g, "\\'")}', this.value)" style="padding:6px 10px; font-size:11px; background:#161b26; color:white; border:1px solid var(--border); border-radius:4px;">
+                            ${topTracks.map(t => {
+                                const idKey = `${t.albumId}_${t.trackIdx}`;
+                                const selected = idKey === `${favoriteTrack.albumId}_${favoriteTrack.trackIdx}` ? 'selected' : '';
+                                return `<option value="${idKey}" ${selected}>Elegir: ${t.name} (${t.score.toFixed(1)})</option>`;
+                            }).join('')}
+                        </select>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div style="background:var(--bg-card); padding:20px; border-radius:12px; border:1px solid var(--border);">
+                <h3 style="margin-top:0; font-family:'Lora', serif;">Catálogo de Canciones (${tracks.length})</h3>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${tracks.map(t => `
+                        <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433;">
+                            <img src="${t.albumCover || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                            <div style="flex:1;">
+                                <div style="font-weight:700; font-size:14px;">${t.name}</div>
+                                <div style="font-size:11px; color:var(--text-muted);">${t.albumTitle} · ${t.duration}</div>
+                            </div>
+                            <input type="number" step="0.1" min="0" max="10" value="${t.score}" 
+                                   onchange="window.AlbumApp.updateTrackFromArtistProfile(${t.albumId}, ${t.trackIdx}, this.value, '${artistName.replace(/'/g, "\\'")}')"
+                                   style="width:65px; text-align:center; font-weight:bold; background:#161b26; border:1px solid var(--accent); color:white; border-radius:4px; padding:6px;">
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderArtistTab() {
+        currentSelectedArtist = null;
+        const container = document.getElementById("artistProfileContainer");
+        if (!container) return;
+
+        const artistMap = {};
+        library.forEach(a => {
+            const key = a.artist ? a.artist.trim() : '';
+            if (!key) return;
+            if (!artistMap[key]) artistMap[key] = { albums: 0, totalScore: 0, scoredTracks: 0 };
+            artistMap[key].albums++;
+            a.tracks.forEach(t => {
+                const s = parseFloat(t.score);
+                if (!isNaN(s)) {
+                    artistMap[key].totalScore += s;
+                    artistMap[key].scoredTracks++;
+                }
+            });
+        });
+
+        const artistKeys = Object.keys(artistMap).sort((a,b) => a.localeCompare(b));
+
+        if (artistKeys.length === 0) {
+            container.innerHTML = `
+                <div class="library-empty">
+                    <div class="empty-icon">🎤</div>
+                    <h3>No hay artistas en tu biblioteca</h3>
+                    <p>Agrega álbumes con canciones punteadas para explorar perfiles de artistas.</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="background:var(--bg-card); padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px;">
+                <h2 style="margin-top:0;">Ecosistema de Artistas</h2>
+                <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">Selecciona un artista para calibrar su catálogo de canciones ($10 \\rightarrow 0$), revisar su promedio automático y gestionar su canción favorita.</p>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:15px;">
+                    ${artistKeys.map(name => {
+                        const data = artistMap[name];
+                        const avg = data.scoredTracks > 0 ? (data.totalScore / data.scoredTracks).toFixed(1) : '—';
+                        return `
+                            <div onclick="window.AlbumApp.selectArtist('${name.replace(/'/g, "\\'")}')" 
+                                 style="background:#0b0f15; border:1px solid #1e2433; border-radius:8px; padding:15px; cursor:pointer; transition:0.2s;"
+                                 onmouseover="this.style.borderColor='var(--accent)'" 
+                                 onmouseout="this.style.borderColor='#1e2433'">
+                                <div style="font-weight:700; font-size:16px; margin-bottom:6px; color:white;">${name}</div>
+                                <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+                                    <span>${data.albums} álbum(es) · ${data.scoredTracks} temas</span>
+                                    <span style="font-weight:800; color:white; background:rgba(59,130,246,0.2); padding:2px 8px; border-radius:4px;">${avg}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>`;
+    }
+
+    function selectArtist(artistName) {
+        currentSelectedArtist = artistName;
+        renderArtistProfile(artistName);
+    }
+
+    function updateTrackFromArtistProfile(albumId, trackIdx, newScore, artistName) {
+        const album = library.find(a => a.id === albumId);
+        if (album) {
+            album.tracks[trackIdx].score = newScore;
+            album.updatedAt = new Date().toISOString();
+            
+            renderArtistProfile(artistName);
+            renderLibrary();
+            showToast("✏️ Nota actualizada en el catálogo global");
+        }
+    }
+
+    function setFavoriteOverride(artistName, key) {
+        artistFavoriteOverrides[`${artistName.toLowerCase()}_fav`] = key;
+        renderArtistProfile(artistName);
     }
 
     // ===================== TABS =====================
@@ -864,6 +1057,10 @@ window.AlbumApp = (function() {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tabName}`));
         if (tabName === 'library') renderLibrary();
+        if (tabName === 'artists') {
+            if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
+            else renderArtistTab();
+        }
     }
 
     // ===================== HELPERS =====================
@@ -908,7 +1105,6 @@ window.AlbumApp = (function() {
     // ===================== SEARCH =====================
     const DISCOGS_KEY = "RzuSUUssEDbaCqSwTzWC";
 
-    // Deduplicate results by albumName+artistName, keeping first occurrence
     function dedupeResults(results) {
         const seen = new Set();
         return results.filter(r => {
@@ -918,14 +1114,12 @@ window.AlbumApp = (function() {
         });
     }
 
-    // Score a result against the query to sort by relevance
     function relevanceScore(item, artist, album) {
         const a = artist.toLowerCase(); const b = album.toLowerCase();
         const ia = item.artistName.toLowerCase(); const ib = item.albumName.toLowerCase();
         let score = 0;
         if (ia === a) score += 40; else if (ia.includes(a) || a.includes(ia)) score += 20;
         if (ib === b) score += 40; else if (ib.includes(b) || b.includes(ib)) score += 20;
-        // Boost exact self-titled albums (e.g. "Playboi Carti - Playboi Carti")
         if (a === b && ia.includes(a) && ib.includes(b)) score += 10;
         return score;
     }
@@ -939,7 +1133,6 @@ window.AlbumApp = (function() {
         dom.btnFetch.disabled = true;
 
         try {
-            // Run all 3 sources IN PARALLEL
             const [discogsRes, itunesRes, mbRes] = await Promise.allSettled([
                 searchDiscogs(art, alb),
                 searchItunes(art, alb),
@@ -950,13 +1143,8 @@ window.AlbumApp = (function() {
             const itunes   = itunesRes.status   === 'fulfilled' ? itunesRes.value   : [];
             const mb       = mbRes.status       === 'fulfilled' ? mbRes.value       : [];
 
-            // Merge: Discogs first (most reliable), then iTunes, then MusicBrainz
             let combined = [...discogs, ...itunes, ...mb];
-
-            // Sort by relevance
             combined.sort((a, b) => relevanceScore(b, art, alb) - relevanceScore(a, art, alb));
-
-            // Deduplicate
             combined = dedupeResults(combined);
 
             if (combined.length === 0) {
@@ -972,10 +1160,8 @@ window.AlbumApp = (function() {
         resetFetchBtn();
     }
 
-    // --- DISCOGS (fuente principal) ---
     async function searchDiscogs(artist, album) {
         const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
-        // Try full title first, then clean title
         const queries = [
             `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(album)}&type=master&per_page=10&key=${DISCOGS_KEY}`,
             `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(cleanAlb)}&type=master&per_page=10&key=${DISCOGS_KEY}`,
@@ -984,11 +1170,10 @@ window.AlbumApp = (function() {
 
         for (const url of queries) {
             try {
-                const res = await fetch(url, { headers: { 'User-Agent': 'ARA-AlbumRater/2.0' } });
+                const res = await fetch(url, { headers: { 'User-Agent': 'ARA-AlbumRater/2.1' } });
                 const data = await res.json();
                 if (data.results && data.results.length > 0) {
                     return data.results.map(item => {
-                        // Discogs title is usually "Artist - Album"
                         const parts = item.title ? item.title.split(' - ') : [];
                         const artistName = parts.length >= 2 ? parts[0].trim() : artist;
                         const albumName  = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : item.title;
@@ -1007,7 +1192,6 @@ window.AlbumApp = (function() {
         return [];
     }
 
-    // --- ITUNES ---
     async function searchItunes(artist, album) {
         const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
         const attempts = [
@@ -1032,13 +1216,12 @@ window.AlbumApp = (function() {
         return [];
     }
 
-    // --- MUSICBRAINZ ---
     async function searchMusicBrainz(artist, album) {
         const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
         const query = encodeURIComponent(`release:"${cleanAlb}" AND artist:"${artist}"`);
         try {
             const res = await fetch(`https://musicbrainz.org/ws/2/release?query=${query}&limit=8&fmt=json`,
-                { headers: { 'User-Agent': 'ARA-AlbumRater/2.0 (personal)' } });
+                { headers: { 'User-Agent': 'ARA-AlbumRater/2.1 (personal)' } });
             const data = await res.json();
             if (!data.releases) return [];
             return data.releases.map(item => ({
@@ -1051,7 +1234,6 @@ window.AlbumApp = (function() {
         } catch(e) { console.warn('MusicBrainz query failed:', e); return []; }
     }
 
-    // --- RENDER RESULTS ---
     function renderSearchResults(results) {
         const list = document.getElementById("searchResultsList");
         list.innerHTML = "";
@@ -1078,7 +1260,6 @@ window.AlbumApp = (function() {
         });
     }
 
-    // --- FETCH TRACKS after selecting an album ---
     async function fetchTracks(item) {
         document.getElementById("searchModal").classList.remove('open');
         dom.btnFetch.textContent = "⏳ Cargando tracklist...";
@@ -1088,22 +1269,20 @@ window.AlbumApp = (function() {
             let coverUrl = item.coverUrl;
 
             if (item.source === 'discogs') {
-                // Use master release for canonical tracklist
                 const endpoint = item.masterId
                     ? `https://api.discogs.com/masters/${item.masterId}`
                     : `https://api.discogs.com/releases/${item.id}`;
                 const res = await fetch(`${endpoint}?key=${DISCOGS_KEY}`,
-                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.0' } });
+                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.1' } });
                 const data = await res.json();
 
-                // Better cover from images array
                 if (data.images && data.images.length > 0) {
                     coverUrl = data.images[0].uri || coverUrl;
                 }
 
                 if (data.tracklist && data.tracklist.length > 0) {
                     tracks = data.tracklist
-                        .filter(t => t.type_ === 'track' || !t.type_) // skip headings
+                        .filter(t => t.type_ === 'track' || !t.type_)
                         .map(t => ({
                             name: t.title,
                             duration: t.duration || "--:--",
@@ -1120,7 +1299,7 @@ window.AlbumApp = (function() {
 
             } else if (item.source === 'musicbrainz') {
                 const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`,
-                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.0 (personal)' } });
+                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.1 (personal)' } });
                 const data = await res.json();
                 if (data.media && data.media.length > 0) {
                     tracks = data.media.flatMap(m => m.tracks).map(t => ({
@@ -1313,7 +1492,6 @@ window.AlbumApp = (function() {
         removeCover: () => { state.cover=""; saveSession(); render(); },
         toggleSortByScore: (btn) => {
             if (!sortedByScore) {
-                // Save original order and sort by score desc
                 originalTrackOrder = JSON.parse(JSON.stringify(state.tracks));
                 const scored = state.tracks.filter(t => t.score !== "" && !isNaN(parseFloat(t.score)));
                 const unscored = state.tracks.filter(t => t.score === "" || isNaN(parseFloat(t.score)));
@@ -1325,7 +1503,6 @@ window.AlbumApp = (function() {
                 btn.style.borderColor = "rgba(59,130,246,0.5)";
                 showToast("↓ Tracks ordenados por score");
             } else {
-                // Restore original order
                 if (originalTrackOrder) state.tracks = originalTrackOrder;
                 originalTrackOrder = null;
                 sortedByScore = false;
@@ -1347,6 +1524,16 @@ window.AlbumApp = (function() {
         deleteFromLibrary,
         renderLibrary,
         openArtistsModal,
+        selectArtist,
+        selectArtistFromModal: (artistName) => {
+            document.getElementById('artistsModal').classList.remove('open');
+            currentSelectedArtist = artistName;
+            switchTab('artists');
+        },
+        renderArtistProfile,
+        renderArtistTab,
+        updateTrackFromArtistProfile,
+        setFavoriteOverride,
         confirmYes: () => {
             document.getElementById('confirmModal').classList.remove('open');
             if (confirmCallback) { confirmCallback(); confirmCallback = null; }
@@ -1374,23 +1561,19 @@ window.AlbumApp = (function() {
         },
 
         init: () => {
-            // Restaurar sesión del editor
             const saved = loadSession();
             if (saved) { state = {...DEFAULT_STATE(), ...saved}; }
 
             initInteractiveChart();
 
-            // Inputs
             dom.btnFetch.addEventListener("click", openSearchSelector);
             dom.inArtist.addEventListener("input", e => { state.artist=e.target.value; saveSession(); render(); });
             dom.inAlbum.addEventListener("input", e => { state.album=e.target.value; saveSession(); render(); });
             dom.inYear.addEventListener("input", e => { state.released=e.target.value; saveSession(); render(); });
             dom.inRanker.addEventListener("input", e => { state.rankedby=e.target.value; saveSession(); render(); });
 
-            // Restaurar selects
             if (saved && saved.mode) document.getElementById('selMode').value = saved.mode;
 
-            // File upload (cover)
             dom.fileInput.addEventListener("change", e => {
                 const file = e.target.files[0];
                 if(file) {
@@ -1400,7 +1583,6 @@ window.AlbumApp = (function() {
                 }
             });
 
-            // Save image
             document.getElementById("btnSaveImage").addEventListener("click", () => {
                 html2canvas(document.getElementById("cardExport"), {backgroundColor:"#050505",scale:2}).then(canvas => {
                     const link = document.createElement('a');
@@ -1409,23 +1591,17 @@ window.AlbumApp = (function() {
                 });
             });
 
-            // Add to library
             document.getElementById("btnAddToLib").addEventListener("click", addCurrentToLibrary);
-
-            // Save library to file
             document.getElementById("btnSaveLib").addEventListener("click", exportLibrary);
-
-            // Load library from file
             document.getElementById("btnLoadLib").addEventListener("click", () => {
                 document.getElementById('libFileInput').click();
             });
             document.getElementById("libFileInput").addEventListener("change", e => {
                 const file = e.target.files[0];
                 if(file) importLibrary(file);
-                e.target.value = ''; // reset so same file can be reloaded
+                e.target.value = ''; 
             });
 
-            // Tabs
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', () => switchTab(btn.dataset.tab));
             });
