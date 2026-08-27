@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARA - Album Rater App</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #0b0f15;
+            --bg-card: #161b26;
+            --accent: #3b82f6;
+            --text-main: #ffffff;
+            --text-muted: #8a94a6;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            display: flex; justify-content: center;
+            min-height: 100vh; overflow-x: hidden;
+        }
+
+        .app-container { width: 100%; max-width: 1400px; padding: 20px; }
+
+        /* HEADER */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 0; margin-bottom: 0;
+        }
+        h1 { font-family: 'Lora', serif; font-size: 24px; margin: 0; }
+        .badge {
+            font-family: 'Inter', sans-serif; font-size: 10px;
+            background: rgba(255,255,255,0.1); padding: 4px 8px;
+            border-radius: 4px; vertical-align: middle; margin-left: 10px; color: var(--text-muted);
+        }
+        .header-actions button {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-main); padding: 8px 16px; border-radius: 6px;
+            cursor: pointer; font-size: 14px; margin-left: 10px; transition: 0.2s;
+        }
+        .header-actions button:hover { background: rgba(255,255,255,0.05); border-color: white; }
+        .header-actions button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+        .header-actions button.success { background: #16a34a; border-color: #16a34a; font-weight: 600; }
+        .header-actions button.danger { background: transparent; border-color: #ef444466; color: #ef4444; }
+        .header-actions button.danger:hover { background: rgba(239,68,68,0.1); }
+
+        /* TABS */
+        .tabs-bar {
+            display: flex; gap: 0; margin: 20px 0 0 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .tab-btn {
+            background: none; border: none; color: var(--text-muted);
+            padding: 12px 24px; font-size: 14px; font-weight: 600;
+            cursor: pointer; border-bottom: 2px solid transparent;
+            transition: 0.2s; font-family: 'Inter', sans-serif;
+            text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px;
+        }
+        .tab-btn:hover { color: white; }
+        .tab-btn.active { color: white; border-bottom-color: var(--accent); }
+        .tab-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--accent); color: white; border-radius: 10px;
+            font-size: 10px; font-weight: 800; min-width: 18px; height: 18px;
+            padding: 0 5px; margin-left: 8px;
+        }
+
+        .tab-content { display: none; padding-top: 25px; }
+        .tab-content.active { display: block; }
+
+        /* EDITOR TAB */
+        .main-grid { display: grid; grid-template-columns: 1fr 500px; gap: 40px; }
+        @media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr; } }
+
+        .panel {
+            background: var(--bg-card); padding: 25px;
+            border-radius: 12px; border: 1px solid var(--border);
+        }
+        h2 { font-family: 'Lora', serif; margin-top: 0; font-size: 20px; margin-bottom: 20px; }
+        .input-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .input-group { flex: 1; display: flex; flex-direction: column; }
+        label {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        input[type="text"], input[type="number"], select {
+            background: #0b0f15; border: 1px solid var(--border);
+            color: white; padding: 12px; border-radius: 6px;
+            font-family: 'Inter', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent); }
+
+        #btnFetch {
+            width: 100%; background: rgba(59, 130, 246, 0.1); color: #60a5fa;
+            border: 1px dashed rgba(59, 130, 246, 0.3); padding: 12px;
+            cursor: pointer; margin-bottom: 20px; border-radius: 6px;
+            font-size: 13px; font-weight: 600; transition: 0.2s;
+        }
+        #btnFetch:hover { background: rgba(59, 130, 246, 0.2); border-color: #60a5fa; }
+
+        /* MODAL */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 10000;
+            justify-content: center; align-items: center; backdrop-filter: blur(10px);
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-content {
+            background: #161b26; width: 90%; max-width: 600px; max-height: 80vh;
+            border-radius: 12px; border: 1px solid #333; display: flex;
+            flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 20px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-body { padding: 20px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        @media (max-width: 500px) { .modal-body { grid-template-columns: 1fr; } }
+        .search-item {
+            background: #0b0f15; border: 1px solid #333; border-radius: 8px;
+            padding: 10px; cursor: pointer; display: flex; gap: 12px;
+            align-items: center; transition: 0.2s;
+        }
+        .search-item:hover { border-color: #3b82f6; background: #121821; }
+
+        /* TRACK EDITOR */
+        .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; transition: 0.2s; }
+        .track-row.dragging { opacity: 0.4; background: rgba(255,255,255,0.05); }
+        .track-num { width: 25px; text-align: center; color: var(--text-muted); font-size: 12px; }
+        .btn-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; padding: 0 5px; }
+
+        /* PREVIEW */
+        .preview-wrapper { display: flex; flex-direction: column; gap: 20px; }
+        .graph-panel {
+            background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border);
+            padding: 20px; padding-bottom: 10px; width: 100%; transition: 0.3s;
+        }
+        .graph-header { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 1px; margin-bottom: 15px; text-align: center; }
+        .graph-container { width: 100%; height: 280px; position: relative; }
+
+        .card-editorial {
+            background: #050505; border-radius: 16px; padding: 35px; text-align: center;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6); border: 1px solid #222; overflow: hidden;
+        }
+        .cover-container {
+            width: 100%; aspect-ratio: 1/1; background: #1a1a1a; border-radius: 6px;
+            overflow: hidden; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); position: relative;
+        }
+        .cover-img { width: 100%; height: 100%; object-fit: cover; }
+        .big-score { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 80px; line-height: 1; margin: 10px 0; color: white; letter-spacing: -3px; }
+        .meta-artist { font-weight: 700; font-size: 18px; color: white; margin-bottom: 5px; letter-spacing: -0.5px; }
+        .meta-album { font-family: 'Lora', serif; font-size: 26px; font-style: italic; color: #e2e8f0; margin-bottom: 12px; line-height: 1.2; }
+        .meta-details { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+        .track-list-preview { margin-top: 30px; text-align: left; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; }
+        .preview-header-row { display: flex; align-items: center; margin-bottom: 15px; font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+        .preview-track-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; color: #eee; }
+        .col-time { width: 50px; color: #888; font-size: 12px; }
+        .col-num { width: 30px; color: #888; font-size: 12px; }
+        .col-name { flex: 1; font-weight: 700; letter-spacing: 0.5px; }
+        .col-rate { width: 50px; text-align: right; }
+        .preview-badge {
+            display: inline-block; padding: 4px 8px; border-radius: 4px;
+            font-weight: 800; color: white; min-width: 32px; text-align: center; font-size: 13px;
+        }
+
+        /* ===== LIBRARY TAB ===== */
+        .library-toolbar {
+            display: flex; gap: 12px; align-items: center;
+            margin-bottom: 25px; flex-wrap: wrap;
+        }
+        .library-toolbar input[type="text"] {
+            flex: 1; min-width: 180px; padding: 10px 14px; font-size: 13px;
+        }
+        .library-toolbar select { padding: 10px 14px; font-size: 13px; }
+        .lib-sort-btn {
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text-muted); padding: 10px 14px; border-radius: 6px;
+            cursor: pointer; font-size: 12px; font-weight: 600; transition: 0.2s;
+            white-space: nowrap;
+        }
+        .lib-sort-btn.active { color: white; border-color: var(--accent); background: rgba(59,130,246,0.1); }
+
+        .library-empty {
+            text-align: center; padding: 80px 20px; color: var(--text-muted);
+        }
+        .library-empty .empty-icon { font-size: 60px; margin-bottom: 20px; opacity: 0.4; }
+        .library-empty h3 { font-family: 'Lora', serif; font-size: 22px; color: white; margin-bottom: 10px; }
+        .library-empty p { font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+
+        /* LIBRARY GRID — 5 columnas */
+        .library-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px;
+        }
+        @media (max-width: 900px)  { .library-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (max-width: 700px)  { .library-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 500px)  { .library-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 340px)  { .library-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); } }
+
+        .lib-card {
+            background: #0d1117; border: 1px solid #1e2433;
+            border-radius: 10px; overflow: hidden; transition: 0.2s; cursor: default;
+            position: relative; display: flex; flex-direction: column;
+        }
+        .lib-card:hover { border-color: rgba(255,255,255,0.18); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+
+        /* Cover image wrapper */
+        .lib-card-cover-wrap { position: relative; width: 100%; }
+        .lib-card-cover {
+            width: 100%; aspect-ratio: 1/1; object-fit: cover;
+            background: #111; display: block;
+        }
+
+        /* Score badge */
+        .lib-card-score {
+            position: absolute; top: 9px; right: 9px;
+            font-weight: 800; font-size: 14px; color: white;
+            background: rgba(13, 17, 23, 0.88);
+            padding: 4px 10px; border-radius: 20px;
+            backdrop-filter: blur(8px);
+            letter-spacing: -0.3px;
+            display: flex; align-items: center; gap: 4px;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .lib-merit-badge { font-size: 11px; line-height: 1; }
+
+        .lib-card-body {
+            padding: 10px 10px 9px 10px;
+            display: flex; flex-direction: column; flex: 1;
+        }
+        .lib-card-artist {
+            font-size: 9px; color: var(--text-muted); font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .lib-card-album {
+            font-family: 'Lora', serif; font-size: 13px; font-style: italic;
+            margin-bottom: 3px; line-height: 1.25; color: #e2e8f0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .lib-card-meta { font-size: 10px; color: var(--text-muted); margin-bottom: 8px; }
+        .lib-card-actions { display: flex; gap: 5px; margin-top: auto; }
+        .lib-card-actions button {
+            flex: 1; padding: 5px 4px; font-size: 10px; font-weight: 600;
+            border-radius: 4px; cursor: pointer; transition: 0.2s; border: 1px solid var(--border);
+            background: transparent; color: var(--text-muted); font-family: 'Inter', sans-serif;
+        }
+        .lib-card-actions button:hover { color: white; border-color: white; background: rgba(255,255,255,0.05); }
+        .lib-card-actions button.btn-edit { color: #60a5fa; border-color: rgba(59,130,246,0.3); }
+        .lib-card-actions button.btn-edit:hover { background: rgba(59,130,246,0.1); border-color: #60a5fa; }
+        .lib-card-actions button.btn-del { color: #ef4444; border-color: rgba(239,68,68,0.25); }
+        .lib-card-actions button.btn-del:hover { background: rgba(239,68,68,0.1); border-color: #ef4444; }
+
+        .lib-stats-bar {
+            display: flex; gap: 20px; margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .lib-stat {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 20px; flex: 1; min-width: 120px;
+        }
+        .lib-stat-val { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
+        .lib-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
+
+        .lib-stat.clickable { cursor: pointer; transition: 0.2s; }
+        .lib-stat.clickable:hover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+        .lib-stat.clickable:hover .lib-stat-label { color: #60a5fa; }
+
+        /* Artists modal */
+        .artists-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 15000; justify-content: center; align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        .artists-modal.open { display: flex; }
+        .artists-modal-box {
+            background: #161b26; border: 1px solid #334155; border-radius: 14px;
+            width: 90%; max-width: 480px; max-height: 75vh;
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        .artists-modal-header {
+            padding: 20px 24px; border-bottom: 1px solid #1e2433;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .artists-modal-header h3 { margin: 0; font-family: 'Lora', serif; font-size: 18px; }
+        .artists-modal-body { overflow-y: auto; padding: 12px 0; }
+        .artist-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 11px 24px; transition: 0.15s;
+        }
+        .artist-row:hover { background: rgba(255,255,255,0.04); }
+        .artist-row-name { font-size: 14px; font-weight: 600; }
+        .artist-row-count {
+            font-size: 12px; font-weight: 700; color: white;
+            background: var(--accent); padding: 3px 9px; border-radius: 12px; min-width: 28px; text-align: center;
+        }
+
+        /* TOAST */
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: #1e293b; border: 1px solid #334155; color: white;
+            padding: 12px 24px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            z-index: 99999; transition: transform 0.3s ease; pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* SAVE TO LIBRARY BANNER */
+        .save-to-lib-bar {
+            background: linear-gradient(135deg, rgba(22,163,74,0.15), rgba(22,163,74,0.05));
+            border: 1px solid rgba(22,163,74,0.3); border-radius: 10px;
+            padding: 16px 20px; display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap;
+        }
+        .save-to-lib-bar span { font-size: 13px; color: #86efac; }
+        .save-to-lib-bar button {
+            background: #16a34a; border: none; color: white;
+            padding: 10px 20px; border-radius: 6px; cursor: pointer;
+            font-weight: 700; font-size: 13px; white-space: nowrap; transition: 0.2s;
+        }
+        .save-to-lib-bar button:hover { background: #15803d; }
+
+        /* CONFIRM MODAL */
+        .confirm-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 20000; justify-content: center; align-items: center;
+        }
+        .confirm-modal.open { display: flex; }
+        .confirm-box {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            padding: 30px; max-width: 380px; width: 90%; text-align: center;
+        }
+        .confirm-box h3 { margin: 0 0 10px; font-family: 'Lora', serif; }
+        .confirm-box p { color: var(--text-muted); font-size: 14px; margin: 0 0 24px; }
+        .confirm-box .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+        .confirm-box .confirm-actions button {
+            padding: 10px 24px; border-radius: 6px; cursor: pointer; font-weight: 600;
+            font-family: 'Inter', sans-serif; font-size: 14px; border: 1px solid var(--border);
+            background: transparent; color: white; transition: 0.2s;
+        }
+        .confirm-box .confirm-actions button.btn-confirm-yes { background: #ef4444; border-color: #ef4444; }
+        .confirm-box .confirm-actions button.btn-confirm-yes:hover { background: #dc2626; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <h1>Album Rater <span class="badge">V2.1</span></h1>
+        <div class="header-actions">
+            <button id="btnLoadLib" title="Cargar tu archivo .ara de biblioteca">📂 Load Library</button>
+            <button id="btnSaveLib" class="success" title="Guardar toda la biblioteca como archivo .ara">💾 Save Library</button>
+        </div>
+    </header>
+
+    <div class="tabs-bar">
+        <button class="tab-btn active" data-tab="editor">🎵 Editor</button>
+        <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
+        <button class="tab-btn" data-tab="artists">🎤 Artists</button>
+    </div>
+
+    <!-- ===== TAB: EDITOR ===== -->
+    <div class="tab-content active" id="tab-editor">
+        <div class="save-to-lib-bar">
+            <span>✅ Cuando termines de puntear un álbum, agrégalo a tu biblioteca para guardarlo.</span>
+            <button id="btnAddToLib">＋ Add to Library</button>
+        </div>
+
+        <div class="main-grid">
+            <div class="editor-col">
+                <div class="panel">
+                    <h2>Metadata</h2>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Artist</label>
+                            <input type="text" id="inArtist" placeholder="Ej. Concrete Boys">
+                        </div>
+                        <div class="input-group">
+                            <label>Album</label>
+                            <input type="text" id="inAlbum" placeholder="Ej. It's Us Vol. 2">
+                        </div>
+                    </div>
+
+                    <button id="btnFetch">🔍 Auto-Fill (Smart Search)</button>
+
+                    <div class="input-row" style="margin-bottom: 20px;">
+                        <div class="input-group">
+                            <label>Cover Art (Manual / Leaks)</label>
+                            <div style="display:flex; gap:10px;">
+                                <input type="file" id="fileInput" accept="image/*" style="display:none;">
+                                <button onclick="document.getElementById('fileInput').click()" style="flex:1;padding:8px;font-size:12px;background:#222;border:1px solid #444;color:#ddd;border-radius:4px;cursor:pointer;">📂 Subir Imagen</button>
+                                <button onclick="window.AlbumApp.removeCover()" style="flex:1;padding:8px;font-size:12px;background:#222;border:1px solid #552222;color:#ef4444;border-radius:4px;cursor:pointer;">× Borrar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Release Year</label>
+                            <input type="text" id="inYear" placeholder="2026">
+                        </div>
+                        <div class="input-group">
+                            <label>Ranked By</label>
+                            <input type="text" id="inRanker" placeholder="Your Name">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>App Mode</label>
+                            <select id="selMode" onchange="window.AlbumApp.changeMode(this.value)">
+                                <option value="rating">Puntuación (1-10) & Gráfica</option>
+                                <option value="ranking">Ranking (Solo ordenar canciones)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-top:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <h2>Tracklist & Editor</h2>
+                        <div style="gap:10px;display:flex;">
+                            <button id="btnSortScore" onclick="window.AlbumApp.toggleSortByScore(this)" style="font-size:11px;background:none;border:1px solid #334;color:#8a94a6;padding:4px 10px;cursor:pointer;border-radius:4px;text-transform:uppercase;font-weight:600;transition:0.2s;">↓ Sort by Score</button>
+                            <button onclick="window.AlbumApp.clearScores()" style="font-size:11px;background:none;border:none;color:#ef4444;cursor:pointer;text-transform:uppercase;font-weight:600;">Reset Scores</button>
+                            <button onclick="window.AlbumApp.newSession()" style="font-size:11px;background:none;border:none;color:#8a94a6;cursor:pointer;text-transform:uppercase;font-weight:600;">New Session</button>
+                            <button onclick="window.AlbumApp.addTrack()" style="font-size:11px;background:#333;border:none;color:white;padding:4px 10px;cursor:pointer;border-radius:4px;text-transform:uppercase;font-weight:600;">+ Track</button>
+                        </div>
+                    </div>
+                    <div id="trackEditor"></div>
+                </div>
+            </div>
+
+            <div class="preview-col">
+                <div class="preview-wrapper">
+                    <div class="graph-panel" id="graphContainer">
+                        <div class="graph-header">Visual Rating (Arrastra los puntos)</div>
+                        <div class="graph-container">
+                            <canvas id="ratingChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card-editorial" id="cardExport">
+                        <div class="cover-container">
+                            <img id="prevCover" src="https://via.placeholder.com/800x800/111/333?text=ARA" alt="Album Cover" class="cover-img">
+                        </div>
+                        <div id="lblScore" style="font-size:10px;letter-spacing:2px;color:#555;text-transform:uppercase;font-weight:700;margin-top:10px;">Overall Score</div>
+                        <div id="prevScore" class="big-score">0.0</div>
+                        <div class="meta-preview">
+                            <div id="prevArtist" class="meta-artist">Artist</div>
+                            <div id="prevAlbum" class="meta-album">Album</div>
+                            <div id="prevDetails" class="meta-details">Year • Ranked by...</div>
+                        </div>
+                        <div class="track-list-preview">
+                            <div class="preview-header-row" id="prevHeaderRow">
+                                <span class="col-time">TIME</span>
+                                <span class="col-num">#</span>
+                                <span class="col-name">TRACK TITLE</span>
+                                <span class="col-rate">RATE</span>
+                            </div>
+                            <div id="prevTracklistContainer"></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="window.print()" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-main);padding:10px;border-radius:6px;cursor:pointer;font-size:13px;transition:0.2s;">Export PDF</button>
+                        <button id="btnSaveImage" style="flex:1;background:var(--accent);border:1px solid var(--accent);color:white;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:0.2s;">Save Image</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TAB: LIBRARY ===== -->
+    <div class="tab-content" id="tab-library">
+        <div class="lib-stats-bar" id="libStatsBar"></div>
+
+        <div class="library-toolbar">
+            <input type="text" id="libSearch" placeholder="🔍  Search artist or album..." oninput="window.AlbumApp.renderLibrary()">
+            <select id="libFilterMode" onchange="window.AlbumApp.renderLibrary()">
+                <option value="all">All Modes</option>
+                <option value="rating">Rating only</option>
+                <option value="ranking">Ranking only</option>
+            </select>
+            <button class="lib-sort-btn active" data-sort="score" onclick="window.AlbumApp.setSort('score',this)">⭐ Score</button>
+            <button class="lib-sort-btn" data-sort="year" onclick="window.AlbumApp.setSort('year',this)">📅 Year</button>
+            <button class="lib-sort-btn" data-sort="artist" onclick="window.AlbumApp.setSort('artist',this)">🎤 Artist</button>
+            <button class="lib-sort-btn" data-sort="added" onclick="window.AlbumApp.setSort('added',this)">🕐 Recent</button>
+        </div>
+
+        <div id="libraryGrid" class="library-grid"></div>
+    </div>
+
+    <!-- ===== TAB: ARTISTS ===== -->
+    <div class="tab-content" id="tab-artists">
+        <div id="artistProfileContainer"></div>
+    </div>
+</div>
+
+<!-- SEARCH MODAL -->
+<div class="modal-overlay" id="searchModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 style="margin:0;font-family:'Lora',serif;">Resultados Encontrados</h3>
+            <button onclick="document.getElementById('searchModal').classList.remove('open')" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;">&times;</button>
+        </div>
+        <div id="searchResultsList" class="modal-body"></div>
+    </div>
+</div>
+
+<!-- ARTISTS MODAL -->
+<div class="artists-modal" id="artistsModal">
+    <div class="artists-modal-box">
+        <div class="artists-modal-header">
+            <h3>🎤 Artists</h3>
+            <button onclick="document.getElementById('artistsModal').classList.remove('open')" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <div class="artists-modal-body" id="artistsModalBody"></div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="confirm-modal" id="confirmModal">
+    <div class="confirm-box">
+        <h3 id="confirmTitle">¿Estás seguro?</h3>
+        <p id="confirmMsg">Esta acción no se puede deshacer.</p>
+        <div class="confirm-actions">
+            <button onclick="window.AlbumApp.confirmCancel()">Cancelar</button>
+            <button class="btn-confirm-yes" onclick="window.AlbumApp.confirmYes()">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- FILE INPUT PARA CARGAR BIBLIOTECA -->
+<input type="file" id="libFileInput" accept=".ara,.json" style="display:none;">
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.3/dist/chartjs-plugin-dragdata.min.js"></script>
+
+<script>
+window.AlbumApp = (function() {
+
+    // ===================== STATE =====================
+    let ratingChart = null;
+    let lastRenderedMode = null;
+    let dragSrcEl = null;
+    let libSort = 'score';
+    let confirmCallback = null;
+    let sortedByScore = false;        
+    let originalTrackOrder = null;    
+    let currentSelectedArtist = null;
+    let artistFavoriteOverrides = {};
+
+    const DEFAULT_STATE = () => ({
+        mode: "rating",
+        artist: "", album: "", released: "", rankedby: "", cover: "",
+        tracks: [{name:"",duration:"",score:""},{name:"",duration:"",score:""},{name:"",duration:"",score:""}]
+    });
+
+    let state = DEFAULT_STATE();
+    let library = []; 
+
+    const dom = {
+        inArtist: document.getElementById("inArtist"),
+        inAlbum: document.getElementById("inAlbum"),
+        inYear: document.getElementById("inYear"),
+        inRanker: document.getElementById("inRanker"),
+        trackEditor: document.getElementById("trackEditor"),
+        pCover: document.getElementById("prevCover"),
+        pScore: document.getElementById("prevScore"),
+        lblScore: document.getElementById("lblScore"),
+        pArtist: document.getElementById("prevArtist"),
+        pAlbum: document.getElementById("prevAlbum"),
+        pDetails: document.getElementById("prevDetails"),
+        pTracklist: document.getElementById("prevTracklistContainer"),
+        pHeaderRow: document.getElementById("prevHeaderRow"),
+        graphContainer: document.getElementById("graphContainer"),
+        fileInput: document.getElementById("fileInput"),
+        btnFetch: document.getElementById("btnFetch"),
+        libCount: document.getElementById("libCount"),
+        libGrid: document.getElementById("libraryGrid"),
+        libStatsBar: document.getElementById("libStatsBar"),
+        libSearch: document.getElementById("libSearch"),
+        libFilterMode: document.getElementById("libFilterMode"),
+    };
+
+    // ===================== PERSISTENCE =====================
+
+    function saveSession() {
+        try { localStorage.setItem('ara_session', JSON.stringify(state)); } catch(e){}
+    }
+
+    function loadSession() {
+        try {
+            const s = localStorage.getItem('ara_session');
+            if (s) return JSON.parse(s);
+        } catch(e){}
+        return null;
+    }
+
+    function exportLibrary() {
+        const payload = {
+            _ara_version: "2.1",
+            _exported: new Date().toISOString(),
+            library: library
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `my-library-${new Date().toISOString().slice(0,10)}.ara`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("✅ Biblioteca guardada como archivo .ara");
+    }
+
+    function importLibrary(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.library && Array.isArray(data.library)) {
+                    library = data.library;
+                    showToast(`✅ Biblioteca cargada: ${library.length} álbumes`);
+                    renderLibrary();
+                    updateLibCount();
+                    if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
+                } else {
+                    alert("El archivo no parece ser una biblioteca ARA válida.");
+                }
+            } catch(err) {
+                alert("Error al leer el archivo. Asegúrate de que sea un archivo .ara válido.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ===================== LIBRARY OPERATIONS =====================
+
+    function addCurrentToLibrary() {
+        if (!state.artist && !state.album) {
+            showToast("⚠️ Agrega al menos un artista o álbum primero.");
+            return;
+        }
+
+        const existingIdx = library.findIndex(a =>
+            a.artist.toLowerCase() === state.artist.toLowerCase() &&
+            a.album.toLowerCase() === state.album.toLowerCase()
+        );
+
+        const entry = {
+            id: existingIdx >= 0 ? library[existingIdx].id : Date.now(),
+            addedAt: existingIdx >= 0 ? library[existingIdx].addedAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            ...state
+        };
+
+        if (existingIdx >= 0) {
+            library[existingIdx] = entry;
+            showToast("✏️ Álbum actualizado en la biblioteca");
+        } else {
+            library.push(entry);
+            showToast("✅ Álbum agregado a la biblioteca");
+        }
+
+        updateLibCount();
+        renderLibrary();
+        if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
+    }
+
+    function editFromLibrary(id) {
+        const entry = library.find(a => a.id === id);
+        if (!entry) return;
+        const { id: _id, addedAt, updatedAt, ...s } = entry;
+        setState(s);
+        switchTab('editor');
+        showToast("📝 Álbum cargado en el editor");
+    }
+
+    function deleteFromLibrary(id) {
+        confirmAction(
+            "Eliminar álbum",
+            "¿Eliminar este álbum de tu biblioteca? No afecta tu archivo .ara guardado.",
+            () => {
+                library = library.filter(a => a.id !== id);
+                updateLibCount();
+                renderLibrary();
+                if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
+                showToast("🗑️ Álbum eliminado");
+            }
+        );
+    }
+
+    // Separa un "artist credit" combinado (ej. "21 Savage & Metro Boomin") en
+    // artistas individuales, para poder indexarlos por separado sin perder
+    // el string de display original. Soporta &, comas, feat./ft., " x ", " and ", " y ", / y ;
+    function parseArtistNames(artistStr) {
+        if (!artistStr) return [];
+        const raw = artistStr.trim();
+        if (!raw) return [];
+        const parts = raw.split(/\s*(?:&|,|\/|;|\bfeat\.?|\bft\.?|\bx\b|\band\b|\by\b)\s*/i);
+        const names = parts.map(p => p.trim()).filter(Boolean);
+        return names.length > 0 ? names : [raw];
+    }
+
+    function computeScore(tracks) {
+        let t = 0, c = 0;
+        tracks.forEach(x => { const s = parseFloat(x.score); if (!isNaN(s)) { t += s; c++; } });
+        return c === 0 ? null : parseFloat((t/c).toFixed(1));
+    }
+
+    function updateLibCount() {
+        dom.libCount.textContent = library.length;
+    }
+
+    // ===================== LIBRARY RENDER =====================
+
+    function renderLibrary() {
+        const query = dom.libSearch.value.toLowerCase();
+        const modeFilter = dom.libFilterMode.value;
+
+        let items = library.filter(a => {
+            const matchQ = !query || a.artist.toLowerCase().includes(query) || a.album.toLowerCase().includes(query);
+            const matchMode = modeFilter === 'all' || a.mode === modeFilter;
+            return matchQ && matchMode;
+        });
+
+        items = [...items].sort((a, b) => {
+            if (libSort === 'score') {
+                const sa = computeScore(a.tracks) ?? -1;
+                const sb = computeScore(b.tracks) ?? -1;
+                return sb - sa;
+            }
+            if (libSort === 'year') return (b.released || '0') > (a.released || '0') ? 1 : -1;
+            if (libSort === 'artist') return a.artist.localeCompare(b.artist);
+            if (libSort === 'added') return new Date(b.addedAt) - new Date(a.addedAt);
+            return 0;
+        });
+
+        renderLibStats();
+
+        if (items.length === 0) {
+            dom.libGrid.innerHTML = library.length === 0 ?
+                `<div class="library-empty">
+                    <div class="empty-icon">🎵</div>
+                    <h3>Tu biblioteca está vacía</h3>
+                    <p>Puntea un álbum en el Editor y presiona <strong>"Add to Library"</strong> para empezar a construir tu colección.</p>
+                </div>` :
+                `<div class="library-empty">
+                    <div class="empty-icon">🔍</div>
+                    <h3>Sin resultados</h3>
+                    <p>No hay álbumes que coincidan con tu búsqueda.</p>
+                </div>`;
+            return;
+        }
+
+        dom.libGrid.innerHTML = '';
+        items.forEach(a => {
+            const score = computeScore(a.tracks);
+            const scoreStr = score !== null ? score.toFixed(1) : '—';
+            const trackCount = a.tracks.length;
+
+            let meritHTML = '';
+            if (score !== null && score >= 8.0) {
+                if (trackCount >= 30) meritHTML = `<span class="lib-merit-badge" title="🏆 Merit: ${scoreStr} avg across ${trackCount} tracks">🏆</span>`;
+                else if (trackCount >= 20) meritHTML = `<span class="lib-merit-badge" title="⭐ Merit: ${scoreStr} avg across ${trackCount} tracks">⭐</span>`;
+            }
+
+            const card = document.createElement('div');
+            card.className = 'lib-card';
+            card.innerHTML = `
+                <div class="lib-card-cover-wrap">
+                    <img class="lib-card-cover"
+                         src="${a.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
+                         onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
+                         alt="${a.album}">
+                    ${score !== null ? `<div class="lib-card-score">${meritHTML}${scoreStr}</div>` : ''}
+                </div>
+                <div class="lib-card-body">
+                    <div class="lib-card-artist">${a.artist || 'Unknown Artist'}</div>
+                    <div class="lib-card-album" title="${(a.album || '').replace(/"/g, '&quot;')}">${a.album || 'Unknown Album'}</div>
+                    <div class="lib-card-meta">${a.released || '—'} · ${trackCount} tracks · ${a.mode === 'ranking' ? 'Ranking' : 'Rating'}</div>
+                    <div class="lib-card-actions">
+                        <button class="btn-edit" onclick="window.AlbumApp.editFromLibrary(${a.id})">✏️ Edit</button>
+                        <button class="btn-del" onclick="window.AlbumApp.deleteFromLibrary(${a.id})">🗑️ Delete</button>
+                    </div>
+                </div>`;
+            dom.libGrid.appendChild(card);
+        });
+    }
+
+    function renderLibStats() {
+        if (library.length === 0) { dom.libStatsBar.innerHTML = ''; return; }
+
+        const scores = library.map(a => computeScore(a.tracks)).filter(s => s !== null);
+        const avgAlbum = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
+
+        let songTotal = 0, songCount = 0;
+        library.forEach(a => {
+            a.tracks.forEach(t => {
+                const s = parseFloat(t.score);
+                if (!isNaN(s)) { songTotal += s; songCount++; }
+            });
+        });
+        const avgSong = songCount > 0 ? (songTotal / songCount).toFixed(1) : '—';
+
+        const artistsCount = new Set(
+            library.flatMap(a => parseArtistNames(a.artist).map(n => n.toLowerCase()))
+        ).size;
+
+        const yearMap = {};
+        library.filter(a => a.mode !== 'ranking' && a.released).forEach(a => {
+            const s = computeScore(a.tracks);
+            if (s === null) return;
+            const y = a.released.trim();
+            if (!yearMap[y]) yearMap[y] = { total: 0, count: 0 };
+            yearMap[y].total += s;
+            yearMap[y].count += 1;
+        });
+        let goldenYear = '—'; let goldenAvg = null;
+        Object.entries(yearMap).forEach(([y, d]) => {
+            const avg = d.total / d.count;
+            if (goldenAvg === null || avg > goldenAvg || (avg === goldenAvg && Number(y) > Number(goldenYear))) {
+                goldenAvg = avg; goldenYear = y;
+            }
+        });
+        const goldenLabel = goldenAvg !== null ? `${goldenAvg.toFixed(1)} · ${goldenYear}` : '—';
+
+        dom.libStatsBar.innerHTML = `
+            <div class="lib-stat"><div class="lib-stat-val">${library.length}</div><div class="lib-stat-label">Albums</div></div>
+            <div class="lib-stat clickable" onclick="window.AlbumApp.openArtistsModal()" title="Click to see all artists"><div class="lib-stat-val">${artistsCount}</div><div class="lib-stat-label">Artists →</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${avgAlbum}</div><div class="lib-stat-label">AVG Album Score</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${avgSong}</div><div class="lib-stat-label">AVG Song Score</div></div>
+            <div class="lib-stat"><div class="lib-stat-val" style="font-size:20px;">${goldenLabel}</div><div class="lib-stat-label">🏅 Golden Year</div></div>
+        `;
+    }
+
+    function openArtistsModal() {
+        const artistMap = {};
+        library.forEach(a => {
+            parseArtistNames(a.artist).forEach(key => {
+                if (!key) return;
+                if (!artistMap[key]) artistMap[key] = 0;
+                artistMap[key]++;
+            });
+        });
+        const sorted = Object.entries(artistMap).sort((a, b) => a[0].localeCompare(b[0]));
+
+        const body = document.getElementById('artistsModalBody');
+        body.innerHTML = sorted.map(([name, count]) => `
+            <div class="artist-row" onclick="window.AlbumApp.selectArtistFromModal('${name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                <span class="artist-row-name">${name}</span>
+                <span class="artist-row-count">${count}</span>
+            </div>`).join('');
+
+        document.getElementById('artistsModal').classList.add('open');
+    }
+
+    // ===================== ARTISTS ECOSYSTEM =====================
+
+    function getArtistCatalog(artistName) {
+        let tracks = [];
+        library
+            .filter(a => a.artist && parseArtistNames(a.artist).some(n => n.toLowerCase() === artistName.toLowerCase()))
+            .forEach(album => {
+                album.tracks.forEach((track, trackIdx) => {
+                    const scoreVal = parseFloat(track.score);
+                    if (!isNaN(scoreVal)) {
+                        tracks.push({
+                            albumId: album.id,
+                            albumTitle: album.album,
+                            albumCover: album.cover,
+                            trackIdx: trackIdx,
+                            name: track.name,
+                            duration: track.duration,
+                            score: scoreVal
+                        });
+                    }
+                });
+            });
+
+        tracks.sort((a, b) => b.score - a.score);
+        return tracks;
+    }
+
+    function renderArtistProfile(artistName) {
+        const container = document.getElementById("artistProfileContainer");
+        if (!container) return;
+
+        const tracks = getArtistCatalog(artistName);
+
+        if (tracks.length === 0) {
+            container.innerHTML = `
+                <div style="margin-bottom:20px;">
+                    <button onclick="window.AlbumApp.renderArtistTab()" style="background:transparent; border:1px solid var(--border); color:var(--text-main); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver a lista de artistas</button>
+                </div>
+                <div style="background:var(--bg-card); padding:25px; border-radius:12px; border:1px solid var(--border);">
+                    <h2>${artistName}</h2>
+                    <p style="color:var(--text-muted);">No hay canciones punteadas para este artista.</p>
+                </div>`;
+            return;
+        }
+
+        const avgScore = (tracks.reduce((acc, t) => acc + t.score, 0) / tracks.length).toFixed(1);
+
+        const topScore = tracks[0].score;
+        const topTracks = tracks.filter(t => t.score === topScore);
+        
+        let favoriteTrack = topTracks[0]; 
+        
+        const overrideKey = `${artistName.toLowerCase()}_fav`;
+        if (topTracks.length > 1 && artistFavoriteOverrides[overrideKey]) {
+            const foundFav = topTracks.find(t => `${t.albumId}_${t.trackIdx}` === artistFavoriteOverrides[overrideKey]);
+            if (foundFav) favoriteTrack = foundFav;
+        }
+
+        container.innerHTML = `
+            <div style="margin-bottom:20px;">
+                <button onclick="window.AlbumApp.renderArtistTab()" style="background:transparent; border:1px solid var(--border); color:var(--text-main); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">← Volver a lista de artistas</button>
+            </div>
+            <div style="background:var(--bg-card); padding:25px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h2 style="margin:0; font-size:28px;">${artistName}</h2>
+                        <p style="color:var(--text-muted); margin:5px 0 0 0;">${tracks.length} canciones punteadas</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:36px; font-weight:800; color:white;">${avgScore}</div>
+                        <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Promedio del Artista</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px; background:#0b0f15; padding:15px; border-radius:8px; border:1px solid rgba(59,130,246,0.3); display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                    <span style="font-size:24px;">⭐</span>
+                    <div style="flex:1;">
+                        <div style="font-size:10px; color:#60a5fa; font-weight:700; text-transform:uppercase;">Canción Favorita</div>
+                        <div style="font-size:16px; font-weight:700; color:white;">${favoriteTrack.name} <span style="font-size:12px; color:var(--text-muted);">(${favoriteTrack.score.toFixed(1)})</span></div>
+                        <div style="font-size:12px; color:var(--text-muted);">${favoriteTrack.albumTitle}</div>
+                    </div>
+                    ${topTracks.length > 1 ? `
+                        <select onchange="window.AlbumApp.setFavoriteOverride('${artistName.replace(/'/g, "\\'")}', this.value)" style="padding:6px 10px; font-size:11px; background:#161b26; color:white; border:1px solid var(--border); border-radius:4px;">
+                            ${topTracks.map(t => {
+                                const idKey = `${t.albumId}_${t.trackIdx}`;
+                                const selected = idKey === `${favoriteTrack.albumId}_${favoriteTrack.trackIdx}` ? 'selected' : '';
+                                return `<option value="${idKey}" ${selected}>Elegir: ${t.name} (${t.score.toFixed(1)})</option>`;
+                            }).join('')}
+                        </select>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div style="background:var(--bg-card); padding:20px; border-radius:12px; border:1px solid var(--border);">
+                <h3 style="margin-top:0; font-family:'Lora', serif;">Catálogo de Canciones (${tracks.length})</h3>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${tracks.map(t => `
+                        <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433;">
+                            <img src="${t.albumCover || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                            <div style="flex:1;">
+                                <div style="font-weight:700; font-size:14px;">${t.name}</div>
+                                <div style="font-size:11px; color:var(--text-muted);">${t.albumTitle} · ${t.duration}</div>
+                            </div>
+                            <input type="number" step="0.1" min="0" max="10" value="${t.score}" 
+                                   onchange="window.AlbumApp.updateTrackFromArtistProfile(${t.albumId}, ${t.trackIdx}, this.value, '${artistName.replace(/'/g, "\\'")}')"
+                                   style="width:65px; text-align:center; font-weight:bold; background:#161b26; border:1px solid var(--accent); color:white; border-radius:4px; padding:6px;">
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderArtistTab() {
+        currentSelectedArtist = null;
+        const container = document.getElementById("artistProfileContainer");
+        if (!container) return;
+
+        const artistMap = {};
+        library.forEach(a => {
+            const names = parseArtistNames(a.artist);
+            if (names.length === 0) return;
+            names.forEach(key => {
+                if (!artistMap[key]) artistMap[key] = { albums: 0, totalScore: 0, scoredTracks: 0 };
+                artistMap[key].albums++;
+                a.tracks.forEach(t => {
+                    const s = parseFloat(t.score);
+                    if (!isNaN(s)) {
+                        artistMap[key].totalScore += s;
+                        artistMap[key].scoredTracks++;
+                    }
+                });
+            });
+        });
+
+        const artistKeys = Object.keys(artistMap).sort((a,b) => a.localeCompare(b));
+
+        if (artistKeys.length === 0) {
+            container.innerHTML = `
+                <div class="library-empty">
+                    <div class="empty-icon">🎤</div>
+                    <h3>No hay artistas en tu biblioteca</h3>
+                    <p>Agrega álbumes con canciones punteadas para explorar perfiles de artistas.</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="background:var(--bg-card); padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px;">
+                <h2 style="margin-top:0;">Ecosistema de Artistas</h2>
+                <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">Selecciona un artista para calibrar su catálogo de canciones ($10 \\rightarrow 0$), revisar su promedio automático y gestionar su canción favorita.</p>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:15px;">
+                    ${artistKeys.map(name => {
+                        const data = artistMap[name];
+                        const avg = data.scoredTracks > 0 ? (data.totalScore / data.scoredTracks).toFixed(1) : '—';
+                        return `
+                            <div onclick="window.AlbumApp.selectArtist('${name.replace(/'/g, "\\'")}')" 
+                                 style="background:#0b0f15; border:1px solid #1e2433; border-radius:8px; padding:15px; cursor:pointer; transition:0.2s;"
+                                 onmouseover="this.style.borderColor='var(--accent)'" 
+                                 onmouseout="this.style.borderColor='#1e2433'">
+                                <div style="font-weight:700; font-size:16px; margin-bottom:6px; color:white;">${name}</div>
+                                <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+                                    <span>${data.albums} álbum(es) · ${data.scoredTracks} temas</span>
+                                    <span style="font-weight:800; color:white; background:rgba(59,130,246,0.2); padding:2px 8px; border-radius:4px;">${avg}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>`;
+    }
+
+    function selectArtist(artistName) {
+        currentSelectedArtist = artistName;
+        renderArtistProfile(artistName);
+    }
+
+    function updateTrackFromArtistProfile(albumId, trackIdx, newScore, artistName) {
+        const album = library.find(a => a.id === albumId);
+        if (album) {
+            album.tracks[trackIdx].score = newScore;
+            album.updatedAt = new Date().toISOString();
+            
+            renderArtistProfile(artistName);
+            renderLibrary();
+            showToast("✏️ Nota actualizada en el catálogo global");
+        }
+    }
+
+    function setFavoriteOverride(artistName, key) {
+        artistFavoriteOverrides[`${artistName.toLowerCase()}_fav`] = key;
+        renderArtistProfile(artistName);
+    }
+
+    // ===================== TABS =====================
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tabName}`));
+        if (tabName === 'library') renderLibrary();
+        if (tabName === 'artists') {
+            if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
+            else renderArtistTab();
+        }
+    }
+
+    // ===================== HELPERS =====================
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function confirmAction(title, msg, cb) {
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMsg').textContent = msg;
+        confirmCallback = cb;
+        document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function msToTime(ms) {
+        if (!ms) return "--:--";
+        let s = Math.floor((ms / 1000) % 60);
+        let m = Math.floor(ms / (1000 * 60));
+        return `${m}:${s < 10 ? "0" + s : s}`;
+    }
+
+    function getBadgeColor(s) {
+        const v = parseFloat(s);
+        if (isNaN(v)) return "#333";
+        if (v >= 9.0) return "#3b82f6";
+        if (v >= 8.0) return "#06b6d4";
+        if (v >= 7.0) return "#22c55e";
+        if (v >= 6.0) return "#eab308";
+        return "#ef4444";
+    }
+
+    function computeAvg() {
+        let t=0, c=0;
+        state.tracks.forEach(x => { const s = parseFloat(x.score); if(!isNaN(s)){t+=s;c++;} });
+        return c===0 ? "0.0" : (t/c).toFixed(1);
+    }
+
+    // ===================== SEARCH =====================
+    const DISCOGS_KEY = "RzuSUUssEDbaCqSwTzWC";
+
+    function dedupeResults(results) {
+        const seen = new Set();
+        return results.filter(r => {
+            const key = `${r.artistName.toLowerCase()}||${r.albumName.toLowerCase()}`;
+            if (seen.has(key)) return false;
+            seen.add(key); return true;
+        });
+    }
+
+    function relevanceScore(item, artist, album) {
+        const a = artist.toLowerCase(); const b = album.toLowerCase();
+        const ia = item.artistName.toLowerCase(); const ib = item.albumName.toLowerCase();
+        let score = 0;
+        if (ia === a) score += 40; else if (ia.includes(a) || a.includes(ia)) score += 20;
+        if (ib === b) score += 40; else if (ib.includes(b) || b.includes(ib)) score += 20;
+        if (a === b && ia.includes(a) && ib.includes(b)) score += 10;
+        return score;
+    }
+
+    async function openSearchSelector() {
+        const art = dom.inArtist.value.trim();
+        const alb = dom.inAlbum.value.trim();
+        if (!art || !alb) { alert("Ingresa Artista y Álbum."); return; }
+
+        dom.btnFetch.textContent = "⏳ Consultando 3 fuentes...";
+        dom.btnFetch.disabled = true;
+
+        try {
+            const [discogsRes, itunesRes, mbRes] = await Promise.allSettled([
+                searchDiscogs(art, alb),
+                searchItunes(art, alb),
+                searchMusicBrainz(art, alb)
+            ]);
+
+            const discogs  = discogsRes.status  === 'fulfilled' ? discogsRes.value  : [];
+            const itunes   = itunesRes.status   === 'fulfilled' ? itunesRes.value   : [];
+            const mb       = mbRes.status       === 'fulfilled' ? mbRes.value       : [];
+
+            let combined = [...discogs, ...itunes, ...mb];
+            combined.sort((a, b) => relevanceScore(b, art, alb) - relevanceScore(a, art, alb));
+            combined = dedupeResults(combined);
+
+            if (combined.length === 0) {
+                alert("No se encontró el álbum en ninguna fuente. Intenta con un nombre más corto o revisa la ortografía.");
+                resetFetchBtn(); return;
+            }
+
+            renderSearchResults(combined);
+        } catch(e) {
+            console.error(e);
+            alert("Error de conexión inesperado.");
+        }
+        resetFetchBtn();
+    }
+
+    async function searchDiscogs(artist, album) {
+        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
+        const queries = [
+            `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(album)}&type=master&per_page=10&key=${DISCOGS_KEY}`,
+            `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(cleanAlb)}&type=master&per_page=10&key=${DISCOGS_KEY}`,
+            `https://api.discogs.com/database/search?q=${encodeURIComponent(artist + ' ' + cleanAlb)}&type=master&per_page=10&key=${DISCOGS_KEY}`
+        ];
+
+        for (const url of queries) {
+            try {
+                const res = await fetch(url, { headers: { 'User-Agent': 'ARA-AlbumRater/2.1' } });
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    return data.results.map(item => {
+                        const parts = item.title ? item.title.split(' - ') : [];
+                        const artistName = parts.length >= 2 ? parts[0].trim() : artist;
+                        const albumName  = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : item.title;
+                        return {
+                            source: 'discogs',
+                            id: item.master_id || item.id,
+                            masterId: item.master_id,
+                            albumName, artistName,
+                            year: item.year ? String(item.year) : "----",
+                            coverUrl: item.cover_image || item.thumb || ""
+                        };
+                    });
+                }
+            } catch(e) { console.warn('Discogs query failed:', e); }
+        }
+        return [];
+    }
+
+    async function searchItunes(artist, album) {
+        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
+        const attempts = [
+            `${artist} ${album}`,
+            `${artist} ${cleanAlb}`,
+            artist
+        ];
+        for (const term of attempts) {
+            try {
+                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=12`);
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    return data.results.map(item => ({
+                        source: 'itunes', id: item.collectionId,
+                        albumName: item.collectionName, artistName: item.artistName,
+                        year: item.releaseDate ? item.releaseDate.substring(0,4) : "----",
+                        coverUrl: item.artworkUrl100.replace("100x100bb","600x600bb")
+                    }));
+                }
+            } catch(e) { console.warn('iTunes query failed:', e); }
+        }
+        return [];
+    }
+
+    async function searchMusicBrainz(artist, album) {
+        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
+        const query = encodeURIComponent(`release:"${cleanAlb}" AND artist:"${artist}"`);
+        try {
+            const res = await fetch(`https://musicbrainz.org/ws/2/release?query=${query}&limit=8&fmt=json`,
+                { headers: { 'User-Agent': 'ARA-AlbumRater/2.1 (personal)' } });
+            const data = await res.json();
+            if (!data.releases) return [];
+            return data.releases.map(item => ({
+                source: 'musicbrainz', id: item.id,
+                albumName: item.title,
+                artistName: item["artist-credit"] ? item["artist-credit"][0].name : artist,
+                year: item.date ? item.date.substring(0,4) : "----",
+                coverUrl: `https://coverartarchive.org/release/${item.id}/front-250`
+            }));
+        } catch(e) { console.warn('MusicBrainz query failed:', e); return []; }
+    }
+
+    function renderSearchResults(results) {
+        const list = document.getElementById("searchResultsList");
+        list.innerHTML = "";
+        document.getElementById("searchModal").classList.add('open');
+
+        const sourceEmoji = { discogs: '🟡', itunes: '🍎', musicbrainz: '🟣' };
+        const sourceLabel = { discogs: 'Discogs', itunes: 'iTunes', musicbrainz: 'MusicBrainz' };
+
+        results.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "search-item";
+            const thumb = item.coverUrl
+                ? `<img src="${item.coverUrl}" onerror="this.style.display='none'" style="width:50px;height:50px;border-radius:4px;object-fit:cover;flex-shrink:0;">`
+                : `<div style="width:50px;height:50px;border-radius:4px;background:#1a1a1a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;">🎵</div>`;
+            div.innerHTML = `
+                ${thumb}
+                <div style="overflow:hidden;width:100%;">
+                    <div style="font-size:12px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.albumName}</div>
+                    <div style="font-size:11px;color:#888;margin-top:2px;">${item.artistName} · ${item.year}</div>
+                    <div style="font-size:10px;color:#555;margin-top:2px;">${sourceEmoji[item.source] || '📀'} ${sourceLabel[item.source] || item.source}</div>
+                </div>`;
+            div.onclick = () => fetchTracks(item);
+            list.appendChild(div);
+        });
+    }
+
+    async function fetchTracks(item) {
+        document.getElementById("searchModal").classList.remove('open');
+        dom.btnFetch.textContent = "⏳ Cargando tracklist...";
+        dom.btnFetch.disabled = true;
+        try {
+            let tracks = [];
+            let coverUrl = item.coverUrl;
+
+            if (item.source === 'discogs') {
+                const endpoint = item.masterId
+                    ? `https://api.discogs.com/masters/${item.masterId}`
+                    : `https://api.discogs.com/releases/${item.id}`;
+                const res = await fetch(`${endpoint}?key=${DISCOGS_KEY}`,
+                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.1' } });
+                const data = await res.json();
+
+                if (data.images && data.images.length > 0) {
+                    coverUrl = data.images[0].uri || coverUrl;
+                }
+
+                if (data.tracklist && data.tracklist.length > 0) {
+                    tracks = data.tracklist
+                        .filter(t => t.type_ === 'track' || !t.type_)
+                        .map(t => ({
+                            name: t.title,
+                            duration: t.duration || "--:--",
+                            score: ""
+                        }));
+                }
+
+            } else if (item.source === 'itunes') {
+                const res = await fetch(`https://itunes.apple.com/lookup?id=${item.id}&entity=song&limit=200`);
+                const data = await res.json();
+                tracks = data.results.filter(x => x.wrapperType === 'track').map(t => ({
+                    name: t.trackName, duration: msToTime(t.trackTimeMillis), score: ""
+                }));
+
+            } else if (item.source === 'musicbrainz') {
+                const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`,
+                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.1 (personal)' } });
+                const data = await res.json();
+                if (data.media && data.media.length > 0) {
+                    tracks = data.media.flatMap(m => m.tracks).map(t => ({
+                        name: t.recording.title,
+                        duration: t.length ? msToTime(t.length) : "--:--",
+                        score: ""
+                    }));
+                }
+            }
+
+            setState({
+                artist: item.artistName,
+                album: item.albumName,
+                released: item.year,
+                cover: coverUrl,
+                tracks: tracks.length > 0 ? tracks : [{name:"",duration:"",score:""}]
+            });
+
+        } catch(e) {
+            console.error(e);
+            alert("Error al cargar el tracklist.");
+        }
+        resetFetchBtn();
+    }
+
+    function resetFetchBtn() {
+        dom.btnFetch.textContent = "🔍 Auto-Fill (Smart Search)";
+        dom.btnFetch.disabled = false;
+    }
+
+    // ===================== DRAG & DROP =====================
+
+    function handleDragStart(e) {
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+        this.classList.add('dragging');
+    }
+    function handleDragOver(e) { if(e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
+    function handleDrop(e) {
+        if(e.stopPropagation) e.stopPropagation();
+        if(dragSrcEl !== this) {
+            let fi = parseInt(dragSrcEl.dataset.index);
+            let ti = parseInt(this.dataset.index);
+            let track = state.tracks.splice(fi,1)[0];
+            state.tracks.splice(ti,0,track);
+            saveSession(); render(true);
+        }
+        return false;
+    }
+    function handleDragEnd() { this.classList.remove('dragging'); }
+
+    // ===================== RENDER =====================
+
+    function render(forceRebuildEditor = false) {
+        dom.pArtist.textContent = state.artist || "Artist";
+        dom.pAlbum.textContent = state.album || "Album Title";
+        dom.pDetails.textContent = `${state.released || "Year"} • Ranked by ${state.rankedby || "You"}`;
+        dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
+
+        if (state.mode === 'ranking') {
+            dom.graphContainer.style.display = 'none';
+            dom.lblScore.style.display = 'none';
+            dom.pScore.style.display = 'none';
+            dom.pHeaderRow.innerHTML = `<span class="col-time">TIME</span><span class="col-num">#</span><span class="col-name">TRACK TITLE</span>`;
+        } else {
+            dom.graphContainer.style.display = 'block';
+            dom.lblScore.style.display = 'block';
+            dom.pScore.style.display = 'block';
+            dom.pScore.textContent = computeAvg();
+            dom.pHeaderRow.innerHTML = `<span class="col-time">TIME</span><span class="col-num">#</span><span class="col-name">TRACK TITLE</span><span class="col-rate">RATE</span>`;
+        }
+
+        const needsRebuild = forceRebuildEditor ||
+            (document.querySelectorAll(".track-row").length !== state.tracks.length) ||
+            (lastRenderedMode !== state.mode);
+
+        if (needsRebuild) { renderEditor(); lastRenderedMode = state.mode; }
+        else {
+            document.querySelectorAll(".track-input-name").forEach((inp,i) => { if(inp.value!==state.tracks[i].name && document.activeElement!==inp) inp.value=state.tracks[i].name; });
+            document.querySelectorAll(".track-input-duration").forEach((inp,i) => { if(inp.value!==state.tracks[i].duration && document.activeElement!==inp) inp.value=state.tracks[i].duration; });
+            if(state.mode==='rating') document.querySelectorAll(".track-input-score").forEach((inp,i) => { if(inp.value!==state.tracks[i].score && document.activeElement!==inp) inp.value=state.tracks[i].score; });
+        }
+
+        dom.pTracklist.innerHTML = "";
+        state.tracks.forEach((t,i) => {
+            let rateHTML = "";
+            if(state.mode==='rating') {
+                let scoreVal = parseFloat(t.score);
+                let scoreText = !isNaN(scoreVal) ? scoreVal.toFixed(1) : "-";
+                let color = !isNaN(scoreVal) ? getBadgeColor(scoreVal) : "#333";
+                rateHTML = `<span class="col-rate"><span class="preview-badge" style="background-color:${color};">${scoreText}</span></span>`;
+            }
+            dom.pTracklist.innerHTML += `
+                <div class="preview-track-row">
+                    <span class="col-time">${t.duration||'--:--'}</span>
+                    <span class="col-num">${i+1}</span>
+                    <span class="col-name">${t.name||'TRACK TITLE'}</span>
+                    ${rateHTML}
+                </div>`;
+        });
+
+        if(state.mode==='rating') updateChartData();
+    }
+
+    function renderEditor() {
+        dom.trackEditor.innerHTML = "";
+        state.tracks.forEach((t,i) => {
+            const row = document.createElement("div");
+            row.className = "track-row"; row.dataset.index = i;
+            if(state.mode==='ranking') {
+                row.draggable = true;
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('drop', handleDrop);
+                row.addEventListener('dragend', handleDragEnd);
+            }
+            let rightControl = state.mode==='rating' ?
+                `<input class="track-input-score" type="number" step="0.1" min="0" max="10" value="${t.score}" oninput="window.AlbumApp.updateTrackFromInput(${i},this.value)" style="width:72px;text-align:center;font-weight:bold;color:white;background:#0b0f15;border:1px solid #333;border-radius:4px;">` :
+                `<span style="width:50px;text-align:center;color:#888;font-size:18px;cursor:grab;" title="Arrastrar para ordenar">≡</span>`;
+            row.innerHTML = `
+                <span class="track-num">${i+1}</span>
+                <input class="track-input-duration" type="text" value="${t.duration||''}" oninput="window.AlbumApp.updateTrack(${i},'duration',this.value)" style="width:45px;text-align:center;color:#888;font-size:12px;padding:12px 6px;">
+                <input class="track-input-name" type="text" value="${t.name}" oninput="window.AlbumApp.updateTrack(${i},'name',this.value)" style="flex:1;">
+                ${rightControl}
+                <button class="btn-remove" onclick="window.AlbumApp.removeTrack(${i})">×</button>`;
+            dom.trackEditor.appendChild(row);
+        });
+    }
+
+    // ===================== CHART =====================
+
+    function updateChartData() {
+        if(!ratingChart) return;
+        ratingChart.data.labels = state.tracks.map((_,i) => i+1);
+        ratingChart.data.datasets[0].data = state.tracks.map(t => t.score===""?5:parseFloat(t.score));
+        ratingChart.update('none');
+    }
+
+    function initInteractiveChart() {
+        ratingChart = new Chart(document.getElementById('ratingChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: state.tracks.map((_,i)=>i+1),
+                datasets: [{
+                    data: state.tracks.map(t=>t.score===""?5:parseFloat(t.score)),
+                    backgroundColor:'rgba(59,130,246,0.2)', borderColor:'#3b82f6', borderWidth:3,
+                    pointBackgroundColor:'#fff', pointRadius:6, tension:0.2, fill:true
+                }]
+            },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                plugins: {
+                    legend:{display:false},
+                    dragData:{
+                        round:1,
+                        onDragEnd:(e,ds,i,v)=>{ state.tracks[i].score=Math.max(0,Math.min(10,v)).toFixed(1); saveSession(); render(); }
+                    }
+                },
+                scales:{
+                    y:{min:0,max:10,ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}},
+                    x:{ticks:{color:'#666'},grid:{display:false}}
+                }
+            }
+        });
+    }
+
+    // ===================== STATE MANAGEMENT =====================
+
+    function setState(ns) {
+        state = {...state, ...ns};
+        if(ns.artist!==undefined) dom.inArtist.value = state.artist;
+        if(ns.album!==undefined) dom.inAlbum.value = state.album;
+        if(ns.released!==undefined) dom.inYear.value = state.released;
+        if(ns.rankedby!==undefined) dom.inRanker.value = state.rankedby;
+        if(ns.mode!==undefined) document.getElementById('selMode').value = state.mode;
+        saveSession();
+        render(true);
+    }
+
+    // ===================== PUBLIC API =====================
+
+    return {
+        addTrack: () => { state.tracks.push({name:"",duration:"",score:""}); saveSession(); render(true); },
+        removeTrack: (i) => { state.tracks.splice(i,1); saveSession(); render(true); },
+        updateTrack: (i,field,val) => { state.tracks[i][field]=val; saveSession(); render(); },
+        updateTrackFromInput: (i,val) => { state.tracks[i].score=val; saveSession(); render(); },
+        clearScores: () => { state.tracks.forEach(t=>t.score=""); saveSession(); render(true); },
+        changeMode: (m) => { state.mode=m; saveSession(); render(true); },
+        removeCover: () => { state.cover=""; saveSession(); render(); },
+        toggleSortByScore: (btn) => {
+            if (!sortedByScore) {
+                originalTrackOrder = JSON.parse(JSON.stringify(state.tracks));
+                const scored = state.tracks.filter(t => t.score !== "" && !isNaN(parseFloat(t.score)));
+                const unscored = state.tracks.filter(t => t.score === "" || isNaN(parseFloat(t.score)));
+                scored.sort((a, b) => parseFloat(b.score) - parseFloat(a.score));
+                state.tracks = [...scored, ...unscored];
+                sortedByScore = true;
+                btn.textContent = "↺ Restore Order";
+                btn.style.color = "#60a5fa";
+                btn.style.borderColor = "rgba(59,130,246,0.5)";
+                showToast("↓ Tracks ordenados por score");
+            } else {
+                if (originalTrackOrder) state.tracks = originalTrackOrder;
+                originalTrackOrder = null;
+                sortedByScore = false;
+                btn.textContent = "↓ Sort by Score";
+                btn.style.color = "#8a94a6";
+                btn.style.borderColor = "#334";
+                showToast("↺ Orden original restaurado");
+            }
+            saveSession();
+            render(true);
+        },
+        setSort: (s, btn) => {
+            libSort = s;
+            document.querySelectorAll('.lib-sort-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            renderLibrary();
+        },
+        editFromLibrary,
+        deleteFromLibrary,
+        renderLibrary,
+        openArtistsModal,
+        selectArtist,
+        selectArtistFromModal: (artistName) => {
+            document.getElementById('artistsModal').classList.remove('open');
+            currentSelectedArtist = artistName;
+            switchTab('artists');
+        },
+        renderArtistProfile,
+        renderArtistTab,
+        updateTrackFromArtistProfile,
+        setFavoriteOverride,
+        confirmYes: () => {
+            document.getElementById('confirmModal').classList.remove('open');
+            if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+        },
+        confirmCancel: () => {
+            document.getElementById('confirmModal').classList.remove('open');
+            confirmCallback = null;
+        },
+        newSession: () => {
+            confirmAction(
+                "Nueva sesión",
+                "Se borrará el editor actual. Tu biblioteca NO se verá afectada.",
+                () => {
+                    state = DEFAULT_STATE();
+                    saveSession();
+                    dom.inArtist.value = '';
+                    dom.inAlbum.value = '';
+                    dom.inYear.value = '';
+                    dom.inRanker.value = '';
+                    document.getElementById('selMode').value = 'rating';
+                    render(true);
+                    showToast("🆕 Nueva sesión iniciada");
+                }
+            );
+        },
+
+        init: () => {
+            const saved = loadSession();
+            if (saved) { state = {...DEFAULT_STATE(), ...saved}; }
+
+            initInteractiveChart();
+
+            dom.btnFetch.addEventListener("click", openSearchSelector);
+            dom.inArtist.addEventListener("input", e => { state.artist=e.target.value; saveSession(); render(); });
+            dom.inAlbum.addEventListener("input", e => { state.album=e.target.value; saveSession(); render(); });
+            dom.inYear.addEventListener("input", e => { state.released=e.target.value; saveSession(); render(); });
+            dom.inRanker.addEventListener("input", e => { state.rankedby=e.target.value; saveSession(); render(); });
+
+            if (saved && saved.mode) document.getElementById('selMode').value = saved.mode;
+
+            dom.fileInput.addEventListener("change", e => {
+                const file = e.target.files[0];
+                if(file) {
+                    const reader = new FileReader();
+                    reader.onload = ev => { state.cover=ev.target.result; saveSession(); render(); };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            document.getElementById("btnSaveImage").addEventListener("click", () => {
+                html2canvas(document.getElementById("cardExport"), {backgroundColor:"#050505",scale:2}).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `${state.artist||'Artist'} - ${state.album||'Album'}.png`;
+                    link.href = canvas.toDataURL(); link.click();
+                });
+            });
+
+            document.getElementById("btnAddToLib").addEventListener("click", addCurrentToLibrary);
+            document.getElementById("btnSaveLib").addEventListener("click", exportLibrary);
+            document.getElementById("btnLoadLib").addEventListener("click", () => {
+                document.getElementById('libFileInput').click();
+            });
+            document.getElementById("libFileInput").addEventListener("change", e => {
+                const file = e.target.files[0];
+                if(file) importLibrary(file);
+                e.target.value = ''; 
+            });
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+            });
+
+            updateLibCount();
+            render(true);
+        }
+    };
+
+})();
+
+window.onload = window.AlbumApp.init;
+</script>
+</body>
+</html>
