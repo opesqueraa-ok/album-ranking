@@ -695,19 +695,6 @@ window.AlbumApp = (function() {
         reader.readAsText(file);
     }
 
-    // Firestore (en modo Datastore) no permite un array que contenga entidades
-    // con OTRO array adentro (library[] -> álbum{} -> tracks[]). Por eso, solo al
-    // hablar con la nube, convertimos library de array a mapa {id: álbum} y viceversa.
-    // Por dentro de la app, `library` sigue siendo un array normal en todo momento.
-    function libraryArrayToMap(arr) {
-        const map = {};
-        (arr || []).forEach(album => { map[String(album.id)] = album; });
-        return map;
-    }
-    function libraryMapToArray(map) {
-        return Object.values(map || {});
-    }
-
     // Cache local instantáneo: pinta rápido al abrir la app mientras llega la nube.
     function persistLocalOnly() {
         try {
@@ -729,14 +716,17 @@ window.AlbumApp = (function() {
 
     // Guarda local al instante + programa un escrito a Firestore (debounced para no
     // saturarlo cuando el usuario está escribiendo notas rápido).
+    // Todo se guarda como UN SOLO string JSON (no como array/mapa nativo de Firestore),
+    // para evitar por completo la restricción de "array con entidades anidadas" que
+    // aparece en bases de datos configuradas en modo Datastore.
     function saveLibraryCache() {
         persistLocalOnly();
         if (applyingRemoteUpdate) return; // lo que acabamos de recibir de la nube no hace falta reenviarlo
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
+            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos });
             libraryDocRef.set({
-                library: libraryArrayToMap(library),
-                artistFavoriteOverrides, artistPhotos,
+                payload,
                 updatedAt: new Date().toISOString()
             }).catch(err => showToast('⚠️ No se pudo sincronizar con la nube: ' + err.message));
         }, 600);
@@ -747,16 +737,22 @@ window.AlbumApp = (function() {
         libraryDocRef.onSnapshot(docSnap => {
             if (!docSnap.exists) return;
             const data = docSnap.data();
-            applyingRemoteUpdate = true;
-            if (data.library) library = libraryMapToArray(data.library);
-            artistFavoriteOverrides = data.artistFavoriteOverrides || {};
-            artistPhotos = data.artistPhotos || {};
-            persistLocalOnly();
-            updateLibCount();
-            renderLibrary();
-            if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
-            else if (document.getElementById('tab-artists')?.classList.contains('active')) renderArtistTab();
-            applyingRemoteUpdate = false;
+            if (!data.payload) return;
+            try {
+                const parsed = JSON.parse(data.payload);
+                applyingRemoteUpdate = true;
+                if (Array.isArray(parsed.library)) library = parsed.library;
+                artistFavoriteOverrides = parsed.artistFavoriteOverrides || {};
+                artistPhotos = parsed.artistPhotos || {};
+                persistLocalOnly();
+                updateLibCount();
+                renderLibrary();
+                if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
+                else if (document.getElementById('tab-artists')?.classList.contains('active')) renderArtistTab();
+                applyingRemoteUpdate = false;
+            } catch(e) {
+                showToast('⚠️ Error leyendo datos de la nube: ' + e.message);
+            }
         }, err => {
             showToast('⚠️ Sin conexión a la nube — usando copia local');
         });
