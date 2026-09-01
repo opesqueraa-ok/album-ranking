@@ -671,15 +671,38 @@ window.AlbumApp = (function() {
         showToast("✅ Biblioteca guardada como archivo .ara");
     }
 
-    function importLibrary(file) {
+    async function importLibrary(file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
                 if (data.library && Array.isArray(data.library)) {
                     library = data.library;
                     artistFavoriteOverrides = data.artistFavoriteOverrides || {};
                     artistPhotos = data.artistPhotos || {};
+
+                    // Migra portadas viejas guardadas como base64 (de antes de tener Storage)
+                    // a Firebase Storage, para no exceder el límite de 1MB por documento en Firestore.
+                    const heavy = library.filter(a => a.cover && a.cover.startsWith('data:'));
+                    if (heavy.length > 0) {
+                        showToast(`⏳ Migrando ${heavy.length} portada(s) pesada(s) a Storage...`);
+                        for (const album of heavy) {
+                            try {
+                                album.cover = await uploadCoverIfNeeded(album.cover, 'covers', album.id);
+                            } catch(err) {
+                                showToast(`⚠️ No se pudo migrar la portada de "${album.album}": ` + err.message);
+                            }
+                        }
+                    }
+
+                    // Migra fotos de artista viejas guardadas como base64, si las hubiera.
+                    const heavyPhotos = Object.keys(artistPhotos).filter(k => artistPhotos[k] && artistPhotos[k].startsWith('data:'));
+                    for (const key of heavyPhotos) {
+                        try {
+                            artistPhotos[key] = await uploadCoverIfNeeded(artistPhotos[key], 'artists', key.replace(/[^a-z0-9]+/g, '_'));
+                        } catch(err) {}
+                    }
+
                     saveLibraryCache();
                     showToast(`✅ Biblioteca cargada: ${library.length} álbumes`);
                     renderLibrary();
