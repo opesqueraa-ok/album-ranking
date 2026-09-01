@@ -695,6 +695,19 @@ window.AlbumApp = (function() {
         reader.readAsText(file);
     }
 
+    // Firestore (en modo Datastore) no permite un array que contenga entidades
+    // con OTRO array adentro (library[] -> álbum{} -> tracks[]). Por eso, solo al
+    // hablar con la nube, convertimos library de array a mapa {id: álbum} y viceversa.
+    // Por dentro de la app, `library` sigue siendo un array normal en todo momento.
+    function libraryArrayToMap(arr) {
+        const map = {};
+        (arr || []).forEach(album => { map[String(album.id)] = album; });
+        return map;
+    }
+    function libraryMapToArray(map) {
+        return Object.values(map || {});
+    }
+
     // Cache local instantáneo: pinta rápido al abrir la app mientras llega la nube.
     function persistLocalOnly() {
         try {
@@ -722,7 +735,8 @@ window.AlbumApp = (function() {
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
             libraryDocRef.set({
-                library, artistFavoriteOverrides, artistPhotos,
+                library: libraryArrayToMap(library),
+                artistFavoriteOverrides, artistPhotos,
                 updatedAt: new Date().toISOString()
             }).catch(err => showToast('⚠️ No se pudo sincronizar con la nube: ' + err.message));
         }, 600);
@@ -734,7 +748,7 @@ window.AlbumApp = (function() {
             if (!docSnap.exists) return;
             const data = docSnap.data();
             applyingRemoteUpdate = true;
-            if (Array.isArray(data.library)) library = data.library;
+            if (data.library) library = libraryMapToArray(data.library);
             artistFavoriteOverrides = data.artistFavoriteOverrides || {};
             artistPhotos = data.artistPhotos || {};
             persistLocalOnly();
