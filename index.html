@@ -512,6 +512,19 @@
 
             <div class="library-toolbar">
                 <input type="text" id="artistSearch" placeholder="🔍  Search artist..." oninput="window.AlbumApp.renderArtistTab()">
+                <select id="artistSortMode" onchange="window.AlbumApp.renderArtistTab()">
+                    <option value="weighted" selected>⚖️ Mejor relación promedio-ranking</option>
+                    <option value="score">🏆 Mayor promedio</option>
+                    <option value="tracks">🎧 Más canciones punteadas</option>
+                </select>
+            </div>
+            <div class="library-toolbar" style="gap:20px; align-items:center;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer;">
+                    <input type="checkbox" id="artistFilterHasAlbum" onchange="window.AlbumApp.renderArtistTab()"> Solo artistas con álbum propio puntuado
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer;">
+                    <input type="checkbox" id="artistFilterMinTracks" onchange="window.AlbumApp.renderArtistTab()"> Mínimo 10 canciones punteadas
+                </label>
             </div>
 
             <div id="artistsGrid" class="library-grid"></div>
@@ -636,6 +649,9 @@ window.AlbumApp = (function() {
         artistsStatsBar: document.getElementById("artistsStatsBar"),
         artistsGrid: document.getElementById("artistsGrid"),
         artistSearch: document.getElementById("artistSearch"),
+        artistSortMode: document.getElementById("artistSortMode"),
+        artistFilterHasAlbum: document.getElementById("artistFilterHasAlbum"),
+        artistFilterMinTracks: document.getElementById("artistFilterMinTracks"),
         artistProfileContainer: document.getElementById("artistProfileContainer"),
     };
 
@@ -1189,22 +1205,42 @@ window.AlbumApp = (function() {
         // Construye el resumen de cada artista individual (score, tracks, favorita)
         // Incluye tanto artistas principales de álbum como artistas "feat." linkeados a un track suelto.
         const artistNames = new Set();
+        const mainArtistNames = new Set(); // solo artistas que son crédito principal de al menos un álbum
         library.forEach(a => {
-            parseArtistNames(a.artist).forEach(n => n && artistNames.add(n));
+            parseArtistNames(a.artist).forEach(n => {
+                if (!n) return;
+                artistNames.add(n);
+                mainArtistNames.add(n);
+            });
             a.tracks.forEach(t => {
                 if (t.features) parseArtistNames(t.features).forEach(n => n && artistNames.add(n));
             });
         });
 
+        // Promedio global de tu biblioteca (cada track cuenta una sola vez) — es el punto
+        // hacia el que "regresa" el score ponderado cuando un artista tiene pocas canciones.
+        let globalSum = 0, globalCount = 0;
+        library.forEach(a => a.tracks.forEach(t => {
+            const s = parseFloat(t.score);
+            if (!isNaN(s)) { globalSum += s; globalCount++; }
+        }));
+        const globalMean = globalCount > 0 ? globalSum / globalCount : 0;
+        const M = 10; // "peso" de confianza: cuántas canciones hacen falta para confiar en el promedio propio
+
         let artists = Array.from(artistNames).map(name => {
             const tracks = getArtistCatalog(name);
             const scoredTracks = tracks.length;
             const avgScore = scoredTracks > 0 ? tracks.reduce((acc, t) => acc + t.score, 0) / scoredTracks : null;
+            const weighted = scoredTracks > 0
+                ? (scoredTracks / (scoredTracks + M)) * avgScore + (M / (scoredTracks + M)) * globalMean
+                : null;
             const fav = getArtistFavorite(name, tracks);
             return {
                 name,
                 scoredTracks,
                 avgScore,
+                weighted,
+                isMainArtist: mainArtistNames.has(name),
                 favoriteTrack: fav ? fav.favoriteTrack : null
             };
         });
@@ -1228,10 +1264,28 @@ window.AlbumApp = (function() {
         const query = (dom.artistSearch.value || '').toLowerCase();
         if (query) artists = artists.filter(a => a.name.toLowerCase().includes(query));
 
-        // ---- Orden: mayor a menor score; empate -> más tracks punteados; empate -> alfabético ----
+        // ---- Filtros: solo con álbum propio / mínimo de canciones ----
+        if (dom.artistFilterHasAlbum.checked) artists = artists.filter(a => a.isMainArtist);
+        if (dom.artistFilterMinTracks.checked) artists = artists.filter(a => a.scoredTracks >= 10);
+
+        // ---- Orden ----
+        const sortMode = dom.artistSortMode.value; // 'weighted' (default) | 'score' | 'tracks'
         artists.sort((a, b) => {
-            const sa = a.avgScore ?? -1, sb = b.avgScore ?? -1;
-            if (sb !== sa) return sb - sa;
+            if (sortMode === 'tracks') {
+                if (b.scoredTracks !== a.scoredTracks) return b.scoredTracks - a.scoredTracks;
+                const sa = a.avgScore ?? -1, sb = b.avgScore ?? -1;
+                if (sb !== sa) return sb - sa;
+                return a.name.localeCompare(b.name);
+            }
+            if (sortMode === 'score') {
+                const sa = a.avgScore ?? -1, sb = b.avgScore ?? -1;
+                if (sb !== sa) return sb - sa;
+                if (b.scoredTracks !== a.scoredTracks) return b.scoredTracks - a.scoredTracks;
+                return a.name.localeCompare(b.name);
+            }
+            // default: mejor relación promedio-ranking (score ponderado)
+            const wa = a.weighted ?? -1, wb = b.weighted ?? -1;
+            if (wb !== wa) return wb - wa;
             if (b.scoredTracks !== a.scoredTracks) return b.scoredTracks - a.scoredTracks;
             return a.name.localeCompare(b.name);
         });
@@ -1241,7 +1295,7 @@ window.AlbumApp = (function() {
                 <div class="library-empty">
                     <div class="empty-icon">🎤</div>
                     <h3>${artistNames.size === 0 ? 'No hay artistas en tu biblioteca' : 'Sin resultados'}</h3>
-                    <p>${artistNames.size === 0 ? 'Agrega álbumes con canciones punteadas para explorar perfiles de artistas.' : 'No hay artistas que coincidan con tu búsqueda.'}</p>
+                    <p>${artistNames.size === 0 ? 'Agrega álbumes con canciones punteadas para explorar perfiles de artistas.' : 'No hay artistas que coincidan con tu búsqueda o filtros.'}</p>
                 </div>`;
             return;
         }
