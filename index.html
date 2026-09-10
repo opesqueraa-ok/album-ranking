@@ -358,6 +358,42 @@
         }
         .confirm-box .confirm-actions button.btn-confirm-yes { background: #ef4444; border-color: #ef4444; }
         .confirm-box .confirm-actions button.btn-confirm-yes:hover { background: #dc2626; }
+
+        /* ===== BATTLE TAB ===== */
+        .battle-arena {
+            display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px;
+            align-items: center; max-width: 900px; margin: 0 auto;
+        }
+        @media (max-width: 700px) { .battle-arena { grid-template-columns: 1fr; } }
+        .battle-side {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 20px; text-align: center; transition: 0.2s; cursor: pointer;
+        }
+        .battle-side:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .battle-side.winner { border-color: #16a34a; background: rgba(22,163,74,0.08); }
+        .battle-side.loser { opacity: 0.55; }
+        .battle-cover { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 10px; margin-bottom: 14px; background: #111; }
+        .battle-name { font-family: 'Lora', serif; font-size: 17px; font-style: italic; margin-bottom: 6px; color: #e2e8f0; }
+        .battle-artist { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .battle-score-reveal { font-size: 32px; font-weight: 800; color: white; margin-top: 12px; }
+        .battle-vs { font-family: 'Lora', serif; font-size: 28px; font-weight: 800; color: var(--text-muted); text-align: center; }
+        .battle-tie-btn {
+            display: block; margin: 20px auto 0; background: transparent; border: 1px solid var(--border);
+            color: var(--text-muted); padding: 10px 24px; border-radius: 20px; cursor: pointer;
+            font-weight: 700; font-size: 13px; transition: 0.2s;
+        }
+        .battle-tie-btn:hover { border-color: white; color: white; }
+        .battle-verdict {
+            max-width: 900px; margin: 20px auto 0; text-align: center; padding: 16px;
+            border-radius: 10px; font-size: 14px; font-weight: 600;
+        }
+        .battle-verdict.ok { background: rgba(22,163,74,0.1); border: 1px solid rgba(22,163,74,0.3); color: #86efac; }
+        .battle-verdict.warn { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); color: #fde047; }
+        .battle-next-btn {
+            display: block; margin: 20px auto 0; background: var(--accent); border: none;
+            color: white; padding: 12px 28px; border-radius: 8px; cursor: pointer;
+            font-weight: 700; font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -375,6 +411,7 @@
         <button class="tab-btn active" data-tab="editor">🎵 Editor</button>
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
         <button class="tab-btn" data-tab="artists">🎤 Artists</button>
+        <button class="tab-btn" data-tab="battle">⚔️ Battle</button>
     </div>
 
     <!-- ===== TAB: EDITOR ===== -->
@@ -534,6 +571,12 @@
         </div>
         <div id="artistProfileContainer"></div>
     </div>
+
+    <!-- ===== TAB: BATTLE ===== -->
+    <div class="tab-content" id="tab-battle">
+        <div class="lib-stats-bar" id="battleStatsBar"></div>
+        <div id="battleArena"></div>
+    </div>
 </div>
 
 <!-- SEARCH MODAL -->
@@ -614,6 +657,8 @@ window.AlbumApp = (function() {
     let currentSelectedArtist = null;
     let artistFavoriteOverrides = {};
     let artistPhotos = {}; // { 'nombre artista en minúsculas': 'https://...url de Storage' }
+    let battleStats = { played: 0, coherent: 0 };
+    let currentBattle = null; // { a, b, revealed, actualWinner, userChoice }
     let cloudSyncTimeout = null;
     let applyingRemoteUpdate = false; // evita loops al recibir nuestro propio write via onSnapshot
 
@@ -656,6 +701,8 @@ window.AlbumApp = (function() {
         artistFilterHasAlbum: document.getElementById("artistFilterHasAlbum"),
         artistFilterMinTracks: document.getElementById("artistFilterMinTracks"),
         artistProfileContainer: document.getElementById("artistProfileContainer"),
+        battleStatsBar: document.getElementById("battleStatsBar"),
+        battleArena: document.getElementById("battleArena"),
     };
 
     // ===================== PERSISTENCE =====================
@@ -674,11 +721,12 @@ window.AlbumApp = (function() {
 
     function exportLibrary() {
         const payload = {
-            _ara_version: "2.3",
+            _ara_version: "2.4",
             _exported: new Date().toISOString(),
             library: library,
             artistFavoriteOverrides: artistFavoriteOverrides,
-            artistPhotos: artistPhotos
+            artistPhotos: artistPhotos,
+            battleStats: battleStats
         };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -699,6 +747,7 @@ window.AlbumApp = (function() {
                     library = data.library;
                     artistFavoriteOverrides = data.artistFavoriteOverrides || {};
                     artistPhotos = data.artistPhotos || {};
+                    battleStats = data.battleStats || { played: 0, coherent: 0 };
 
                     // Migra portadas viejas guardadas como base64 (de antes de tener Storage)
                     // a Firebase Storage, para no exceder el límite de 1MB por documento en Firestore.
@@ -740,7 +789,7 @@ window.AlbumApp = (function() {
     // Cache local instantáneo: pinta rápido al abrir la app mientras llega la nube.
     function persistLocalOnly() {
         try {
-            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos }));
+            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats }));
         } catch(e) {}
     }
 
@@ -752,6 +801,7 @@ window.AlbumApp = (function() {
                 if (Array.isArray(parsed.library)) library = parsed.library;
                 if (parsed.artistFavoriteOverrides) artistFavoriteOverrides = parsed.artistFavoriteOverrides;
                 if (parsed.artistPhotos) artistPhotos = parsed.artistPhotos;
+                if (parsed.battleStats) battleStats = parsed.battleStats;
             }
         } catch(e) {}
     }
@@ -766,7 +816,7 @@ window.AlbumApp = (function() {
         if (applyingRemoteUpdate) return; // lo que acabamos de recibir de la nube no hace falta reenviarlo
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
-            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos });
+            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats });
             libraryDocRef.set({
                 payload,
                 updatedAt: new Date().toISOString()
@@ -786,11 +836,13 @@ window.AlbumApp = (function() {
                 if (Array.isArray(parsed.library)) library = parsed.library;
                 artistFavoriteOverrides = parsed.artistFavoriteOverrides || {};
                 artistPhotos = parsed.artistPhotos || {};
+                battleStats = parsed.battleStats || { played: 0, coherent: 0 };
                 persistLocalOnly();
                 updateLibCount();
                 renderLibrary();
                 if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
                 else if (document.getElementById('tab-artists')?.classList.contains('active')) renderArtistTab();
+                if (document.getElementById('tab-battle')?.classList.contains('active')) renderBattleStats();
                 applyingRemoteUpdate = false;
             } catch(e) {
                 showToast('⚠️ Error leyendo datos de la nube: ' + e.message);
@@ -1354,6 +1406,129 @@ window.AlbumApp = (function() {
         renderArtistProfile(artistName);
     }
 
+    // ===================== BATTLE (GUERRA DE CANCIONES) =====================
+
+    // Junta todas las canciones puntuadas de toda la biblioteca en un solo pool,
+    // cada una una sola vez (independientemente de cuántos artistas la compartan).
+    function buildBattlePool() {
+        const pool = [];
+        library.forEach(album => {
+            album.tracks.forEach((t, idx) => {
+                const s = parseFloat(t.score);
+                if (isNaN(s)) return;
+                pool.push({
+                    albumId: album.id,
+                    trackIdx: idx,
+                    name: t.name || 'Sin título',
+                    artist: album.artist || 'Unknown Artist',
+                    albumTitle: album.album,
+                    cover: album.cover,
+                    score: s
+                });
+            });
+        });
+        return pool;
+    }
+
+    function renderBattleStats() {
+        const pct = battleStats.played > 0 ? Math.round((battleStats.coherent / battleStats.played) * 100) : 0;
+        dom.battleStatsBar.innerHTML = `
+            <div class="lib-stat"><div class="lib-stat-val">${battleStats.played}</div><div class="lib-stat-label">Batallas Jugadas</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${battleStats.played > 0 ? pct + '%' : '—'}</div><div class="lib-stat-label">Coherencia con tus notas</div></div>
+        `;
+    }
+
+    function newBattle() {
+        renderBattleStats();
+        const pool = buildBattlePool();
+        if (pool.length < 2) {
+            currentBattle = null;
+            dom.battleArena.innerHTML = `
+                <div class="library-empty">
+                    <div class="empty-icon">⚔️</div>
+                    <h3>Necesitas al menos 2 canciones punteadas</h3>
+                    <p>Puntea más canciones en el Editor para poder empezar a jugar Guerra de Canciones.</p>
+                </div>`;
+            return;
+        }
+
+        let ia = Math.floor(Math.random() * pool.length);
+        let ib = Math.floor(Math.random() * pool.length);
+        while (ib === ia || (pool[ia].albumId === pool[ib].albumId && pool[ia].trackIdx === pool[ib].trackIdx)) {
+            ib = Math.floor(Math.random() * pool.length);
+        }
+
+        currentBattle = { a: pool[ia], b: pool[ib], revealed: false };
+        renderBattle();
+    }
+
+    function renderBattle() {
+        if (!currentBattle) { newBattle(); return; }
+        const { a, b, revealed } = currentBattle;
+
+        const sideHTML = (track, side, isWinner, isLoser) => `
+            <div class="battle-side ${revealed && isWinner ? 'winner' : ''} ${revealed && isLoser ? 'loser' : ''}"
+                 ${revealed ? '' : `onclick="window.AlbumApp.voteBattle('${side}')"`}>
+                <img class="battle-cover" src="${track.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}" onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'">
+                <div class="battle-name">${track.name}</div>
+                <div class="battle-artist">${track.artist}</div>
+                ${revealed ? `<div class="battle-score-reveal">${track.score.toFixed(1)}</div>` : ''}
+            </div>`;
+
+        let verdictHTML = '';
+        let winnerSide = null, loserSide = null;
+        if (revealed) {
+            const diff = a.score - b.score;
+            let actualWinner = 'tie';
+            if (diff > 0.3) actualWinner = 'a';
+            else if (diff < -0.3) actualWinner = 'b';
+
+            if (actualWinner === 'a') { winnerSide = 'a'; loserSide = 'b'; }
+            else if (actualWinner === 'b') { winnerSide = 'b'; loserSide = 'a'; }
+
+            const coherent = currentBattle.userChoice === actualWinner;
+
+            if (coherent) {
+                verdictHTML = `<div class="battle-verdict ok">✅ Coherente — tu voto coincide con tus propias notas (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}).</div>`;
+            } else if (actualWinner === 'tie') {
+                verdictHTML = `<div class="battle-verdict warn">🤏 Según tus notas es un empate técnico (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}), pero elegiste un ganador.</div>`;
+            } else {
+                verdictHTML = `<div class="battle-verdict warn">⚠️ Revisa tus notas — según tu propio puntaje debería ganar "${actualWinner === 'a' ? a.name : b.name}" (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}).</div>`;
+            }
+        }
+
+        dom.battleArena.innerHTML = `
+            <div class="battle-arena">
+                ${sideHTML(a, 'a', winnerSide === 'a', loserSide === 'a')}
+                <div class="battle-vs">VS</div>
+                ${sideHTML(b, 'b', winnerSide === 'b', loserSide === 'b')}
+            </div>
+            ${!revealed ? `<button class="battle-tie-btn" onclick="window.AlbumApp.voteBattle('tie')">🤝 Empate</button>` : ''}
+            ${verdictHTML}
+            ${revealed ? `<button class="battle-next-btn" onclick="window.AlbumApp.newBattle()">Nueva Batalla →</button>` : ''}
+        `;
+    }
+
+    function voteBattle(choice) {
+        if (!currentBattle || currentBattle.revealed) return;
+        const { a, b } = currentBattle;
+        const diff = a.score - b.score;
+        let actualWinner = 'tie';
+        if (diff > 0.3) actualWinner = 'a';
+        else if (diff < -0.3) actualWinner = 'b';
+
+        const coherent = choice === actualWinner;
+
+        battleStats.played++;
+        if (coherent) battleStats.coherent++;
+        saveLibraryCache();
+
+        currentBattle.revealed = true;
+        currentBattle.userChoice = choice;
+        renderBattle();
+        renderBattleStats();
+    }
+
     // ===================== TABS =====================
 
     function switchTab(tabName) {
@@ -1363,6 +1538,10 @@ window.AlbumApp = (function() {
         if (tabName === 'artists') {
             if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
             else renderArtistTab();
+        }
+        if (tabName === 'battle') {
+            if (currentBattle) { renderBattleStats(); renderBattle(); }
+            else newBattle();
         }
     }
 
@@ -1839,6 +2018,8 @@ window.AlbumApp = (function() {
         uploadArtistPhoto,
         updateTrackFromArtistProfile,
         setFavoriteOverride,
+        newBattle,
+        voteBattle,
         confirmYes: () => {
             document.getElementById('confirmModal').classList.remove('open');
             if (confirmCallback) { confirmCallback(); confirmCallback = null; }
