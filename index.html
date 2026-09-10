@@ -448,7 +448,6 @@
         <button class="tab-btn active" data-tab="editor">🎵 Editor</button>
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
         <button class="tab-btn" data-tab="artists">🎤 Artists</button>
-        <button class="tab-btn" data-tab="battle">⚔️ Battle</button>
         <button class="tab-btn" data-tab="tournament">🏆 Torneo</button>
         <button class="tab-btn" data-tab="duel">🆚 Duelo</button>
     </div>
@@ -611,12 +610,6 @@
         <div id="artistProfileContainer"></div>
     </div>
 
-    <!-- ===== TAB: BATTLE ===== -->
-    <div class="tab-content" id="tab-battle">
-        <div class="lib-stats-bar" id="battleStatsBar"></div>
-        <div id="battleArena"></div>
-    </div>
-
     <!-- ===== TAB: TOURNAMENT ===== -->
     <div class="tab-content" id="tab-tournament">
         <div id="tournamentArena"></div>
@@ -706,12 +699,11 @@ window.AlbumApp = (function() {
     let currentSelectedArtist = null;
     let artistFavoriteOverrides = {};
     let artistPhotos = {}; // { 'nombre artista en minúsculas': 'https://...url de Storage' }
-    let battleStats = { played: 0, coherent: 0 };
-    let currentBattle = null; // { a, b, revealed, actualWinner, userChoice }
-    let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins } } — persistente, entre todos los torneos jugados
+    let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins, losses } } — persistente, entre todos los torneos jugados
     let tournament = null; // { band, size, rounds, roundIndex, matchIndex, winnersThisRound, currentMatch, champion, pendingWinner }
-    let duelStats = {}; // { "nombre artista en minúsculas": { duels, wins } } — persistente, entre todos los duelos jugados
+    let duelStats = {}; // { "nombre artista en minúsculas": { duels, wins, losses, displayName } } — persistente
     let duel = null; // { artistA, artistB, poolA, poolB, rounds, roundIndex, scoreA, scoreB, currentRound, finished }
+    let correctionStats = { edits: 0, increases: 0, decreases: 0, netChange: 0 }; // qué tan beneficiosas han sido las correcciones hechas en los minijuegos
     let cloudSyncTimeout = null;
     let applyingRemoteUpdate = false; // evita loops al recibir nuestro propio write via onSnapshot
 
@@ -754,8 +746,6 @@ window.AlbumApp = (function() {
         artistFilterHasAlbum: document.getElementById("artistFilterHasAlbum"),
         artistFilterMinTracks: document.getElementById("artistFilterMinTracks"),
         artistProfileContainer: document.getElementById("artistProfileContainer"),
-        battleStatsBar: document.getElementById("battleStatsBar"),
-        battleArena: document.getElementById("battleArena"),
         tournamentArena: document.getElementById("tournamentArena"),
         duelArena: document.getElementById("duelArena"),
     };
@@ -781,9 +771,9 @@ window.AlbumApp = (function() {
             library: library,
             artistFavoriteOverrides: artistFavoriteOverrides,
             artistPhotos: artistPhotos,
-            battleStats: battleStats,
             tournamentStats: tournamentStats,
-            duelStats: duelStats
+            duelStats: duelStats,
+            correctionStats: correctionStats
         };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -804,9 +794,9 @@ window.AlbumApp = (function() {
                     library = data.library;
                     artistFavoriteOverrides = data.artistFavoriteOverrides || {};
                     artistPhotos = data.artistPhotos || {};
-                    battleStats = data.battleStats || { played: 0, coherent: 0 };
                     tournamentStats = data.tournamentStats || {};
                     duelStats = data.duelStats || {};
+                    correctionStats = data.correctionStats || { edits: 0, increases: 0, decreases: 0, netChange: 0 };
 
                     // Migra portadas viejas guardadas como base64 (de antes de tener Storage)
                     // a Firebase Storage, para no exceder el límite de 1MB por documento en Firestore.
@@ -848,7 +838,7 @@ window.AlbumApp = (function() {
     // Cache local instantáneo: pinta rápido al abrir la app mientras llega la nube.
     function persistLocalOnly() {
         try {
-            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats, tournamentStats, duelStats }));
+            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats }));
         } catch(e) {}
     }
 
@@ -860,9 +850,9 @@ window.AlbumApp = (function() {
                 if (Array.isArray(parsed.library)) library = parsed.library;
                 if (parsed.artistFavoriteOverrides) artistFavoriteOverrides = parsed.artistFavoriteOverrides;
                 if (parsed.artistPhotos) artistPhotos = parsed.artistPhotos;
-                if (parsed.battleStats) battleStats = parsed.battleStats;
                 if (parsed.tournamentStats) tournamentStats = parsed.tournamentStats;
                 if (parsed.duelStats) duelStats = parsed.duelStats;
+                if (parsed.correctionStats) correctionStats = parsed.correctionStats;
             }
         } catch(e) {}
     }
@@ -877,7 +867,7 @@ window.AlbumApp = (function() {
         if (applyingRemoteUpdate) return; // lo que acabamos de recibir de la nube no hace falta reenviarlo
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
-            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats, tournamentStats, duelStats });
+            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats });
             libraryDocRef.set({
                 payload,
                 updatedAt: new Date().toISOString()
@@ -897,15 +887,16 @@ window.AlbumApp = (function() {
                 if (Array.isArray(parsed.library)) library = parsed.library;
                 artistFavoriteOverrides = parsed.artistFavoriteOverrides || {};
                 artistPhotos = parsed.artistPhotos || {};
-                battleStats = parsed.battleStats || { played: 0, coherent: 0 };
                 tournamentStats = parsed.tournamentStats || {};
                 duelStats = parsed.duelStats || {};
+                correctionStats = parsed.correctionStats || { edits: 0, increases: 0, decreases: 0, netChange: 0 };
                 persistLocalOnly();
                 updateLibCount();
                 renderLibrary();
                 if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
                 else if (document.getElementById('tab-artists')?.classList.contains('active')) renderArtistTab();
-                if (document.getElementById('tab-battle')?.classList.contains('active')) renderBattleStats();
+                if (document.getElementById('tab-tournament')?.classList.contains('active')) renderTournamentEntry();
+                if (document.getElementById('tab-duel')?.classList.contains('active')) renderDuelEntry();
                 applyingRemoteUpdate = false;
             } catch(e) {
                 showToast('⚠️ Error leyendo datos de la nube: ' + e.message);
@@ -1469,11 +1460,10 @@ window.AlbumApp = (function() {
         renderArtistProfile(artistName);
     }
 
-    // ===================== BATTLE (GUERRA DE CANCIONES) =====================
-
     // Junta todas las canciones puntuadas de toda la biblioteca en un solo pool,
     // cada una una sola vez (independientemente de cuántos artistas la compartan).
-    function buildBattlePool() {
+    // Usado por Torneo y Duelo.
+    function buildScoredTrackPool() {
         const pool = [];
         library.forEach(album => {
             album.tracks.forEach((t, idx) => {
@@ -1493,42 +1483,10 @@ window.AlbumApp = (function() {
         return pool;
     }
 
-    function renderBattleStats() {
-        const pct = battleStats.played > 0 ? Math.round((battleStats.coherent / battleStats.played) * 100) : 0;
-        dom.battleStatsBar.innerHTML = `
-            <div class="lib-stat"><div class="lib-stat-val">${battleStats.played}</div><div class="lib-stat-label">Batallas Jugadas</div></div>
-            <div class="lib-stat"><div class="lib-stat-val">${battleStats.played > 0 ? pct + '%' : '—'}</div><div class="lib-stat-label">Coherencia con tus notas</div></div>
-        `;
-    }
-
-    function newBattle() {
-        renderBattleStats();
-        const pool = buildBattlePool();
-        if (pool.length < 2) {
-            currentBattle = null;
-            dom.battleArena.innerHTML = `
-                <div class="library-empty">
-                    <div class="empty-icon">⚔️</div>
-                    <h3>Necesitas al menos 2 canciones punteadas</h3>
-                    <p>Puntea más canciones en el Editor para poder empezar a jugar Guerra de Canciones.</p>
-                </div>`;
-            return;
-        }
-
-        let ia = Math.floor(Math.random() * pool.length);
-        let ib = Math.floor(Math.random() * pool.length);
-        while (ib === ia || (pool[ia].albumId === pool[ib].albumId && pool[ia].trackIdx === pool[ib].trackIdx)) {
-            ib = Math.floor(Math.random() * pool.length);
-        }
-
-        currentBattle = { a: pool[ia], b: pool[ib], revealed: false };
-        renderBattle();
-    }
-
-    // Evalúa un match: solo un empate EXACTO exige votar "Empate"; con cualquier
-    // diferencia real, tanto acertar el lado ganador como votar "Empate" (si la
-    // brecha es chica, ≤0.3) cuentan como coherente. Solo el lado equivocado falla.
-    function evaluateBattle(scoreA, scoreB, userChoice) {
+    // Evalúa un enfrentamiento: solo un empate EXACTO exige votar "Empate"; con
+    // cualquier diferencia real, tanto acertar el lado ganador como votar "Empate"
+    // (si la brecha es chica, ≤0.3) cuentan como coherente. Usado por Torneo y Duelo.
+    function evaluateMatchup(scoreA, scoreB, userChoice) {
         const diff = scoreA - scoreB;
         const absDiff = Math.abs(diff);
         const trueWinner = absDiff === 0 ? 'tie' : (diff > 0 ? 'a' : 'b');
@@ -1539,98 +1497,56 @@ window.AlbumApp = (function() {
         return { trueWinner, coherent: acceptable.includes(userChoice), absDiff };
     }
 
-    function renderBattle() {
-        if (!currentBattle) { newBattle(); return; }
-        const { a, b, revealed } = currentBattle;
-
-        const sideHTML = (track, side, isWinner, isLoser) => `
-            <div class="battle-side ${revealed && isWinner ? 'winner' : ''} ${revealed && isLoser ? 'loser' : ''}"
-                 ${revealed ? '' : `onclick="window.AlbumApp.voteBattle('${side}')"`}>
-                <img class="battle-cover" src="${track.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}" onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'">
-                <div class="battle-name">${track.name}</div>
-                <div class="battle-artist">${track.artist}</div>
-                ${revealed ? `<input type="number" step="0.1" min="0" max="10" value="${track.score}" onclick="event.stopPropagation()" onchange="window.AlbumApp.updateBattleTrackScore('${side}', this.value)" class="battle-score-reveal" style="width:90px; margin:12px auto 0; text-align:center; background:#0b0f15; border:1px solid var(--accent); color:white; border-radius:6px; padding:4px;">` : ''}
-            </div>`;
-
-        let verdictHTML = '';
-        let winnerSide = null, loserSide = null;
-        if (revealed) {
-            const { trueWinner, coherent } = evaluateBattle(a.score, b.score, currentBattle.userChoice);
-
-            if (trueWinner === 'a') { winnerSide = 'a'; loserSide = 'b'; }
-            else if (trueWinner === 'b') { winnerSide = 'b'; loserSide = 'a'; }
-
-            if (coherent) {
-                verdictHTML = `<div class="battle-verdict ok">✅ Coherente — tu voto coincide con tus propias notas (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}).</div>`;
-            } else if (trueWinner === 'tie') {
-                verdictHTML = `<div class="battle-verdict warn">🤏 Empate exacto según tus notas (mismo puntaje), pero elegiste un ganador.</div>`;
-            } else {
-                verdictHTML = `<div class="battle-verdict warn">⚠️ Revisa tus notas — según tu propio puntaje debería ganar "${trueWinner === 'a' ? a.name : b.name}" (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}). Puedes corregir la nota arriba si fue un error.</div>`;
-            }
-        }
-
-        dom.battleArena.innerHTML = `
-            <div class="battle-arena">
-                ${sideHTML(a, 'a', winnerSide === 'a', loserSide === 'a')}
-                <div class="battle-vs">VS</div>
-                ${sideHTML(b, 'b', winnerSide === 'b', loserSide === 'b')}
-            </div>
-            ${!revealed ? `<button class="battle-tie-btn" onclick="window.AlbumApp.voteBattle('tie')">🤝 Empate</button>` : ''}
-            ${verdictHTML}
-            ${revealed ? `<button class="battle-next-btn" onclick="window.AlbumApp.newBattle()">Nueva Batalla →</button>` : ''}
-        `;
-    }
-
-    function voteBattle(choice) {
-        if (!currentBattle || currentBattle.revealed) return;
-        const { a, b } = currentBattle;
-        const { coherent } = evaluateBattle(a.score, b.score, choice);
-
-        battleStats.played++;
-        if (coherent) battleStats.coherent++;
-        saveLibraryCache();
-
-        currentBattle.revealed = true;
-        currentBattle.userChoice = choice;
-        renderBattle();
-        renderBattleStats();
-    }
-
-    // Edita la nota de una de las dos canciones directamente desde la batalla revelada.
-    // Se propaga al álbum real en la biblioteca (y por lo tanto a Library/Artists/Firestore).
     // Aplica una edición de nota al álbum real en la biblioteca (compartido entre
-    // Battle y Torneo), y refresca todas las vistas que dependan de ella.
+    // Torneo y Duelo), refresca todas las vistas que dependan de ella, y lleva la
+    // cuenta de cuánto han "corregido" tus propias notas estos minijuegos en total.
     function applyScoreEdit(track, newValue) {
         const album = library.find(al => al.id === track.albumId);
         if (!album) return;
+        const oldScore = parseFloat(album.tracks[track.trackIdx].score);
+        const newScore = parseFloat(newValue);
+        if (!isNaN(oldScore) && !isNaN(newScore) && oldScore !== newScore) {
+            correctionStats.edits++;
+            correctionStats.netChange += (newScore - oldScore);
+            if (newScore > oldScore) correctionStats.increases++;
+            else correctionStats.decreases++;
+        }
         album.tracks[track.trackIdx].score = newValue;
         album.updatedAt = new Date().toISOString();
-        track.score = parseFloat(newValue); // refleja el cambio de inmediato en la vista actual
+        track.score = newScore; // refleja el cambio de inmediato en la vista actual
         saveLibraryCache();
         renderLibrary();
         if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
     }
 
-    function updateBattleTrackScore(side, newValue) {
-        if (!currentBattle) return;
-        applyScoreEdit(currentBattle[side], newValue);
-        renderBattle();
-        showToast("✏️ Nota actualizada en toda tu biblioteca");
+    // Pequeño banner reutilizado en las pantallas de inicio de Torneo y Duelo,
+    // mostrando qué tan beneficiosas han sido las correcciones hechas jugando.
+    function renderCorrectionStatsBanner() {
+        if (correctionStats.edits === 0) return '';
+        const sign = correctionStats.netChange > 0 ? '+' : '';
+        return `
+            <div style="font-size:12px; color:var(--text-muted); margin-top:10px; padding:10px; background:#0b0f15; border-radius:8px; border:1px solid var(--border);">
+                📊 Desde que juegas estos minijuegos: <strong style="color:#86efac;">${correctionStats.increases} notas subidas</strong>,
+                <strong style="color:#fca5a5;">${correctionStats.decreases} bajadas</strong> —
+                cambio neto: <strong style="color:white;">${sign}${correctionStats.netChange.toFixed(1)} puntos</strong>
+            </div>`;
     }
 
     // ===================== TOURNAMENT (TORNEO) =====================
 
+
     const TOURNAMENT_BANDS = [
-        { id: 'low',  label: '6.0 – 7.5',  min: 6.0, max: 7.5 },
-        { id: 'mid',  label: '7.6 – 8.5',  min: 7.6, max: 8.5 },
-        { id: 'high', label: '8.6 – 10.0', min: 8.6, max: 10.0 }
+        { id: 'low',   label: '6.0 – 7.5',  min: 6.0, max: 7.5 },
+        { id: 'mid',   label: '7.6 – 8.5',  min: 7.6, max: 8.5 },
+        { id: 'high',  label: '8.6 – 9.4',  min: 8.6, max: 9.4 },
+        { id: 'elite', label: '9.5 – 10.0 ⭐ Especial', min: 9.5, max: 10.0 }
     ];
     const TOURNAMENT_SIZES = [8, 16, 32, 64];
 
     function tournamentKey(track) { return `${track.albumId}_${track.trackIdx}`; }
 
     function getTournamentPool(band) {
-        return buildBattlePool().filter(t => t.score >= band.min && t.score <= band.max);
+        return buildScoredTrackPool().filter(t => t.score >= band.min && t.score <= band.max);
     }
 
     // Elige N canciones al azar SIN reemplazo, pero ponderado: entre más veces ha
@@ -1694,6 +1610,8 @@ window.AlbumApp = (function() {
                 <h2 style="margin-top:0;">🏆 Torneo de Canciones</h2>
                 <p style="color:var(--text-muted); font-size:13px;">Elige una banda de dificultad — así compites entre canciones parecidas, no un 9 aplastando a un 6.</p>
                 <div class="tourn-band-grid">${bandsHTML}</div>
+                <button onclick="window.AlbumApp.renderSongRanking()" style="margin-top:20px; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🏅 Ver Ranking de Canciones</button>
+                ${renderCorrectionStatsBanner()}
             </div>`;
     }
 
@@ -1727,7 +1645,7 @@ window.AlbumApp = (function() {
 
         selected.forEach(t => {
             const key = tournamentKey(t);
-            if (!tournamentStats[key]) tournamentStats[key] = { plays: 0, wins: 0 };
+            if (!tournamentStats[key]) tournamentStats[key] = { plays: 0, wins: 0, losses: 0 };
             tournamentStats[key].plays++;
         });
         saveLibraryCache();
@@ -1777,12 +1695,12 @@ window.AlbumApp = (function() {
                 <div class="battle-name">${track.name}</div>
                 <div class="battle-artist">${track.artist}</div>
                 ${revealed ? `<input type="number" step="0.1" min="0" max="10" value="${track.score}" onclick="event.stopPropagation()" onchange="window.AlbumApp.updateTournamentTrackScore('${side}', this.value)" class="battle-score-reveal" style="width:90px; margin:12px auto 0; text-align:center; background:#0b0f15; border:1px solid var(--accent); color:white; border-radius:6px; padding:4px;">` : ''}
-                ${revealed ? `<div style="font-size:11px; color:var(--text-muted); margin-top:6px;">🏆 ${(tournamentStats[tournamentKey(track)] && tournamentStats[tournamentKey(track)].wins) || 0} victorias históricas</div>` : ''}
+                ${revealed ? `<div style="font-size:11px; color:var(--text-muted); margin-top:6px;">🏆 ${(tournamentStats[tournamentKey(track)] && tournamentStats[tournamentKey(track)].wins) || 0}V - ${(tournamentStats[tournamentKey(track)] && tournamentStats[tournamentKey(track)].losses) || 0}D histórico</div>` : ''}
             </div>`;
 
         let verdictHTML = '';
         if (revealed) {
-            const { trueWinner, coherent } = evaluateBattle(a.score, b.score, tournament.currentMatch.userChoice);
+            const { trueWinner, coherent } = evaluateMatchup(a.score, b.score, tournament.currentMatch.userChoice);
             if (coherent) {
                 verdictHTML = `<div class="battle-verdict ok">✅ Coherente — tu elección coincide con tus notas (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}).</div>`;
             } else if (trueWinner === 'tie') {
@@ -1809,10 +1727,16 @@ window.AlbumApp = (function() {
         if (!tournament || !tournament.currentMatch || tournament.currentMatch.revealed) return;
         const { a, b } = tournament.currentMatch;
         const winnerTrack = choice === 'a' ? a : b;
+        const loserTrack = choice === 'a' ? b : a;
 
-        const key = tournamentKey(winnerTrack);
-        if (!tournamentStats[key]) tournamentStats[key] = { plays: 0, wins: 0 };
-        tournamentStats[key].wins++;
+        const winKey = tournamentKey(winnerTrack);
+        if (!tournamentStats[winKey]) tournamentStats[winKey] = { plays: 0, wins: 0, losses: 0 };
+        tournamentStats[winKey].wins++;
+
+        const loseKey = tournamentKey(loserTrack);
+        if (!tournamentStats[loseKey]) tournamentStats[loseKey] = { plays: 0, wins: 0, losses: 0 };
+        tournamentStats[loseKey].losses++;
+
         saveLibraryCache();
 
         tournament.currentMatch.revealed = true;
@@ -1850,6 +1774,49 @@ window.AlbumApp = (function() {
             </div>`;
     }
 
+    // Ranking de canciones por victorias históricas en Torneo — como el leaderboard de un videojuego.
+    function getSongRankingList(limit = 30) {
+        return Object.entries(tournamentStats)
+            .map(([key, stats]) => {
+                const [albumId, trackIdx] = key.split('_');
+                const album = library.find(al => String(al.id) === albumId);
+                if (!album) return null;
+                const track = album.tracks[trackIdx];
+                if (!track) return null;
+                return {
+                    name: track.name, artist: album.artist, cover: album.cover,
+                    wins: stats.wins || 0, losses: stats.losses || 0, plays: stats.plays || 0
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.wins - a.wins || b.plays - a.plays)
+            .slice(0, limit);
+    }
+
+    function renderSongRanking() {
+        const list = getSongRankingList();
+        const rowsHTML = list.length === 0
+            ? `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún torneo.</p>`
+            : list.map((s, i) => `
+                <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; text-align:left;">
+                    <span style="width:24px; font-weight:800; color:var(--text-muted);">${i + 1}</span>
+                    <img src="${s.cover || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.name}</div>
+                        <div style="font-size:11px; color:var(--text-muted);">${s.artist}</div>
+                    </div>
+                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D</div>
+                </div>`).join('');
+
+        dom.tournamentArena.innerHTML = `
+            <div class="tourn-setup-box" style="max-width:600px;">
+                <h2 style="margin-top:0;">🏅 Ranking de Canciones</h2>
+                <p style="color:var(--text-muted); font-size:13px;">Ordenado por victorias históricas en el Torneo.</p>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">${rowsHTML}</div>
+                <button onclick="window.AlbumApp.renderTournamentEntry()" style="margin-top:20px; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+            </div>`;
+    }
+
     function cancelTournament() {
         tournament = null;
         renderTournamentSetup();
@@ -1878,19 +1845,22 @@ window.AlbumApp = (function() {
     }
 
     function renderDuelSetup(preselectA, preselectB) {
-        const artists = getAllArtistsWithCounts();
+        const artists = getAllArtistsWithCounts().filter(a => a.count >= 3);
         if (artists.length < 2) {
             dom.duelArena.innerHTML = `
                 <div class="library-empty">
                     <div class="empty-icon">🆚</div>
-                    <h3>Necesitas al menos 2 artistas puntuados</h3>
+                    <h3>Necesitas al menos 2 artistas con 3+ canciones puntuadas</h3>
                     <p>Puntea más canciones en el Editor para poder armar un duelo.</p>
                 </div>`;
             return;
         }
-        const optionsHTML = (selected) => artists.map(a =>
-            `<option value="${a.name.replace(/"/g, '&quot;')}" ${a.name === selected ? 'selected' : ''}>${a.name} (${a.count} tracks)</option>`
-        ).join('');
+        const optionsHTML = (selected) => {
+            const opts = artists.map(a =>
+                `<option value="${a.name.replace(/"/g, '&quot;')}" ${a.name === selected ? 'selected' : ''}>${a.name} (${a.count} tracks)</option>`
+            ).join('');
+            return selected ? opts : `<option value="" disabled selected>-- Elige un artista --</option>` + opts;
+        };
 
         dom.duelArena.innerHTML = `
             <div class="duel-setup-box">
@@ -1903,12 +1873,9 @@ window.AlbumApp = (function() {
                 </div>
                 <button class="battle-next-btn" style="margin-top:20px;" onclick="window.AlbumApp.confirmDuelArtists()">Elegir rondas →</button>
                 <button onclick="window.AlbumApp.randomDuel()" style="display:block; margin:12px auto 0; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🎲 Duelo Aleatorio</button>
+                <button onclick="window.AlbumApp.renderArtistRanking()" style="display:block; margin:8px auto 0; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🏅 Ver Ranking de Artistas</button>
+                ${renderCorrectionStatsBanner()}
             </div>`;
-
-        // Evita que ambos selects queden en el mismo artista por defecto
-        const selA = document.getElementById('duelSelectA');
-        const selB = document.getElementById('duelSelectB');
-        if (!preselectA && !preselectB && artists.length > 1) selB.selectedIndex = 1;
     }
 
     function randomDuel() {
@@ -1921,6 +1888,7 @@ window.AlbumApp = (function() {
     function confirmDuelArtists() {
         const nameA = document.getElementById('duelSelectA').value;
         const nameB = document.getElementById('duelSelectB').value;
+        if (!nameA || !nameB) { showToast('⚠️ Elige ambos artistas.'); return; }
         if (nameA === nameB) { showToast('⚠️ Elige dos artistas distintos.'); return; }
 
         const artists = getAllArtistsWithCounts();
@@ -1964,12 +1932,15 @@ window.AlbumApp = (function() {
         if (duel.roundIndex >= duel.rounds) {
             duel.finished = true;
 
-            if (!duelStats[duel.artistA.toLowerCase()]) duelStats[duel.artistA.toLowerCase()] = { duels: 0, wins: 0 };
-            if (!duelStats[duel.artistB.toLowerCase()]) duelStats[duel.artistB.toLowerCase()] = { duels: 0, wins: 0 };
-            duelStats[duel.artistA.toLowerCase()].duels++;
-            duelStats[duel.artistB.toLowerCase()].duels++;
-            if (duel.scoreA > duel.scoreB) duelStats[duel.artistA.toLowerCase()].wins++;
-            else if (duel.scoreB > duel.scoreA) duelStats[duel.artistB.toLowerCase()].wins++;
+            const keyA = duel.artistA.toLowerCase(), keyB = duel.artistB.toLowerCase();
+            if (!duelStats[keyA]) duelStats[keyA] = { duels: 0, wins: 0, losses: 0, displayName: duel.artistA };
+            if (!duelStats[keyB]) duelStats[keyB] = { duels: 0, wins: 0, losses: 0, displayName: duel.artistB };
+            duelStats[keyA].displayName = duel.artistA;
+            duelStats[keyB].displayName = duel.artistB;
+            duelStats[keyA].duels++;
+            duelStats[keyB].duels++;
+            if (duel.scoreA > duel.scoreB) { duelStats[keyA].wins++; duelStats[keyB].losses++; }
+            else if (duel.scoreB > duel.scoreA) { duelStats[keyB].wins++; duelStats[keyA].losses++; }
             saveLibraryCache();
 
             renderDuelResult();
@@ -1993,7 +1964,7 @@ window.AlbumApp = (function() {
 
         let verdictHTML = '';
         if (revealed) {
-            const { trueWinner, coherent } = evaluateBattle(a.score, b.score, userChoice);
+            const { trueWinner, coherent } = evaluateMatchup(a.score, b.score, userChoice);
             if (coherent) {
                 verdictHTML = `<div class="battle-verdict ok">✅ Coherente — tu voto coincide con tus notas (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}).</div>`;
             } else if (trueWinner === 'tie') {
@@ -2063,6 +2034,31 @@ window.AlbumApp = (function() {
             </div>`;
     }
 
+    // Ranking de artistas por duelos ganados históricamente.
+    function renderArtistRanking() {
+        const list = Object.values(duelStats)
+            .sort((a, b) => b.wins - a.wins || b.duels - a.duels);
+
+        const rowsHTML = list.length === 0
+            ? `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún duelo.</p>`
+            : list.map((s, i) => `
+                <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; text-align:left;">
+                    <span style="width:24px; font-weight:800; color:var(--text-muted);">${i + 1}</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:700; font-size:14px;">${s.displayName}</div>
+                    </div>
+                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses || 0}D (${s.duels} duelos)</div>
+                </div>`).join('');
+
+        dom.duelArena.innerHTML = `
+            <div class="duel-setup-box" style="max-width:600px;">
+                <h2 style="margin-top:0;">🏅 Ranking de Artistas</h2>
+                <p style="color:var(--text-muted); font-size:13px;">Ordenado por duelos ganados históricamente.</p>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">${rowsHTML}</div>
+                <button onclick="window.AlbumApp.renderDuelEntry()" style="margin-top:20px; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+            </div>`;
+    }
+
     function cancelDuel() {
         duel = null;
         renderDuelSetup();
@@ -2077,10 +2073,6 @@ window.AlbumApp = (function() {
         if (tabName === 'artists') {
             if (currentSelectedArtist) renderArtistProfile(currentSelectedArtist);
             else renderArtistTab();
-        }
-        if (tabName === 'battle') {
-            if (currentBattle) { renderBattleStats(); renderBattle(); }
-            else newBattle();
         }
         if (tabName === 'tournament') renderTournamentEntry();
         if (tabName === 'duel') renderDuelEntry();
@@ -2559,9 +2551,6 @@ window.AlbumApp = (function() {
         uploadArtistPhoto,
         updateTrackFromArtistProfile,
         setFavoriteOverride,
-        newBattle,
-        voteBattle,
-        updateBattleTrackScore,
         renderTournamentEntry,
         selectTournamentBand,
         startTournament,
@@ -2569,6 +2558,7 @@ window.AlbumApp = (function() {
         nextTournamentMatch,
         updateTournamentTrackScore,
         cancelTournament,
+        renderSongRanking,
         renderDuelEntry,
         randomDuel,
         confirmDuelArtists,
@@ -2577,6 +2567,7 @@ window.AlbumApp = (function() {
         nextDuelRound,
         updateDuelTrackScore,
         cancelDuel,
+        renderArtistRanking,
         confirmYes: () => {
             document.getElementById('confirmModal').classList.remove('open');
             if (confirmCallback) { confirmCallback(); confirmCallback = null; }
