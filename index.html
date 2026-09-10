@@ -416,6 +416,21 @@
             background: var(--bg-card); border: 1px solid #eab308; border-radius: 16px; padding: 30px;
         }
         .tourn-champion-badge { font-size: 40px; margin-bottom: 10px; }
+
+        /* ===== DUEL ===== */
+        .duel-setup-box {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 30px; max-width: 700px; margin: 0 auto; text-align: center;
+        }
+        .duel-artist-picker { display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+        .duel-artist-picker select { min-width: 220px; }
+        .duel-vs-label { font-family: 'Lora', serif; font-size: 20px; color: var(--text-muted); }
+        .duel-scoreboard {
+            display: flex; justify-content: center; align-items: center; gap: 25px;
+            max-width: 700px; margin: 0 auto 15px; font-family: 'Lora', serif;
+        }
+        .duel-score-name { font-size: 15px; font-weight: 700; }
+        .duel-score-val { font-size: 30px; font-weight: 800; color: var(--accent); }
     </style>
 </head>
 <body>
@@ -435,6 +450,7 @@
         <button class="tab-btn" data-tab="artists">🎤 Artists</button>
         <button class="tab-btn" data-tab="battle">⚔️ Battle</button>
         <button class="tab-btn" data-tab="tournament">🏆 Torneo</button>
+        <button class="tab-btn" data-tab="duel">🆚 Duelo</button>
     </div>
 
     <!-- ===== TAB: EDITOR ===== -->
@@ -605,6 +621,11 @@
     <div class="tab-content" id="tab-tournament">
         <div id="tournamentArena"></div>
     </div>
+
+    <!-- ===== TAB: DUEL ===== -->
+    <div class="tab-content" id="tab-duel">
+        <div id="duelArena"></div>
+    </div>
 </div>
 
 <!-- SEARCH MODAL -->
@@ -689,6 +710,8 @@ window.AlbumApp = (function() {
     let currentBattle = null; // { a, b, revealed, actualWinner, userChoice }
     let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins } } — persistente, entre todos los torneos jugados
     let tournament = null; // { band, size, rounds, roundIndex, matchIndex, winnersThisRound, currentMatch, champion, pendingWinner }
+    let duelStats = {}; // { "nombre artista en minúsculas": { duels, wins } } — persistente, entre todos los duelos jugados
+    let duel = null; // { artistA, artistB, poolA, poolB, rounds, roundIndex, scoreA, scoreB, currentRound, finished }
     let cloudSyncTimeout = null;
     let applyingRemoteUpdate = false; // evita loops al recibir nuestro propio write via onSnapshot
 
@@ -734,6 +757,7 @@ window.AlbumApp = (function() {
         battleStatsBar: document.getElementById("battleStatsBar"),
         battleArena: document.getElementById("battleArena"),
         tournamentArena: document.getElementById("tournamentArena"),
+        duelArena: document.getElementById("duelArena"),
     };
 
     // ===================== PERSISTENCE =====================
@@ -758,7 +782,8 @@ window.AlbumApp = (function() {
             artistFavoriteOverrides: artistFavoriteOverrides,
             artistPhotos: artistPhotos,
             battleStats: battleStats,
-            tournamentStats: tournamentStats
+            tournamentStats: tournamentStats,
+            duelStats: duelStats
         };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -781,6 +806,7 @@ window.AlbumApp = (function() {
                     artistPhotos = data.artistPhotos || {};
                     battleStats = data.battleStats || { played: 0, coherent: 0 };
                     tournamentStats = data.tournamentStats || {};
+                    duelStats = data.duelStats || {};
 
                     // Migra portadas viejas guardadas como base64 (de antes de tener Storage)
                     // a Firebase Storage, para no exceder el límite de 1MB por documento en Firestore.
@@ -822,7 +848,7 @@ window.AlbumApp = (function() {
     // Cache local instantáneo: pinta rápido al abrir la app mientras llega la nube.
     function persistLocalOnly() {
         try {
-            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats, tournamentStats }));
+            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats, tournamentStats, duelStats }));
         } catch(e) {}
     }
 
@@ -836,6 +862,7 @@ window.AlbumApp = (function() {
                 if (parsed.artistPhotos) artistPhotos = parsed.artistPhotos;
                 if (parsed.battleStats) battleStats = parsed.battleStats;
                 if (parsed.tournamentStats) tournamentStats = parsed.tournamentStats;
+                if (parsed.duelStats) duelStats = parsed.duelStats;
             }
         } catch(e) {}
     }
@@ -850,7 +877,7 @@ window.AlbumApp = (function() {
         if (applyingRemoteUpdate) return; // lo que acabamos de recibir de la nube no hace falta reenviarlo
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
-            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats, tournamentStats });
+            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, battleStats, tournamentStats, duelStats });
             libraryDocRef.set({
                 payload,
                 updatedAt: new Date().toISOString()
@@ -872,6 +899,7 @@ window.AlbumApp = (function() {
                 artistPhotos = parsed.artistPhotos || {};
                 battleStats = parsed.battleStats || { played: 0, coherent: 0 };
                 tournamentStats = parsed.tournamentStats || {};
+                duelStats = parsed.duelStats || {};
                 persistLocalOnly();
                 updateLibCount();
                 renderLibrary();
@@ -1827,6 +1855,219 @@ window.AlbumApp = (function() {
         renderTournamentSetup();
     }
 
+    // ===================== DUEL (DUELO DE ARTISTAS) =====================
+
+    const DUEL_ROUND_OPTIONS = [3, 5, 7];
+
+    function getAllArtistsWithCounts() {
+        const names = new Set();
+        library.forEach(a => {
+            parseArtistNames(a.artist).forEach(n => n && names.add(n));
+            a.tracks.forEach(t => { if (t.features) parseArtistNames(t.features).forEach(n => n && names.add(n)); });
+        });
+        return Array.from(names)
+            .map(name => ({ name, count: getArtistCatalog(name).length }))
+            .filter(a => a.count > 0)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    function renderDuelEntry() {
+        if (!duel) { renderDuelSetup(); return; }
+        if (duel.finished) { renderDuelResult(); return; }
+        renderDuelRound();
+    }
+
+    function renderDuelSetup(preselectA, preselectB) {
+        const artists = getAllArtistsWithCounts();
+        if (artists.length < 2) {
+            dom.duelArena.innerHTML = `
+                <div class="library-empty">
+                    <div class="empty-icon">🆚</div>
+                    <h3>Necesitas al menos 2 artistas puntuados</h3>
+                    <p>Puntea más canciones en el Editor para poder armar un duelo.</p>
+                </div>`;
+            return;
+        }
+        const optionsHTML = (selected) => artists.map(a =>
+            `<option value="${a.name.replace(/"/g, '&quot;')}" ${a.name === selected ? 'selected' : ''}>${a.name} (${a.count} tracks)</option>`
+        ).join('');
+
+        dom.duelArena.innerHTML = `
+            <div class="duel-setup-box">
+                <h2 style="margin-top:0;">🆚 Duelo de Artistas</h2>
+                <p style="color:var(--text-muted); font-size:13px;">Elige dos artistas — se enfrentan ronda por ronda con canciones al azar de cada uno.</p>
+                <div class="duel-artist-picker">
+                    <select id="duelSelectA">${optionsHTML(preselectA)}</select>
+                    <span class="duel-vs-label">VS</span>
+                    <select id="duelSelectB">${optionsHTML(preselectB)}</select>
+                </div>
+                <button class="battle-next-btn" style="margin-top:20px;" onclick="window.AlbumApp.confirmDuelArtists()">Elegir rondas →</button>
+                <button onclick="window.AlbumApp.randomDuel()" style="display:block; margin:12px auto 0; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🎲 Duelo Aleatorio</button>
+            </div>`;
+
+        // Evita que ambos selects queden en el mismo artista por defecto
+        const selA = document.getElementById('duelSelectA');
+        const selB = document.getElementById('duelSelectB');
+        if (!preselectA && !preselectB && artists.length > 1) selB.selectedIndex = 1;
+    }
+
+    function randomDuel() {
+        const eligible = getAllArtistsWithCounts().filter(a => a.count >= 3);
+        if (eligible.length < 2) { showToast('⚠️ Necesitas al menos 2 artistas con 3+ canciones puntuadas.'); return; }
+        const shuffled = shuffle(eligible);
+        renderDuelSetup(shuffled[0].name, shuffled[1].name);
+    }
+
+    function confirmDuelArtists() {
+        const nameA = document.getElementById('duelSelectA').value;
+        const nameB = document.getElementById('duelSelectB').value;
+        if (nameA === nameB) { showToast('⚠️ Elige dos artistas distintos.'); return; }
+
+        const artists = getAllArtistsWithCounts();
+        const countA = artists.find(a => a.name === nameA).count;
+        const countB = artists.find(a => a.name === nameB).count;
+        const maxRounds = Math.min(countA, countB);
+
+        if (maxRounds < 3) { showToast('⚠️ Ambos artistas necesitan al menos 3 canciones puntuadas.'); return; }
+
+        const sizesHTML = DUEL_ROUND_OPTIONS.filter(n => n <= maxRounds).map(n =>
+            `<button class="tourn-size-btn" onclick="window.AlbumApp.startDuel('${nameA.replace(/'/g, "\\'")}', '${nameB.replace(/'/g, "\\'")}', ${n})">
+                <div class="tourn-band-title">${n} rondas</div>
+             </button>`
+        ).join('');
+
+        dom.duelArena.innerHTML = `
+            <div class="duel-setup-box">
+                <h2 style="margin-top:0;">${nameA} <span class="duel-vs-label">VS</span> ${nameB}</h2>
+                <p style="color:var(--text-muted); font-size:13px;">¿Cuántas rondas quieres jugar?</p>
+                <div class="tourn-size-grid">${sizesHTML}</div>
+                <button onclick="window.AlbumApp.renderDuelEntry()" style="margin-top:20px; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Elegir otros artistas</button>
+            </div>`;
+    }
+
+    function startDuel(nameA, nameB, rounds) {
+        const poolA = shuffle(getArtistCatalog(nameA)).slice(0, rounds);
+        const poolB = shuffle(getArtistCatalog(nameB)).slice(0, rounds);
+
+        duel = {
+            artistA: nameA, artistB: nameB,
+            poolA, poolB,
+            rounds, roundIndex: 0,
+            scoreA: 0, scoreB: 0,
+            currentRound: null,
+            finished: false
+        };
+        nextDuelRound();
+    }
+
+    function nextDuelRound() {
+        if (duel.roundIndex >= duel.rounds) {
+            duel.finished = true;
+
+            if (!duelStats[duel.artistA.toLowerCase()]) duelStats[duel.artistA.toLowerCase()] = { duels: 0, wins: 0 };
+            if (!duelStats[duel.artistB.toLowerCase()]) duelStats[duel.artistB.toLowerCase()] = { duels: 0, wins: 0 };
+            duelStats[duel.artistA.toLowerCase()].duels++;
+            duelStats[duel.artistB.toLowerCase()].duels++;
+            if (duel.scoreA > duel.scoreB) duelStats[duel.artistA.toLowerCase()].wins++;
+            else if (duel.scoreB > duel.scoreA) duelStats[duel.artistB.toLowerCase()].wins++;
+            saveLibraryCache();
+
+            renderDuelResult();
+            return;
+        }
+        duel.currentRound = { a: duel.poolA[duel.roundIndex], b: duel.poolB[duel.roundIndex], revealed: false, userChoice: null };
+        renderDuelRound();
+    }
+
+    function renderDuelRound() {
+        const { a, b, revealed, userChoice } = duel.currentRound;
+
+        const sideHTML = (track, side) => `
+            <div class="battle-side ${revealed && userChoice === side ? 'winner' : ''} ${revealed && userChoice !== side && userChoice !== 'tie' ? 'loser' : ''}"
+                 ${revealed ? '' : `onclick="window.AlbumApp.voteDuel('${side}')"`}>
+                <img class="battle-cover" src="${track.albumCover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}" onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'">
+                <div class="battle-name">${track.name}</div>
+                <div class="battle-artist">${side === 'a' ? duel.artistA : duel.artistB}</div>
+                ${revealed ? `<input type="number" step="0.1" min="0" max="10" value="${track.score}" onclick="event.stopPropagation()" onchange="window.AlbumApp.updateDuelTrackScore('${side}', this.value)" class="battle-score-reveal" style="width:90px; margin:12px auto 0; text-align:center; background:#0b0f15; border:1px solid var(--accent); color:white; border-radius:6px; padding:4px;">` : ''}
+            </div>`;
+
+        let verdictHTML = '';
+        if (revealed) {
+            const { trueWinner, coherent } = evaluateBattle(a.score, b.score, userChoice);
+            if (coherent) {
+                verdictHTML = `<div class="battle-verdict ok">✅ Coherente — tu voto coincide con tus notas (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}).</div>`;
+            } else if (trueWinner === 'tie') {
+                verdictHTML = `<div class="battle-verdict warn">🤏 Empate exacto según tus notas, pero elegiste un ganador.</div>`;
+            } else {
+                verdictHTML = `<div class="battle-verdict warn">⚠️ Según tus notas debería ganar "${trueWinner === 'a' ? duel.artistA : duel.artistB}" en esta ronda (${a.score.toFixed(1)} vs ${b.score.toFixed(1)}). Puedes corregir la nota arriba.</div>`;
+            }
+        }
+
+        dom.duelArena.innerHTML = `
+            <div class="duel-scoreboard">
+                <div><div class="duel-score-name">${duel.artistA}</div><div class="duel-score-val">${duel.scoreA}</div></div>
+                <div class="duel-vs-label">Ronda ${duel.roundIndex + 1}/${duel.rounds}</div>
+                <div><div class="duel-score-name">${duel.artistB}</div><div class="duel-score-val">${duel.scoreB}</div></div>
+            </div>
+            <div class="battle-arena">
+                ${sideHTML(a, 'a')}
+                <div class="battle-vs">VS</div>
+                ${sideHTML(b, 'b')}
+            </div>
+            ${!revealed ? `<button class="battle-tie-btn" onclick="window.AlbumApp.voteDuel('tie')">🤝 Empate (ronda neutra)</button>` : ''}
+            ${verdictHTML}
+            ${revealed ? `<button class="battle-next-btn" onclick="window.AlbumApp.nextDuelRound()">${duel.roundIndex + 1 >= duel.rounds ? 'Ver Resultado →' : 'Siguiente Ronda →'}</button>` : ''}
+            <button onclick="window.AlbumApp.cancelDuel()" style="display:block; margin:20px auto 0; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">✕ Cancelar duelo</button>
+        `;
+    }
+
+    function voteDuel(choice) {
+        if (!duel || !duel.currentRound || duel.currentRound.revealed) return;
+        if (choice === 'a') duel.scoreA++;
+        else if (choice === 'b') duel.scoreB++;
+        // 'tie' => ronda neutra, nadie suma
+
+        duel.currentRound.revealed = true;
+        duel.currentRound.userChoice = choice;
+        duel.roundIndex++;
+        renderDuelRound();
+    }
+
+    function updateDuelTrackScore(side, newValue) {
+        if (!duel || !duel.currentRound) return;
+        applyScoreEdit(duel.currentRound[side], newValue);
+        renderDuelRound();
+        showToast("✏️ Nota actualizada en toda tu biblioteca");
+    }
+
+    function renderDuelResult() {
+        const { artistA, artistB, scoreA, scoreB } = duel;
+        let resultLine;
+        if (scoreA > scoreB) resultLine = `🏆 ${artistA} gana el duelo`;
+        else if (scoreB > scoreA) resultLine = `🏆 ${artistB} gana el duelo`;
+        else resultLine = `🤝 Empate general`;
+
+        const statsA = duelStats[artistA.toLowerCase()] || { duels: 0, wins: 0 };
+        const statsB = duelStats[artistB.toLowerCase()] || { duels: 0, wins: 0 };
+
+        dom.duelArena.innerHTML = `
+            <div class="tourn-champion-box">
+                <div class="tourn-champion-badge">🆚</div>
+                <h2 style="margin:0 0 6px;">${resultLine}</h2>
+                <p style="color:var(--text-muted); margin:0 0 20px;">${artistA} ${scoreA} — ${scoreB} ${artistB}</p>
+                <div style="display:flex; justify-content:center; gap:30px; font-size:12px; color:var(--text-muted);">
+                    <div>🏆 ${artistA}: ${statsA.wins}/${statsA.duels} duelos ganados</div>
+                    <div>🏆 ${artistB}: ${statsB.wins}/${statsB.duels} duelos ganados</div>
+                </div>
+                <button class="battle-next-btn" onclick="window.AlbumApp.cancelDuel()">Nuevo Duelo →</button>
+            </div>`;
+    }
+
+    function cancelDuel() {
+        duel = null;
+        renderDuelSetup();
+    }
+
     // ===================== TABS =====================
 
     function switchTab(tabName) {
@@ -1842,6 +2083,7 @@ window.AlbumApp = (function() {
             else newBattle();
         }
         if (tabName === 'tournament') renderTournamentEntry();
+        if (tabName === 'duel') renderDuelEntry();
     }
 
     // ===================== HELPERS =====================
@@ -2327,6 +2569,14 @@ window.AlbumApp = (function() {
         nextTournamentMatch,
         updateTournamentTrackScore,
         cancelTournament,
+        renderDuelEntry,
+        randomDuel,
+        confirmDuelArtists,
+        startDuel,
+        voteDuel,
+        nextDuelRound,
+        updateDuelTrackScore,
+        cancelDuel,
         confirmYes: () => {
             document.getElementById('confirmModal').classList.remove('open');
             if (confirmCallback) { confirmCallback(); confirmCallback = null; }
