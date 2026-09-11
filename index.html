@@ -1775,22 +1775,45 @@ window.AlbumApp = (function() {
     }
 
     // Ranking de canciones por victorias históricas en Torneo — como el leaderboard de un videojuego.
+    let songRankingSort = 'wins'; // 'wins' | 'losses' | 'winrate'
+
     function getSongRankingList(limit = 30) {
-        return Object.entries(tournamentStats)
+        const list = Object.entries(tournamentStats)
             .map(([key, stats]) => {
                 const [albumId, trackIdx] = key.split('_');
                 const album = library.find(al => String(al.id) === albumId);
                 if (!album) return null;
                 const track = album.tracks[trackIdx];
                 if (!track) return null;
+                const wins = stats.wins || 0, losses = stats.losses || 0;
                 return {
                     name: track.name, artist: album.artist, cover: album.cover,
-                    wins: stats.wins || 0, losses: stats.losses || 0, plays: stats.plays || 0
+                    wins, losses, plays: stats.plays || 0,
+                    winRate: (wins + losses) > 0 ? wins / (wins + losses) : -1
                 };
             })
-            .filter(Boolean)
-            .sort((a, b) => b.wins - a.wins || b.plays - a.plays)
-            .slice(0, limit);
+            .filter(Boolean);
+
+        if (songRankingSort === 'losses') list.sort((a, b) => b.losses - a.losses || b.plays - a.plays);
+        else if (songRankingSort === 'winrate') list.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+        else list.sort((a, b) => b.wins - a.wins || b.plays - a.plays);
+
+        return list.slice(0, limit);
+    }
+
+    function setSongRankingSort(mode) { songRankingSort = mode; renderSongRanking(); }
+
+    function resetTournamentStats() {
+        confirmAction(
+            "Reiniciar ranking de canciones",
+            "Esto borra todas las victorias, derrotas y veces jugadas de todas las canciones en Torneo. No afecta tus notas ni tu biblioteca.",
+            () => {
+                tournamentStats = {};
+                saveLibraryCache();
+                renderSongRanking();
+                showToast("🗑️ Ranking de canciones reiniciado");
+            }
+        );
     }
 
     function renderSongRanking() {
@@ -1805,15 +1828,24 @@ window.AlbumApp = (function() {
                         <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.name}</div>
                         <div style="font-size:11px; color:var(--text-muted);">${s.artist}</div>
                     </div>
-                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D</div>
+                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D${s.winRate >= 0 ? ` · ${Math.round(s.winRate * 100)}%` : ''}</div>
                 </div>`).join('');
+
+        const filterBtn = (mode, label) => `<button class="tourn-size-btn" style="${songRankingSort === mode ? 'border-color:var(--accent); background:rgba(59,130,246,0.1);' : ''} padding:8px 14px; min-width:auto;" onclick="window.AlbumApp.setSongRankingSort('${mode}')">${label}</button>`;
 
         dom.tournamentArena.innerHTML = `
             <div class="tourn-setup-box" style="max-width:600px;">
                 <h2 style="margin-top:0;">🏅 Ranking de Canciones</h2>
-                <p style="color:var(--text-muted); font-size:13px;">Ordenado por victorias históricas en el Torneo.</p>
-                <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">${rowsHTML}</div>
-                <button onclick="window.AlbumApp.renderTournamentEntry()" style="margin-top:20px; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
+                    ${filterBtn('wins', '🏆 Más Victorias')}
+                    ${filterBtn('losses', '💀 Más Derrotas')}
+                    ${filterBtn('winrate', '📊 Mejor % Victorias')}
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">${rowsHTML}</div>
+                <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                    <button onclick="window.AlbumApp.renderTournamentEntry()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+                    <button onclick="window.AlbumApp.resetTournamentStats()" style="background:transparent; border:1px solid rgba(239,68,68,0.3); color:#ef4444; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🗑️ Reiniciar Ranking</button>
+                </div>
             </div>`;
     }
 
@@ -2034,10 +2066,34 @@ window.AlbumApp = (function() {
             </div>`;
     }
 
+    let artistRankingSort = 'wins'; // 'wins' | 'losses' | 'winrate'
+
+    function setArtistRankingSort(mode) { artistRankingSort = mode; renderArtistRanking(); }
+
+    function resetDuelStats() {
+        confirmAction(
+            "Reiniciar ranking de artistas",
+            "Esto borra todas las victorias, derrotas y duelos jugados de todos los artistas. No afecta tus notas ni tu biblioteca.",
+            () => {
+                duelStats = {};
+                saveLibraryCache();
+                renderArtistRanking();
+                showToast("🗑️ Ranking de artistas reiniciado");
+            }
+        );
+    }
+
     // Ranking de artistas por duelos ganados históricamente.
     function renderArtistRanking() {
-        const list = Object.values(duelStats)
-            .sort((a, b) => b.wins - a.wins || b.duels - a.duels);
+        const list = Object.values(duelStats).map(s => ({
+            ...s,
+            losses: s.losses || 0,
+            winRate: (s.wins + (s.losses || 0)) > 0 ? s.wins / (s.wins + (s.losses || 0)) : -1
+        }));
+
+        if (artistRankingSort === 'losses') list.sort((a, b) => b.losses - a.losses || b.duels - a.duels);
+        else if (artistRankingSort === 'winrate') list.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+        else list.sort((a, b) => b.wins - a.wins || b.duels - a.duels);
 
         const rowsHTML = list.length === 0
             ? `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún duelo.</p>`
@@ -2047,15 +2103,24 @@ window.AlbumApp = (function() {
                     <div style="flex:1;">
                         <div style="font-weight:700; font-size:14px;">${s.displayName}</div>
                     </div>
-                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses || 0}D (${s.duels} duelos)</div>
+                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D (${s.duels} duelos)${s.winRate >= 0 ? ` · ${Math.round(s.winRate * 100)}%` : ''}</div>
                 </div>`).join('');
+
+        const filterBtn = (mode, label) => `<button class="tourn-size-btn" style="${artistRankingSort === mode ? 'border-color:var(--accent); background:rgba(59,130,246,0.1);' : ''} padding:8px 14px; min-width:auto;" onclick="window.AlbumApp.setArtistRankingSort('${mode}')">${label}</button>`;
 
         dom.duelArena.innerHTML = `
             <div class="duel-setup-box" style="max-width:600px;">
                 <h2 style="margin-top:0;">🏅 Ranking de Artistas</h2>
-                <p style="color:var(--text-muted); font-size:13px;">Ordenado por duelos ganados históricamente.</p>
-                <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">${rowsHTML}</div>
-                <button onclick="window.AlbumApp.renderDuelEntry()" style="margin-top:20px; background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
+                    ${filterBtn('wins', '🏆 Más Victorias')}
+                    ${filterBtn('losses', '💀 Más Derrotas')}
+                    ${filterBtn('winrate', '📊 Mejor % Victorias')}
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">${rowsHTML}</div>
+                <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                    <button onclick="window.AlbumApp.renderDuelEntry()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+                    <button onclick="window.AlbumApp.resetDuelStats()" style="background:transparent; border:1px solid rgba(239,68,68,0.3); color:#ef4444; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🗑️ Reiniciar Ranking</button>
+                </div>
             </div>`;
     }
 
@@ -2559,6 +2624,8 @@ window.AlbumApp = (function() {
         updateTournamentTrackScore,
         cancelTournament,
         renderSongRanking,
+        setSongRankingSort,
+        resetTournamentStats,
         renderDuelEntry,
         randomDuel,
         confirmDuelArtists,
@@ -2568,6 +2635,8 @@ window.AlbumApp = (function() {
         updateDuelTrackScore,
         cancelDuel,
         renderArtistRanking,
+        setArtistRankingSort,
+        resetDuelStats,
         confirmYes: () => {
             document.getElementById('confirmModal').classList.remove('open');
             if (confirmCallback) { confirmCallback(); confirmCallback = null; }
