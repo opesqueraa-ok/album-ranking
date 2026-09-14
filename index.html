@@ -435,12 +435,31 @@
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div class="modal-overlay open" id="loginScreen" style="z-index:50000;">
+    <div class="modal-content" style="max-width:380px; padding:35px; flex-direction:column;">
+        <h2 style="margin:0 0 6px; text-align:center; font-family:'Lora',serif;">🔒 Album Rater</h2>
+        <p style="color:var(--text-muted); font-size:13px; text-align:center; margin:0 0 25px;">Inicia sesión para acceder a tu biblioteca.</p>
+        <div class="input-group" style="margin-bottom:15px;">
+            <label>Email</label>
+            <input type="email" id="loginEmail" placeholder="tucorreo@ejemplo.com">
+        </div>
+        <div class="input-group" style="margin-bottom:10px;">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="••••••••">
+        </div>
+        <div id="loginError" style="color:#ef4444; font-size:12px; margin-bottom:12px; display:none;"></div>
+        <button id="btnLogin" style="width:100%; background:var(--accent); border:none; color:white; padding:12px; border-radius:6px; cursor:pointer; font-weight:700; font-size:14px;">Entrar</button>
+    </div>
+</div>
+
 <div class="app-container">
     <header>
         <h1>Album Rater <span class="badge">V2.1</span></h1>
         <div class="header-actions">
             <button id="btnLoadLib" title="Cargar tu archivo .ara de biblioteca">📂 Load Library</button>
             <button id="btnSaveLib" class="success" title="Guardar toda la biblioteca como archivo .ara">💾 Save Library</button>
+            <button id="btnLogout" class="danger" title="Cerrar sesión">🔒 Cerrar Sesión</button>
         </div>
     </header>
 
@@ -701,6 +720,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 
 <script>
 window.AlbumApp = (function() {
@@ -717,8 +737,10 @@ window.AlbumApp = (function() {
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const storage = firebase.storage();
-    // Toda la biblioteca vive en un único documento (mismo modelo que ya usabas con el .ara)
-    const libraryDocRef = db.collection('ara').doc('mainLibrary');
+    const auth = firebase.auth();
+    // Cada usuario autenticado tiene su propio documento — se arma al iniciar sesión.
+    let currentUid = null;
+    let libraryDocRef = null;
 
     // ===================== STATE =====================
     let ratingChart = null;
@@ -877,15 +899,18 @@ window.AlbumApp = (function() {
     }
 
     // Cache local instantáneo: pinta rápido al abrir la app mientras llega la nube.
+    // Se guarda por usuario (uid) para que dos cuentas en el mismo navegador no se mezclen.
+    function cacheKey() { return currentUid ? `ara_library_cache_${currentUid}` : 'ara_library_cache'; }
+
     function persistLocalOnly() {
         try {
-            localStorage.setItem('ara_library_cache', JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats }));
+            localStorage.setItem(cacheKey(), JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats }));
         } catch(e) {}
     }
 
     function loadLibraryCache() {
         try {
-            const cached = localStorage.getItem('ara_library_cache');
+            const cached = localStorage.getItem(cacheKey());
             if (cached) {
                 const parsed = JSON.parse(cached);
                 if (Array.isArray(parsed.library)) library = parsed.library;
@@ -906,6 +931,7 @@ window.AlbumApp = (function() {
     function saveLibraryCache() {
         persistLocalOnly();
         if (applyingRemoteUpdate) return; // lo que acabamos de recibir de la nube no hace falta reenviarlo
+        if (!libraryDocRef) return; // sin sesión iniciada, no hay a dónde sincronizar
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
             const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats });
@@ -916,9 +942,13 @@ window.AlbumApp = (function() {
         }, 600);
     }
 
+    let cloudUnsubscribe = null;
+
     // Escucha cambios en tiempo real (ej. hechos desde otro dispositivo/pestaña).
     function listenToCloud() {
-        libraryDocRef.onSnapshot(docSnap => {
+        if (!libraryDocRef) return;
+        if (cloudUnsubscribe) cloudUnsubscribe(); // deja de escuchar el documento del usuario anterior, si lo había
+        cloudUnsubscribe = libraryDocRef.onSnapshot(docSnap => {
             if (!docSnap.exists) return;
             const data = docSnap.data();
             if (!data.payload) return;
@@ -951,7 +981,7 @@ window.AlbumApp = (function() {
     // Si ya es una URL normal (viene de una búsqueda externa), la deja tal cual.
     async function uploadCoverIfNeeded(dataUrlOrUrl, pathPrefix, id) {
         if (!dataUrlOrUrl || !dataUrlOrUrl.startsWith('data:')) return dataUrlOrUrl;
-        const ref = storage.ref().child(`${pathPrefix}/${id}_${Date.now()}.jpg`);
+        const ref = storage.ref().child(`users/${currentUid}/${pathPrefix}/${id}_${Date.now()}.jpg`);
         const snap = await ref.putString(dataUrlOrUrl, 'data_url');
         return await snap.ref.getDownloadURL();
     }
@@ -962,7 +992,7 @@ window.AlbumApp = (function() {
         showToast('⏳ Subiendo foto de artista...');
         try {
             const safeName = artistName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-            const ref = storage.ref().child(`artists/${safeName}_${Date.now()}.jpg`);
+            const ref = storage.ref().child(`users/${currentUid}/artists/${safeName}_${Date.now()}.jpg`);
             const snap = await ref.put(file);
             const url = await snap.ref.getDownloadURL();
             artistPhotos[artistName.toLowerCase()] = url;
@@ -2989,8 +3019,6 @@ window.AlbumApp = (function() {
         },
 
         init: () => {
-            loadLibraryCache();
-            listenToCloud();
             const saved = loadSession();
             if (saved) { state = {...DEFAULT_STATE(), ...saved}; }
 
@@ -3035,6 +3063,54 @@ window.AlbumApp = (function() {
 
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+            });
+
+            // ---- LOGIN / LOGOUT ----
+            const loginScreen = document.getElementById('loginScreen');
+            const loginErrorEl = document.getElementById('loginError');
+
+            function doLogin() {
+                const email = document.getElementById('loginEmail').value.trim();
+                const pass = document.getElementById('loginPassword').value;
+                loginErrorEl.style.display = 'none';
+                if (!email || !pass) {
+                    loginErrorEl.textContent = 'Ingresa tu correo y contraseña.';
+                    loginErrorEl.style.display = 'block';
+                    return;
+                }
+                auth.signInWithEmailAndPassword(email, pass).catch(err => {
+                    loginErrorEl.textContent = '⚠️ ' + err.message;
+                    loginErrorEl.style.display = 'block';
+                });
+            }
+
+            document.getElementById('btnLogin').addEventListener('click', doLogin);
+            document.getElementById('loginPassword').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+            document.getElementById('loginEmail').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+            document.getElementById('btnLogout').addEventListener('click', () => auth.signOut());
+
+            // Al iniciar/cerrar sesión, apunta la app al documento de Firestore de ESE usuario.
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUid = user.uid;
+                    libraryDocRef = db.collection('users').doc(currentUid).collection('ara').doc('mainLibrary');
+                    loginScreen.classList.remove('open');
+                    loginErrorEl.style.display = 'none';
+                    loadLibraryCache();
+                    listenToCloud();
+                    updateLibCount();
+                    renderLibrary();
+                } else {
+                    currentUid = null;
+                    libraryDocRef = null;
+                    if (cloudUnsubscribe) { cloudUnsubscribe(); cloudUnsubscribe = null; }
+                    library = [];
+                    artistFavoriteOverrides = {}; artistPhotos = {};
+                    tournamentStats = {}; duelStats = {}; correctionStats = { edits: 0, increases: 0, decreases: 0, netChange: 0 };
+                    updateLibCount();
+                    renderLibrary();
+                    loginScreen.classList.add('open');
+                }
             });
 
             updateLibCount();
