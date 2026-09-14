@@ -241,6 +241,19 @@
 
         .lib-merit-badge { font-size: 11px; line-height: 1; }
 
+        .lib-card-rank {
+            position: absolute; top: 9px; left: 9px;
+            font-weight: 800; font-size: 11px; color: white;
+            background: rgba(13, 17, 23, 0.88);
+            padding: 3px 8px; border-radius: 20px;
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; gap: 4px;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .lib-card-rank .trend-up { color: #4ade80; }
+        .lib-card-rank .trend-down { color: #f87171; }
+        .lib-card-rank .trend-new { color: #fbbf24; }
+
         .lib-card-body {
             padding: 10px 10px 9px 10px;
             display: flex; flex-direction: column; flex: 1;
@@ -753,6 +766,8 @@ window.AlbumApp = (function() {
     let currentSelectedArtist = null;
     let currentSelectedSeries = null;
     let chartZoomEnabled = false;
+    let previousLibraryRanks = {}; // { albumId: rank } — última posición conocida, para mostrar movimiento
+    let previousArtistRanks = {}; // { "nombre artista en minúsculas": rank }
     let artistFavoriteOverrides = {};
     let artistPhotos = {}; // { 'nombre artista en minúsculas': 'https://...url de Storage' }
     let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins, losses } } — persistente, entre todos los torneos jugados
@@ -836,7 +851,9 @@ window.AlbumApp = (function() {
             artistPhotos: artistPhotos,
             tournamentStats: tournamentStats,
             duelStats: duelStats,
-            correctionStats: correctionStats
+            correctionStats: correctionStats,
+            previousLibraryRanks: previousLibraryRanks,
+            previousArtistRanks: previousArtistRanks
         };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -860,6 +877,8 @@ window.AlbumApp = (function() {
                     tournamentStats = data.tournamentStats || {};
                     duelStats = data.duelStats || {};
                     correctionStats = data.correctionStats || { edits: 0, increases: 0, decreases: 0, netChange: 0 };
+                    previousLibraryRanks = data.previousLibraryRanks || {};
+                    previousArtistRanks = data.previousArtistRanks || {};
 
                     // Migra portadas viejas guardadas como base64 (de antes de tener Storage)
                     // a Firebase Storage, para no exceder el límite de 1MB por documento en Firestore.
@@ -904,7 +923,7 @@ window.AlbumApp = (function() {
 
     function persistLocalOnly() {
         try {
-            localStorage.setItem(cacheKey(), JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats }));
+            localStorage.setItem(cacheKey(), JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats, previousLibraryRanks, previousArtistRanks }));
         } catch(e) {}
     }
 
@@ -919,6 +938,8 @@ window.AlbumApp = (function() {
                 if (parsed.tournamentStats) tournamentStats = parsed.tournamentStats;
                 if (parsed.duelStats) duelStats = parsed.duelStats;
                 if (parsed.correctionStats) correctionStats = parsed.correctionStats;
+                if (parsed.previousLibraryRanks) previousLibraryRanks = parsed.previousLibraryRanks;
+                if (parsed.previousArtistRanks) previousArtistRanks = parsed.previousArtistRanks;
             }
         } catch(e) {}
     }
@@ -934,7 +955,7 @@ window.AlbumApp = (function() {
         if (!libraryDocRef) return; // sin sesión iniciada, no hay a dónde sincronizar
         clearTimeout(cloudSyncTimeout);
         cloudSyncTimeout = setTimeout(() => {
-            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats });
+            const payload = JSON.stringify({ library, artistFavoriteOverrides, artistPhotos, tournamentStats, duelStats, correctionStats, previousLibraryRanks, previousArtistRanks });
             libraryDocRef.set({
                 payload,
                 updatedAt: new Date().toISOString()
@@ -961,6 +982,8 @@ window.AlbumApp = (function() {
                 tournamentStats = parsed.tournamentStats || {};
                 duelStats = parsed.duelStats || {};
                 correctionStats = parsed.correctionStats || { edits: 0, increases: 0, decreases: 0, netChange: 0 };
+                previousLibraryRanks = parsed.previousLibraryRanks || {};
+                previousArtistRanks = parsed.previousArtistRanks || {};
                 persistLocalOnly();
                 updateLibCount();
                 renderLibrary();
@@ -1100,9 +1123,28 @@ window.AlbumApp = (function() {
 
     // ===================== LIBRARY RENDER =====================
 
+    // Ranking global por score (independiente del orden/filtro que tengas activo en la UI) —
+    // es la base para mostrar "#3", "▲2", "▼1" o "NEW" en cada tarjeta.
+    function computeLibraryRanks() {
+        const ranked = [...library].sort((a, b) => (computeScore(b.tracks) ?? -1) - (computeScore(a.tracks) ?? -1));
+        const ranks = {};
+        ranked.forEach((a, i) => { ranks[a.id] = i + 1; });
+        return ranks;
+    }
+
+    function rankTrendHTML(currentRank, previousRank) {
+        if (previousRank === undefined) return `<span class="trend-new">NEW</span>`;
+        const delta = previousRank - currentRank; // positivo = subió (rank number bajó)
+        if (delta > 0) return `<span class="trend-up">▲${delta}</span>`;
+        if (delta < 0) return `<span class="trend-down">▼${Math.abs(delta)}</span>`;
+        return '';
+    }
+
     function renderLibrary() {
         const query = dom.libSearch.value.toLowerCase();
         const modeFilter = dom.libFilterMode.value;
+
+        const currentRanks = computeLibraryRanks();
 
         let items = library.filter(a => {
             const matchQ = !query || a.artist.toLowerCase().includes(query) || a.album.toLowerCase().includes(query);
@@ -1136,6 +1178,12 @@ window.AlbumApp = (function() {
                     <h3>Sin resultados</h3>
                     <p>No hay álbumes que coincidan con tu búsqueda.</p>
                 </div>`;
+            // Aunque no haya nada que mostrar (filtrado), sigue siendo un buen momento
+            // para fijar la base de comparación si la biblioteca cambió.
+            if (JSON.stringify(currentRanks) !== JSON.stringify(previousLibraryRanks)) {
+                previousLibraryRanks = currentRanks;
+                saveLibraryCache();
+            }
             return;
         }
 
@@ -1151,6 +1199,9 @@ window.AlbumApp = (function() {
                 else if (trackCount >= 20) meritHTML = `<span class="lib-merit-badge" title="⭐ Merit: ${scoreStr} avg across ${trackCount} tracks">⭐</span>`;
             }
 
+            const rank = currentRanks[a.id];
+            const trendHTML = rankTrendHTML(rank, previousLibraryRanks[a.id]);
+
             const card = document.createElement('div');
             card.className = 'lib-card';
             card.innerHTML = `
@@ -1159,6 +1210,7 @@ window.AlbumApp = (function() {
                          src="${a.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
                          onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
                          alt="${a.album}">
+                    <div class="lib-card-rank">#${rank} ${trendHTML}</div>
                     ${score !== null ? `<div class="lib-card-score">${meritHTML}${scoreStr}</div>` : ''}
                 </div>
                 <div class="lib-card-body">
@@ -1172,6 +1224,11 @@ window.AlbumApp = (function() {
                 </div>`;
             dom.libGrid.appendChild(card);
         });
+
+        if (JSON.stringify(currentRanks) !== JSON.stringify(previousLibraryRanks)) {
+            previousLibraryRanks = currentRanks;
+            saveLibraryCache();
+        }
     }
 
     function renderLibStats() {
@@ -1425,6 +1482,12 @@ window.AlbumApp = (function() {
             };
         });
 
+        // Ranking global de artistas por score ponderado (independiente del modo de orden
+        // o filtros activos en la UI) — base para mostrar "#3", "▲2", "▼1" o "NEW".
+        const rankedByWeighted = [...artists].sort((a, b) => (b.weighted ?? -1) - (a.weighted ?? -1));
+        const currentArtistRanks = {};
+        rankedByWeighted.forEach((a, i) => { currentArtistRanks[a.name.toLowerCase()] = i + 1; });
+
         // ---- Stats bar (siempre sobre el total, sin importar el filtro de búsqueda) ----
         const withScore = artists.filter(a => a.avgScore !== null);
         const avgArtistScore = withScore.length > 0
@@ -1486,6 +1549,9 @@ window.AlbumApp = (function() {
             const customPhoto = artistPhotos[a.name.toLowerCase()];
             const cover = customPhoto || (a.favoriteTrack ? (a.favoriteTrack.albumCover || '') : '');
             const favName = a.favoriteTrack ? a.favoriteTrack.name : 'Sin tracks puntuados aún';
+            const rank = currentArtistRanks[a.name.toLowerCase()];
+            const trendHTML = rankTrendHTML(rank, previousArtistRanks[a.name.toLowerCase()]);
+            const nameEscaped = a.name.replace(/'/g, "\\'");
 
             const card = document.createElement('div');
             card.className = 'lib-card';
@@ -1497,7 +1563,12 @@ window.AlbumApp = (function() {
                          src="${cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
                          onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
                          alt="${a.name}">
+                    <div class="lib-card-rank">#${rank} ${trendHTML}</div>
                     ${a.avgScore !== null ? `<div class="lib-card-score">${scoreStr}</div>` : ''}
+                    <label title="Poner/cambiar foto de artista" onclick="event.stopPropagation()" style="position:absolute; bottom:9px; right:9px; background:rgba(13,17,23,0.88); width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:12px; border:1px solid rgba(255,255,255,0.12);">
+                        📷
+                        <input type="file" accept="image/*" style="display:none;" onchange="window.AlbumApp.uploadArtistPhoto('${nameEscaped}', this)">
+                    </label>
                 </div>
                 <div class="lib-card-body">
                     <div class="lib-card-artist">🎧 ${a.scoredTracks} track${a.scoredTracks === 1 ? '' : 's'} punteado${a.scoredTracks === 1 ? '' : 's'}</div>
@@ -1506,6 +1577,11 @@ window.AlbumApp = (function() {
                 </div>`;
             dom.artistsGrid.appendChild(card);
         });
+
+        if (JSON.stringify(currentArtistRanks) !== JSON.stringify(previousArtistRanks)) {
+            previousArtistRanks = currentArtistRanks;
+            saveLibraryCache();
+        }
     }
 
     function selectArtist(artistName) {
@@ -1660,7 +1736,7 @@ window.AlbumApp = (function() {
                         <p style="color:var(--text-muted); margin:5px 0 0 0;">${group.albumCount} álbumes · ${group.totalTracks} canciones combinadas</p>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-size:36px; font-weight:800; color:white;">${scoreStr}</div>
+                        <div style="font-size:36px; font-weight:800; color:${group.combinedAvg !== null ? getBadgeColor(group.combinedAvg) : 'white'};">${scoreStr}</div>
                         <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Promedio Combinado de la Serie</div>
                     </div>
                 </div>
@@ -1678,7 +1754,7 @@ window.AlbumApp = (function() {
                                 <div style="font-weight:700; font-size:14px;">${a.album}</div>
                                 <div style="font-size:11px; color:var(--text-muted);">${a.artist} · ${a.released || '—'} · ${a.tracks.length} tracks</div>
                             </div>
-                            <div style="font-weight:800; font-size:18px; color:white;">${s !== null ? s.toFixed(1) : '—'}</div>
+                            <div style="font-weight:800; font-size:18px; color:${s !== null ? getBadgeColor(s) : 'white'};">${s !== null ? s.toFixed(1) : '—'}</div>
                         </div>`;
                     }).join('')}
                 </div>
@@ -2086,12 +2162,13 @@ window.AlbumApp = (function() {
 
     function getAllArtistsWithCounts() {
         const names = new Set();
+        const mainNames = new Set();
         library.forEach(a => {
-            parseArtistNames(a.artist).forEach(n => n && names.add(n));
+            parseArtistNames(a.artist).forEach(n => { if (n) { names.add(n); mainNames.add(n); } });
             a.tracks.forEach(t => { if (t.features) parseArtistNames(t.features).forEach(n => n && names.add(n)); });
         });
         return Array.from(names)
-            .map(name => ({ name, count: getArtistCatalog(name).length }))
+            .map(name => ({ name, count: getArtistCatalog(name).length, isMainArtist: mainNames.has(name) }))
             .filter(a => a.count > 0)
             .sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -2103,13 +2180,13 @@ window.AlbumApp = (function() {
     }
 
     function renderDuelSetup(preselectA, preselectB) {
-        const artists = getAllArtistsWithCounts().filter(a => a.count >= 3);
+        const artists = getAllArtistsWithCounts().filter(a => a.isMainArtist);
         if (artists.length < 2) {
             dom.duelArena.innerHTML = `
                 <div class="library-empty">
                     <div class="empty-icon">🆚</div>
-                    <h3>Necesitas al menos 2 artistas con 3+ canciones puntuadas</h3>
-                    <p>Puntea más canciones en el Editor para poder armar un duelo.</p>
+                    <h3>Necesitas al menos 2 artistas con álbum propio puntuado</h3>
+                    <p>Los artistas que solo aparecen como "feat." en una canción no cuentan para el duelo — puntea un álbum completo suyo para que califiquen.</p>
                 </div>`;
             return;
         }
@@ -2137,8 +2214,8 @@ window.AlbumApp = (function() {
     }
 
     function randomDuel() {
-        const eligible = getAllArtistsWithCounts().filter(a => a.count >= 3);
-        if (eligible.length < 2) { showToast('⚠️ Necesitas al menos 2 artistas con 3+ canciones puntuadas.'); return; }
+        const eligible = getAllArtistsWithCounts().filter(a => a.isMainArtist && a.count >= 3);
+        if (eligible.length < 2) { showToast('⚠️ Necesitas al menos 2 artistas con álbum propio y 3+ canciones puntuadas.'); return; }
         const shuffled = shuffle(eligible);
         renderDuelSetup(shuffled[0].name, shuffled[1].name);
     }
@@ -3107,6 +3184,7 @@ window.AlbumApp = (function() {
                     library = [];
                     artistFavoriteOverrides = {}; artistPhotos = {};
                     tournamentStats = {}; duelStats = {}; correctionStats = { edits: 0, increases: 0, decreases: 0, netChange: 0 };
+                    previousLibraryRanks = {}; previousArtistRanks = {};
                     updateLibCount();
                     renderLibrary();
                     loginScreen.classList.add('open');
