@@ -448,6 +448,7 @@
         <button class="tab-btn active" data-tab="editor">🎵 Editor</button>
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
         <button class="tab-btn" data-tab="artists">🎤 Artists</button>
+        <button class="tab-btn" data-tab="series">📚 Series</button>
         <button class="tab-btn" data-tab="tournament">🏆 Torneo</button>
         <button class="tab-btn" data-tab="duel">🆚 Duelo</button>
     </div>
@@ -495,6 +496,13 @@
                         <div class="input-group">
                             <label>Ranked By</label>
                             <input type="text" id="inRanker" placeholder="Your Name">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>Serie / Saga (opcional)</label>
+                            <input type="text" id="inSeries" placeholder="Ej. Drip Season — agrupa entregas de la misma serie">
                         </div>
                     </div>
 
@@ -610,6 +618,25 @@
         <div id="artistProfileContainer"></div>
     </div>
 
+    <!-- ===== TAB: SERIES ===== -->
+    <div class="tab-content" id="tab-series">
+        <div id="seriesListView">
+            <div class="lib-stats-bar" id="seriesStatsBar"></div>
+
+            <div class="library-toolbar">
+                <input type="text" id="seriesSearch" placeholder="🔍  Search series..." oninput="window.AlbumApp.renderSeriesTab()">
+                <select id="seriesSortMode" onchange="window.AlbumApp.renderSeriesTab()">
+                    <option value="score" selected>⭐ Mayor promedio combinado</option>
+                    <option value="albums">📚 Más álbumes</option>
+                    <option value="name">🔤 Alfabético</option>
+                </select>
+            </div>
+
+            <div id="seriesGrid" class="library-grid"></div>
+        </div>
+        <div id="seriesDetailContainer"></div>
+    </div>
+
     <!-- ===== TAB: TOURNAMENT ===== -->
     <div class="tab-content" id="tab-tournament">
         <div id="tournamentArena"></div>
@@ -697,6 +724,7 @@ window.AlbumApp = (function() {
     let sortedByScore = false;        
     let originalTrackOrder = null;    
     let currentSelectedArtist = null;
+    let currentSelectedSeries = null;
     let artistFavoriteOverrides = {};
     let artistPhotos = {}; // { 'nombre artista en minúsculas': 'https://...url de Storage' }
     let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins, losses } } — persistente, entre todos los torneos jugados
@@ -709,7 +737,7 @@ window.AlbumApp = (function() {
 
     const DEFAULT_STATE = () => ({
         mode: "rating",
-        artist: "", album: "", released: "", rankedby: "", cover: "",
+        artist: "", album: "", released: "", rankedby: "", cover: "", series: "",
         tracks: [{name:"",duration:"",score:""},{name:"",duration:"",score:""},{name:"",duration:"",score:""}]
     });
 
@@ -720,6 +748,7 @@ window.AlbumApp = (function() {
         inArtist: document.getElementById("inArtist"),
         inAlbum: document.getElementById("inAlbum"),
         inYear: document.getElementById("inYear"),
+        inSeries: document.getElementById("inSeries"),
         inRanker: document.getElementById("inRanker"),
         trackEditor: document.getElementById("trackEditor"),
         pCover: document.getElementById("prevCover"),
@@ -746,6 +775,12 @@ window.AlbumApp = (function() {
         artistFilterHasAlbum: document.getElementById("artistFilterHasAlbum"),
         artistFilterMinTracks: document.getElementById("artistFilterMinTracks"),
         artistProfileContainer: document.getElementById("artistProfileContainer"),
+        seriesListView: document.getElementById("seriesListView"),
+        seriesStatsBar: document.getElementById("seriesStatsBar"),
+        seriesSearch: document.getElementById("seriesSearch"),
+        seriesSortMode: document.getElementById("seriesSortMode"),
+        seriesGrid: document.getElementById("seriesGrid"),
+        seriesDetailContainer: document.getElementById("seriesDetailContainer"),
         tournamentArena: document.getElementById("tournamentArena"),
         duelArena: document.getElementById("duelArena"),
     };
@@ -1460,6 +1495,161 @@ window.AlbumApp = (function() {
         renderArtistProfile(artistName);
     }
 
+    // ===================== SERIES / SAGAS =====================
+
+    // Agrupa los álbumes de la biblioteca que comparten la misma etiqueta "series"
+    // (ej. "Drip Season" agrupa Drip Season 1, 2, 3, 4), sin importar mayúsculas/espacios.
+    function getSeriesGroups() {
+        const groups = {};
+        library.forEach(album => {
+            const raw = (album.series || '').trim();
+            if (!raw) return;
+            const key = raw.toLowerCase();
+            if (!groups[key]) groups[key] = { displayName: raw, albums: [] };
+            groups[key].albums.push(album);
+        });
+
+        return Object.values(groups).map(g => {
+            let totalScore = 0, totalTracks = 0;
+            g.albums.forEach(a => a.tracks.forEach(t => {
+                const s = parseFloat(t.score);
+                if (!isNaN(s)) { totalScore += s; totalTracks++; }
+            }));
+            const combinedAvg = totalTracks > 0 ? totalScore / totalTracks : null;
+
+            // Portada representativa: la del álbum mejor puntuado de la serie.
+            const sorted = [...g.albums].sort((a, b) => (computeScore(b.tracks) ?? -1) - (computeScore(a.tracks) ?? -1));
+            const cover = sorted[0] ? sorted[0].cover : '';
+
+            return {
+                key: g.displayName.toLowerCase(),
+                name: g.displayName,
+                albums: g.albums,
+                albumCount: g.albums.length,
+                totalTracks,
+                combinedAvg,
+                cover
+            };
+        });
+    }
+
+    function renderSeriesTab() {
+        currentSelectedSeries = null;
+        dom.seriesDetailContainer.style.display = 'none';
+        dom.seriesListView.style.display = 'block';
+
+        let series = getSeriesGroups();
+
+        const withScore = series.filter(s => s.combinedAvg !== null);
+        const avgSeriesScore = withScore.length > 0
+            ? (withScore.reduce((acc, s) => acc + s.combinedAvg, 0) / withScore.length).toFixed(1)
+            : '—';
+        if (series.length === 0) {
+            dom.seriesStatsBar.innerHTML = '';
+        } else {
+            dom.seriesStatsBar.innerHTML = `
+                <div class="lib-stat"><div class="lib-stat-val">${series.length}</div><div class="lib-stat-label">Series</div></div>
+                <div class="lib-stat"><div class="lib-stat-val">${avgSeriesScore}</div><div class="lib-stat-label">AVG Series Score</div></div>
+            `;
+        }
+
+        const query = (dom.seriesSearch.value || '').toLowerCase();
+        if (query) series = series.filter(s => s.name.toLowerCase().includes(query));
+
+        const sortMode = dom.seriesSortMode.value;
+        series.sort((a, b) => {
+            if (sortMode === 'albums') return b.albumCount - a.albumCount || a.name.localeCompare(b.name);
+            if (sortMode === 'name') return a.name.localeCompare(b.name);
+            const sa = a.combinedAvg ?? -1, sb = b.combinedAvg ?? -1;
+            return sb - sa || a.name.localeCompare(b.name);
+        });
+
+        if (series.length === 0) {
+            dom.seriesGrid.innerHTML = `
+                <div class="library-empty">
+                    <div class="empty-icon">📚</div>
+                    <h3>${getSeriesGroups().length === 0 ? 'Todavía no tienes series' : 'Sin resultados'}</h3>
+                    <p>${getSeriesGroups().length === 0 ? 'Al crear o editar un álbum, ponle el mismo nombre de "Serie / Saga" a las entregas que quieras agrupar (ej. "Drip Season").' : 'No hay series que coincidan con tu búsqueda.'}</p>
+                </div>`;
+            return;
+        }
+
+        dom.seriesGrid.innerHTML = '';
+        series.forEach(s => {
+            const scoreStr = s.combinedAvg !== null ? s.combinedAvg.toFixed(1) : '—';
+            const card = document.createElement('div');
+            card.className = 'lib-card';
+            card.style.cursor = 'pointer';
+            card.onclick = () => window.AlbumApp.selectSeries(s.key);
+            card.innerHTML = `
+                <div class="lib-card-cover-wrap">
+                    <img class="lib-card-cover"
+                         src="${s.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
+                         onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
+                         alt="${s.name}">
+                    ${s.combinedAvg !== null ? `<div class="lib-card-score">${scoreStr}</div>` : ''}
+                </div>
+                <div class="lib-card-body">
+                    <div class="lib-card-artist">📚 ${s.albumCount} álbum${s.albumCount === 1 ? '' : 'es'}</div>
+                    <div class="lib-card-album" title="${s.name.replace(/"/g, '&quot;')}">${s.name}</div>
+                    <div class="lib-card-meta">${s.totalTracks} canciones combinadas</div>
+                </div>`;
+            dom.seriesGrid.appendChild(card);
+        });
+    }
+
+    function selectSeries(key) {
+        currentSelectedSeries = key;
+        renderSeriesDetail(key);
+    }
+
+    function renderSeriesDetail(key) {
+        dom.seriesListView.style.display = 'none';
+        dom.seriesDetailContainer.style.display = 'block';
+
+        const group = getSeriesGroups().find(s => s.key === key);
+        if (!group) { renderSeriesTab(); return; }
+
+        const albumsSorted = [...group.albums].sort((a, b) => (a.released || '').localeCompare(b.released || ''));
+        const scoreStr = group.combinedAvg !== null ? group.combinedAvg.toFixed(1) : '—';
+
+        dom.seriesDetailContainer.innerHTML = `
+            <div style="margin-bottom:20px;">
+                <button onclick="window.AlbumApp.renderSeriesTab()" style="background:transparent; border:1px solid var(--border); color:var(--text-main); padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">← Volver a Series</button>
+            </div>
+            <div style="background:var(--bg-card); padding:25px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
+                    <div>
+                        <h2 style="margin:0; font-size:28px;">${group.name}</h2>
+                        <p style="color:var(--text-muted); margin:5px 0 0 0;">${group.albumCount} álbumes · ${group.totalTracks} canciones combinadas</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:36px; font-weight:800; color:white;">${scoreStr}</div>
+                        <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Promedio Combinado de la Serie</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background:var(--bg-card); padding:20px; border-radius:12px; border:1px solid var(--border);">
+                <h3 style="margin-top:0; font-family:'Lora', serif;">Entregas de la Serie</h3>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${albumsSorted.map(a => {
+                        const s = computeScore(a.tracks);
+                        return `
+                        <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; cursor:pointer;" onclick="window.AlbumApp.editFromLibrary(${a.id})">
+                            <img src="${a.cover || 'https://via.placeholder.com/40'}" style="width:44px; height:44px; border-radius:4px; object-fit:cover;">
+                            <div style="flex:1;">
+                                <div style="font-weight:700; font-size:14px;">${a.album}</div>
+                                <div style="font-size:11px; color:var(--text-muted);">${a.artist} · ${a.released || '—'} · ${a.tracks.length} tracks</div>
+                            </div>
+                            <div style="font-weight:800; font-size:18px; color:white;">${s !== null ? s.toFixed(1) : '—'}</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     // Junta todas las canciones puntuadas de toda la biblioteca en un solo pool,
     // cada una una sola vez (independientemente de cuántos artistas la compartan).
     // Usado por Torneo y Duelo.
@@ -2141,6 +2331,10 @@ window.AlbumApp = (function() {
         }
         if (tabName === 'tournament') renderTournamentEntry();
         if (tabName === 'duel') renderDuelEntry();
+        if (tabName === 'series') {
+            if (currentSelectedSeries) renderSeriesDetail(currentSelectedSeries);
+            else renderSeriesTab();
+        }
     }
 
     // ===================== HELPERS =====================
@@ -2555,6 +2749,7 @@ window.AlbumApp = (function() {
         if(ns.artist!==undefined) dom.inArtist.value = state.artist;
         if(ns.album!==undefined) dom.inAlbum.value = state.album;
         if(ns.released!==undefined) dom.inYear.value = state.released;
+        if(ns.series!==undefined) dom.inSeries.value = state.series || '';
         if(ns.rankedby!==undefined) dom.inRanker.value = state.rankedby;
         if(ns.mode!==undefined) document.getElementById('selMode').value = state.mode;
         saveSession();
@@ -2613,6 +2808,8 @@ window.AlbumApp = (function() {
         },
         renderArtistProfile,
         renderArtistTab,
+        renderSeriesTab,
+        selectSeries,
         uploadArtistPhoto,
         updateTrackFromArtistProfile,
         setFavoriteOverride,
@@ -2655,6 +2852,7 @@ window.AlbumApp = (function() {
                     dom.inArtist.value = '';
                     dom.inAlbum.value = '';
                     dom.inYear.value = '';
+                    dom.inSeries.value = '';
                     dom.inRanker.value = '';
                     document.getElementById('selMode').value = 'rating';
                     render(true);
@@ -2675,6 +2873,7 @@ window.AlbumApp = (function() {
             dom.inArtist.addEventListener("input", e => { state.artist=e.target.value; saveSession(); render(); });
             dom.inAlbum.addEventListener("input", e => { state.album=e.target.value; saveSession(); render(); });
             dom.inYear.addEventListener("input", e => { state.released=e.target.value; saveSession(); render(); });
+            dom.inSeries.addEventListener("input", e => { state.series=e.target.value; saveSession(); });
             dom.inRanker.addEventListener("input", e => { state.rankedby=e.target.value; saveSession(); render(); });
 
             if (saved && saved.mode) document.getElementById('selMode').value = saved.mode;
