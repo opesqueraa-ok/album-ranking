@@ -2735,29 +2735,106 @@ window.AlbumApp = (function() {
         ratingChart.options.scales.y.max = max;
     }
 
+    // Los tracks sin puntear se muestran en el promedio de los ya puntuados (así caen
+    // dentro del rango del zoom y se pueden arrastrar), pero con un estilo distinto
+    // (punto hueco/translúcido) para diferenciarlos de una nota real.
+    function buildChartValues() {
+        const scored = state.tracks.map(t => parseFloat(t.score)).filter(s => !isNaN(s));
+        const avg = scored.length > 0 ? scored.reduce((a, b) => a + b, 0) / scored.length : 5;
+        return state.tracks.map(t => {
+            const s = parseFloat(t.score);
+            return isNaN(s) ? avg : s;
+        });
+    }
+
+    function buildChartPointStyles() {
+        const bg = [], radius = [];
+        state.tracks.forEach(t => {
+            const isScored = t.score !== "" && !isNaN(parseFloat(t.score));
+            bg.push(isScored ? '#fff' : 'rgba(59,130,246,0.25)');
+            radius.push(isScored ? 6 : 5);
+        });
+        return { bg, radius };
+    }
+
+    // Dibuja el número de cada nota sobre su punto, en el menor espacio posible.
+    // Si dos (o más) puntos consecutivos tienen la misma nota, no repite la etiqueta:
+    // dibuja una sola, centrada entre ellos.
+    const scoreLabelsPlugin = {
+        id: 'scoreLabels',
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            const points = meta.data;
+            const values = chart.data.datasets[0].data;
+            const n = values.length;
+            if (!n || !points[0]) return;
+
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.font = '700 10px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+
+            let i = 0;
+            while (i < n) {
+                let j = i;
+                while (j + 1 < n && Math.abs(values[j + 1] - values[i]) < 0.05) j++;
+                const midIdx = (i + j) / 2;
+                let x, y;
+                if (Number.isInteger(midIdx)) {
+                    x = points[midIdx].x; y = points[midIdx].y;
+                } else {
+                    const p1 = points[Math.floor(midIdx)], p2 = points[Math.ceil(midIdx)];
+                    x = (p1.x + p2.x) / 2; y = (p1.y + p2.y) / 2;
+                }
+                const text = values[i].toFixed(1);
+                const w = ctx.measureText(text).width;
+                ctx.fillStyle = 'rgba(11,15,21,0.8)';
+                ctx.fillRect(x - w / 2 - 3, y - 23, w + 6, 14);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(text, x, y - 11);
+                i = j + 1;
+            }
+            ctx.restore();
+        }
+    };
+
     function updateChartData() {
         if(!ratingChart) return;
         ratingChart.data.labels = state.tracks.map((_,i) => i+1);
-        ratingChart.data.datasets[0].data = state.tracks.map(t => t.score===""?null:parseFloat(t.score));
+        ratingChart.data.datasets[0].data = buildChartValues();
+        const { bg, radius } = buildChartPointStyles();
+        ratingChart.data.datasets[0].pointBackgroundColor = bg;
+        ratingChart.data.datasets[0].pointRadius = radius;
         applyChartZoomRange();
         ratingChart.update('none');
     }
 
     function initInteractiveChart() {
+        const { bg, radius } = buildChartPointStyles();
         ratingChart = new Chart(document.getElementById('ratingChart').getContext('2d'), {
             type: 'line',
+            plugins: [scoreLabelsPlugin],
             data: {
                 labels: state.tracks.map((_,i)=>i+1),
                 datasets: [{
-                    data: state.tracks.map(t=>t.score===""?null:parseFloat(t.score)),
+                    data: buildChartValues(),
                     backgroundColor:'rgba(59,130,246,0.2)', borderColor:'#3b82f6', borderWidth:3,
-                    pointBackgroundColor:'#fff', pointRadius:6, tension:0.2, fill:true, spanGaps:true
+                    pointBackgroundColor: bg, pointBorderColor:'#3b82f6', pointRadius: radius,
+                    tension:0.2, fill:true, spanGaps:true
                 }]
             },
             options: {
                 responsive:true, maintainAspectRatio:false,
+                interaction: { mode: 'nearest', intersect: true },
                 plugins: {
                     legend:{display:false},
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => state.tracks[items[0].dataIndex]?.name || `Track ${items[0].dataIndex + 1}`,
+                            label: (item) => `Nota: ${item.parsed.y.toFixed(1)}`
+                        }
+                    },
                     dragData:{
                         round:1,
                         onDragEnd:(e,ds,i,v)=>{
