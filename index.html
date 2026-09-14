@@ -534,7 +534,12 @@
             <div class="preview-col">
                 <div class="preview-wrapper">
                     <div class="graph-panel" id="graphContainer">
-                        <div class="graph-header">Visual Rating (Arrastra los puntos)</div>
+                        <div class="graph-header" style="display:flex; align-items:center; justify-content:center; gap:12px;">
+                            <span>Visual Rating (Arrastra los puntos)</span>
+                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:normal; font-weight:600;">
+                                <input type="checkbox" id="chkChartZoom" onchange="window.AlbumApp.toggleChartZoom(this.checked)"> 🔍 Zoom automático
+                            </label>
+                        </div>
                         <div class="graph-container">
                             <canvas id="ratingChart"></canvas>
                         </div>
@@ -725,6 +730,7 @@ window.AlbumApp = (function() {
     let originalTrackOrder = null;    
     let currentSelectedArtist = null;
     let currentSelectedSeries = null;
+    let chartZoomEnabled = false;
     let artistFavoriteOverrides = {};
     let artistPhotos = {}; // { 'nombre artista en minúsculas': 'https://...url de Storage' }
     let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins, losses } } — persistente, entre todos los torneos jugados
@@ -2707,10 +2713,33 @@ window.AlbumApp = (function() {
 
     // ===================== CHART =====================
 
+    // Calcula el rango visual del eje Y cuando el zoom automático está activo:
+    // redondea hacia abajo la nota más baja y le resta 1, redondea hacia abajo
+    // la nota más alta y le suma 1 — así el rango se ajusta a dónde realmente
+    // se mueven tus notas, para poder afinar los decimales con más precisión.
+    function getChartYRange() {
+        if (!chartZoomEnabled) return { min: 0, max: 10 };
+        const scores = state.tracks.map(t => parseFloat(t.score)).filter(s => !isNaN(s));
+        if (scores.length === 0) return { min: 0, max: 10 };
+        const lo = Math.min(...scores), hi = Math.max(...scores);
+        let min = Math.max(0, Math.floor(lo) - 1);
+        let max = Math.min(10, Math.floor(hi) + 1);
+        if (max - min < 2) max = Math.min(10, min + 2); // margen mínimo para que no quede plano
+        return { min, max };
+    }
+
+    function applyChartZoomRange() {
+        if (!ratingChart) return;
+        const { min, max } = getChartYRange();
+        ratingChart.options.scales.y.min = min;
+        ratingChart.options.scales.y.max = max;
+    }
+
     function updateChartData() {
         if(!ratingChart) return;
         ratingChart.data.labels = state.tracks.map((_,i) => i+1);
         ratingChart.data.datasets[0].data = state.tracks.map(t => t.score===""?5:parseFloat(t.score));
+        applyChartZoomRange();
         ratingChart.update('none');
     }
 
@@ -2765,6 +2794,7 @@ window.AlbumApp = (function() {
         updateTrackFromInput: (i,val) => { state.tracks[i].score=val; saveSession(); render(); },
         clearScores: () => { state.tracks.forEach(t=>t.score=""); saveSession(); render(true); },
         changeMode: (m) => { state.mode=m; saveSession(); render(true); },
+        toggleChartZoom: (enabled) => { chartZoomEnabled = enabled; updateChartData(); },
         removeCover: () => { state.cover=""; saveSession(); render(); },
         toggleSortByScore: (btn) => {
             if (!sortedByScore) {
