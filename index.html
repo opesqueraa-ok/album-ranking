@@ -1484,7 +1484,10 @@ window.AlbumApp = (function() {
 
         // Ranking global de artistas por score ponderado (independiente del modo de orden
         // o filtros activos en la UI) — base para mostrar "#3", "▲2", "▼1" o "NEW".
-        const rankedByWeighted = [...artists].sort((a, b) => (b.weighted ?? -1) - (a.weighted ?? -1));
+        // Ranking global de artistas por score ponderado — SOLO entre quienes tienen
+        // álbum propio puntuado. Los que solo aparecen como "feat." no cuentan aquí,
+        // para no inflar el número de posición de los artistas "verificados" reales.
+        const rankedByWeighted = artists.filter(a => a.isMainArtist).sort((a, b) => (b.weighted ?? -1) - (a.weighted ?? -1));
         const currentArtistRanks = {};
         rankedByWeighted.forEach((a, i) => { currentArtistRanks[a.name.toLowerCase()] = i + 1; });
 
@@ -1550,7 +1553,7 @@ window.AlbumApp = (function() {
             const cover = customPhoto || (a.favoriteTrack ? (a.favoriteTrack.albumCover || '') : '');
             const favName = a.favoriteTrack ? a.favoriteTrack.name : 'Sin tracks puntuados aún';
             const rank = currentArtistRanks[a.name.toLowerCase()];
-            const trendHTML = rankTrendHTML(rank, previousArtistRanks[a.name.toLowerCase()]);
+            const trendHTML = rank !== undefined ? rankTrendHTML(rank, previousArtistRanks[a.name.toLowerCase()]) : '';
             const nameEscaped = a.name.replace(/'/g, "\\'");
 
             const card = document.createElement('div');
@@ -1563,7 +1566,7 @@ window.AlbumApp = (function() {
                          src="${cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
                          onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'"
                          alt="${a.name}">
-                    <div class="lib-card-rank">#${rank} ${trendHTML}</div>
+                    ${rank !== undefined ? `<div class="lib-card-rank">#${rank} ${trendHTML}</div>` : ''}
                     ${a.avgScore !== null ? `<div class="lib-card-score">${scoreStr}</div>` : ''}
                     <label title="Poner/cambiar foto de artista" onclick="event.stopPropagation()" style="position:absolute; bottom:9px; right:9px; background:rgba(13,17,23,0.88); width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:12px; border:1px solid rgba(255,255,255,0.12);">
                         📷
