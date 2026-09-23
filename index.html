@@ -243,16 +243,16 @@
 
         .lib-card-rank {
             position: absolute; top: 9px; left: 9px;
-            font-weight: 800; font-size: 11px; color: white;
+            font-weight: 800; font-size: 11px; color: rgba(255,255,255,0.85);
             background: rgba(13, 17, 23, 0.88);
             padding: 3px 8px; border-radius: 20px;
             backdrop-filter: blur(8px);
             display: flex; align-items: center; gap: 4px;
             border: 1px solid rgba(255,255,255,0.12);
         }
-        .lib-card-rank .trend-up { color: #4ade80; }
-        .lib-card-rank .trend-down { color: #f87171; }
-        .lib-card-rank .trend-new { color: #fbbf24; }
+        .lib-card-rank .trend-up { color: #4ade80; font-size: 10px; }
+        .lib-card-rank .trend-down { color: #f87171; font-size: 10px; }
+        .lib-card-rank .trend-new { color: #fbbf24; font-size: 10px; }
 
         .lib-card-body {
             padding: 10px 10px 9px 10px;
@@ -2082,8 +2082,8 @@ window.AlbumApp = (function() {
     // Ranking de canciones por victorias históricas en Torneo — como el leaderboard de un videojuego.
     let songRankingSort = 'wins'; // 'wins' | 'losses' | 'winrate'
 
-    function getSongRankingList(limit = 30) {
-        const list = Object.entries(tournamentStats)
+    function getSongRankingList() {
+        return Object.entries(tournamentStats)
             .map(([key, stats]) => {
                 const [albumId, trackIdx] = key.split('_');
                 const album = library.find(al => String(al.id) === albumId);
@@ -2091,19 +2091,18 @@ window.AlbumApp = (function() {
                 const track = album.tracks[trackIdx];
                 if (!track) return null;
                 const wins = stats.wins || 0, losses = stats.losses || 0;
+                const score = parseFloat(track.score);
+                // Determina en qué banda vive actualmente esta canción según su nota real
+                const band = TOURNAMENT_BANDS.find(b => !isNaN(score) && score >= b.min && score <= b.max);
                 return {
                     name: track.name, artist: album.artist, cover: album.cover,
                     wins, losses, plays: stats.plays || 0,
-                    winRate: (wins + losses) > 0 ? wins / (wins + losses) : -1
+                    winRate: (wins + losses) > 0 ? wins / (wins + losses) : -1,
+                    bandId: band ? band.id : 'none',
+                    bandLabel: band ? band.label : 'Sin banda'
                 };
             })
             .filter(Boolean);
-
-        if (songRankingSort === 'losses') list.sort((a, b) => b.losses - a.losses || b.plays - a.plays);
-        else if (songRankingSort === 'winrate') list.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
-        else list.sort((a, b) => b.wins - a.wins || b.plays - a.plays);
-
-        return list.slice(0, limit);
     }
 
     function setSongRankingSort(mode) { songRankingSort = mode; renderSongRanking(); }
@@ -2122,31 +2121,61 @@ window.AlbumApp = (function() {
     }
 
     function renderSongRanking() {
-        const list = getSongRankingList();
-        const rowsHTML = list.length === 0
-            ? `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún torneo.</p>`
-            : list.map((s, i) => `
-                <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; text-align:left;">
-                    <span style="width:24px; font-weight:800; color:var(--text-muted);">${i + 1}</span>
-                    <img src="${s.cover || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
-                    <div style="flex:1; overflow:hidden;">
-                        <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.name}</div>
-                        <div style="font-size:11px; color:var(--text-muted);">${s.artist}</div>
-                    </div>
-                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D${s.winRate >= 0 ? ` · ${Math.round(s.winRate * 100)}%` : ''}</div>
-                </div>`).join('');
-
+        const allEntries = getSongRankingList();
         const filterBtn = (mode, label) => `<button class="tourn-size-btn" style="${songRankingSort === mode ? 'border-color:var(--accent); background:rgba(59,130,246,0.1);' : ''} padding:8px 14px; min-width:auto;" onclick="window.AlbumApp.setSongRankingSort('${mode}')">${label}</button>`;
+
+        // Agrupa por banda (en el orden definido en TOURNAMENT_BANDS, más "sin banda" al final)
+        const bandOrder = [...TOURNAMENT_BANDS.map(b => b.id), 'none'];
+        const byBand = {};
+        bandOrder.forEach(id => { byBand[id] = []; });
+        allEntries.forEach(e => { if (byBand[e.bandId]) byBand[e.bandId].push(e); else byBand['none'].push(e); });
+
+        // Ordena dentro de cada banda según el modo activo
+        const sortGroup = (group) => {
+            if (songRankingSort === 'losses') return [...group].sort((a, b) => b.losses - a.losses || b.plays - a.plays);
+            if (songRankingSort === 'winrate') return [...group].sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+            return [...group].sort((a, b) => b.wins - a.wins || b.plays - a.plays);
+        };
+
+        const rowHTML = (s, i) => `
+            <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; text-align:left;">
+                <span style="width:24px; font-weight:800; color:var(--text-muted);">${i + 1}</span>
+                <img src="${s.cover || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                <div style="flex:1; overflow:hidden;">
+                    <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.name}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${s.artist}</div>
+                </div>
+                <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D${s.winRate >= 0 ? ` · ${Math.round(s.winRate * 100)}%` : ''}</div>
+            </div>`;
+
+        let sectionsHTML = '';
+        const bandLabels = {};
+        TOURNAMENT_BANDS.forEach(b => { bandLabels[b.id] = b.label; });
+        bandLabels['none'] = 'Sin banda activa';
+
+        bandOrder.forEach(bandId => {
+            const group = sortGroup(byBand[bandId]);
+            if (group.length === 0) return;
+            sectionsHTML += `
+                <div style="margin-top:18px;">
+                    <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:8px;">🎯 Banda ${bandLabels[bandId]}</div>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        ${group.map((s, i) => rowHTML(s, i)).join('')}
+                    </div>
+                </div>`;
+        });
+
+        if (!sectionsHTML) sectionsHTML = `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún torneo.</p>`;
 
         dom.tournamentArena.innerHTML = `
             <div class="tourn-setup-box" style="max-width:600px;">
                 <h2 style="margin-top:0;">🏅 Ranking de Canciones</h2>
-                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:5px;">
                     ${filterBtn('wins', '🏆 Más Victorias')}
                     ${filterBtn('losses', '💀 Más Derrotas')}
                     ${filterBtn('winrate', '📊 Mejor % Victorias')}
                 </div>
-                <div style="display:flex; flex-direction:column; gap:8px;">${rowsHTML}</div>
+                ${sectionsHTML}
                 <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
                     <button onclick="window.AlbumApp.renderTournamentEntry()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
                     <button onclick="window.AlbumApp.resetTournamentStats()" style="background:transparent; border:1px solid rgba(239,68,68,0.3); color:#ef4444; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🗑️ Reiniciar Ranking</button>
@@ -2391,38 +2420,71 @@ window.AlbumApp = (function() {
 
     // Ranking de artistas por duelos ganados históricamente.
     function renderArtistRanking() {
-        const list = Object.values(duelStats).map(s => ({
-            ...s,
-            losses: s.losses || 0,
-            winRate: (s.wins + (s.losses || 0)) > 0 ? s.wins / (s.wins + (s.losses || 0)) : -1
-        }));
+        // Enriquece cada entrada con el promedio actual del artista para asignarle banda
+        const list = Object.values(duelStats).map(s => {
+            const key = (s.displayName || '').toLowerCase();
+            const catalog = getArtistCatalog(s.displayName || '');
+            const avg = catalog.length > 0 ? catalog.reduce((a, t) => a + t.score, 0) / catalog.length : null;
+            const band = avg !== null ? TOURNAMENT_BANDS.find(b => avg >= b.min && avg <= b.max) : null;
+            return {
+                ...s,
+                losses: s.losses || 0,
+                winRate: (s.wins + (s.losses || 0)) > 0 ? s.wins / (s.wins + (s.losses || 0)) : -1,
+                avg,
+                bandId: band ? band.id : 'none',
+                bandLabel: band ? band.label : 'Sin banda'
+            };
+        });
 
-        if (artistRankingSort === 'losses') list.sort((a, b) => b.losses - a.losses || b.duels - a.duels);
-        else if (artistRankingSort === 'winrate') list.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
-        else list.sort((a, b) => b.wins - a.wins || b.duels - a.duels);
+        const sortGroup = (group) => {
+            if (artistRankingSort === 'losses') return [...group].sort((a, b) => b.losses - a.losses || b.duels - a.duels);
+            if (artistRankingSort === 'winrate') return [...group].sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+            return [...group].sort((a, b) => b.wins - a.wins || b.duels - a.duels);
+        };
 
-        const rowsHTML = list.length === 0
-            ? `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún duelo.</p>`
-            : list.map((s, i) => `
-                <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; text-align:left;">
-                    <span style="width:24px; font-weight:800; color:var(--text-muted);">${i + 1}</span>
-                    <div style="flex:1;">
-                        <div style="font-weight:700; font-size:14px;">${s.displayName}</div>
-                    </div>
-                    <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D (${s.duels} duelos)${s.winRate >= 0 ? ` · ${Math.round(s.winRate * 100)}%` : ''}</div>
-                </div>`).join('');
+        const bandOrder = [...TOURNAMENT_BANDS.map(b => b.id), 'none'];
+        const byBand = {};
+        bandOrder.forEach(id => { byBand[id] = []; });
+        list.forEach(e => { (byBand[e.bandId] || byBand['none']).push(e); });
+
+        const bandLabels = {};
+        TOURNAMENT_BANDS.forEach(b => { bandLabels[b.id] = b.label; });
+        bandLabels['none'] = 'Sin banda activa';
 
         const filterBtn = (mode, label) => `<button class="tourn-size-btn" style="${artistRankingSort === mode ? 'border-color:var(--accent); background:rgba(59,130,246,0.1);' : ''} padding:8px 14px; min-width:auto;" onclick="window.AlbumApp.setArtistRankingSort('${mode}')">${label}</button>`;
+
+        let sectionsHTML = '';
+        bandOrder.forEach(bandId => {
+            const group = sortGroup(byBand[bandId]);
+            if (group.length === 0) return;
+            sectionsHTML += `
+                <div style="margin-top:18px;">
+                    <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:8px;">🎯 Banda ${bandLabels[bandId]}</div>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        ${group.map((s, i) => `
+                        <div style="display:flex; align-items:center; gap:12px; background:#0b0f15; padding:10px; border-radius:6px; border:1px solid #1e2433; text-align:left;">
+                            <span style="width:24px; font-weight:800; color:var(--text-muted);">${i + 1}</span>
+                            <div style="flex:1;">
+                                <div style="font-weight:700; font-size:14px;">${s.displayName}</div>
+                                ${s.avg !== null ? `<div style="font-size:11px; color:var(--text-muted);">Promedio actual: ${s.avg.toFixed(1)}</div>` : ''}
+                            </div>
+                            <div style="font-size:12px; font-weight:700; color:#eab308; white-space:nowrap;">🏆 ${s.wins}V - ${s.losses}D (${s.duels} duelos)${s.winRate >= 0 ? ` · ${Math.round(s.winRate * 100)}%` : ''}</div>
+                        </div>`).join('')}
+                    </div>
+                </div>`;
+        });
+
+        if (!sectionsHTML) sectionsHTML = `<p style="color:var(--text-muted); font-size:13px;">Todavía no has jugado ningún duelo.</p>`;
 
         dom.duelArena.innerHTML = `
             <div class="duel-setup-box" style="max-width:600px;">
                 <h2 style="margin-top:0;">🏅 Ranking de Artistas</h2>
-                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:15px;">
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:5px;">
                     ${filterBtn('wins', '🏆 Más Victorias')}
                     ${filterBtn('losses', '💀 Más Derrotas')}
                     ${filterBtn('winrate', '📊 Mejor % Victorias')}
                 </div>
-                <div style="display:flex; flex-direction:column; gap:8px;">${rowsHTML}</div>
+                ${sectionsHTML}
                 <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
                     <button onclick="window.AlbumApp.renderDuelEntry()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
                     <button onclick="window.AlbumApp.resetDuelStats()" style="background:transparent; border:1px solid rgba(239,68,68,0.3); color:#ef4444; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px;">🗑️ Reiniciar Ranking</button>
