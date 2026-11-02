@@ -137,7 +137,30 @@
         .search-item:hover { border-color: #3b82f6; background: #121821; }
 
         /* TRACK EDITOR */
-        .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; transition: 0.2s; }
+        .track-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; transition: 0.2s; border-left: 3px solid transparent; padding-left: 4px; border-radius: 4px; }
+        .track-row.in-playlist { border-left-color: #22c55e; background: rgba(34,197,94,0.08); }
+
+        /* ===== PLAYLIST TAB ===== */
+        .pl-layout { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; }
+        @media (max-width: 900px) { .pl-layout { grid-template-columns: 1fr; } }
+        .pl-seg { display: flex; background: #0b0f15; border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 3px; }
+        .pl-seg button { flex: 1; background: none; border: none; color: var(--text-muted); padding: 9px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 12px; font-family: 'Inter', sans-serif; }
+        .pl-seg button.active { background: var(--accent); color: white; }
+        .pl-mini-btn { flex: 1; background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 7px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; }
+        .pl-mini-btn:hover { color: white; border-color: white; }
+        .pl-album-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
+        .pl-album-item { display: flex; align-items: center; gap: 10px; background: #0b0f15; border: 1px solid #1e2433; border-radius: 6px; padding: 8px; cursor: pointer; transition: 0.15s; }
+        .pl-album-item:hover { border-color: rgba(255,255,255,0.2); }
+        .pl-album-item.selected { border-color: #22c55e; background: rgba(34,197,94,0.06); }
+        .pl-album-item img { width: 38px; height: 38px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: #111; }
+        .pl-album-item .pl-check { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #444; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+        .pl-album-item.selected .pl-check { background: #22c55e; border-color: #22c55e; color: #0b0f15; font-weight: 800; }
+        .pl-count { font-size: 11px; font-weight: 800; color: #4ade80; white-space: nowrap; }
+        .pl-track { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #0b0f15; border: 1px solid #1e2433; }
+        .pl-track img { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: #111; }
+        .pl-group-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
+        .track-row.in-playlist .track-num { color: #4ade80; font-weight: 800; }
+        #btnPlaylistHighlight.active { color: #4ade80 !important; border-color: rgba(34,197,94,0.5) !important; background: rgba(34,197,94,0.08) !important; }
         .track-row.dragging { opacity: 0.4; background: rgba(255,255,255,0.05); }
         .track-num { width: 25px; text-align: center; color: var(--text-muted); font-size: 12px; }
         .btn-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; padding: 0 5px; }
@@ -481,6 +504,7 @@
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
         <button class="tab-btn" data-tab="artists">🎤 Artists</button>
         <button class="tab-btn" data-tab="series">📚 Series</button>
+        <button class="tab-btn" data-tab="playlist">🎧 Playlist</button>
         <button class="tab-btn" data-tab="tournament">🏆 Torneo</button>
         <button class="tab-btn" data-tab="duel">🆚 Duelo</button>
     </div>
@@ -553,6 +577,7 @@
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                         <h2>Tracklist & Editor</h2>
                         <div style="gap:10px;display:flex;">
+                            <button id="btnPlaylistHighlight" onclick="window.AlbumApp.togglePlaylistHighlight()" title="Resalta en verde las canciones que van a tu playlist (según el mínimo elegido en la pestaña Playlist)" style="font-size:11px;background:none;border:1px solid #334;color:#8a94a6;padding:4px 10px;cursor:pointer;border-radius:4px;text-transform:uppercase;font-weight:600;transition:0.2s;">🎧 Playlist</button>
                             <button id="btnSortScore" onclick="window.AlbumApp.toggleSortByScore(this)" style="font-size:11px;background:none;border:1px solid #334;color:#8a94a6;padding:4px 10px;cursor:pointer;border-radius:4px;text-transform:uppercase;font-weight:600;transition:0.2s;">↓ Sort by Score</button>
                             <button onclick="window.AlbumApp.clearScores()" style="font-size:11px;background:none;border:none;color:#ef4444;cursor:pointer;text-transform:uppercase;font-weight:600;">Reset Scores</button>
                             <button onclick="window.AlbumApp.newSession()" style="font-size:11px;background:none;border:none;color:#8a94a6;cursor:pointer;text-transform:uppercase;font-weight:600;">New Session</button>
@@ -653,6 +678,55 @@
             <div id="artistsGrid" class="library-grid"></div>
         </div>
         <div id="artistProfileContainer"></div>
+    </div>
+
+    <!-- ===== TAB: PLAYLIST ===== -->
+    <div class="tab-content" id="tab-playlist">
+        <div class="pl-layout">
+            <div class="panel pl-picker">
+                <div class="pl-seg" id="plModeSeg">
+                    <button data-mode="albums" onclick="window.AlbumApp.setPlaylistMode('albums')">💿 Por álbumes</button>
+                    <button data-mode="artist" onclick="window.AlbumApp.setPlaylistMode('artist')">🎤 Por artista</button>
+                </div>
+
+                <div class="input-row" style="margin-top:15px;">
+                    <div class="input-group">
+                        <label>Nota mínima</label>
+                        <select id="plMinScore" onchange="window.AlbumApp.setPlaylistMin(this.value)">
+                            <option value="8">8+ · Playlist</option>
+                            <option value="9">9+ · Muy buenas</option>
+                            <option value="10">10 · Perfectas</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Orden</label>
+                        <select id="plSort" onchange="window.AlbumApp.setPlaylistSort(this.value)">
+                            <option value="album">Orden del álbum</option>
+                            <option value="score">Mayor nota primero</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="plAlbumsPicker">
+                    <input type="text" id="plAlbumSearch" placeholder="🔍  Buscar álbum o artista..." oninput="window.AlbumApp.renderPlaylistAlbumList()" style="width:100%;">
+                    <div style="display:flex; gap:8px; margin:10px 0;">
+                        <button class="pl-mini-btn" onclick="window.AlbumApp.playlistSelectVisible()">✓ Seleccionar visibles</button>
+                        <button class="pl-mini-btn" onclick="window.AlbumApp.playlistClearSelection()">✕ Limpiar</button>
+                    </div>
+                    <div id="plAlbumList" class="pl-album-list"></div>
+                </div>
+
+                <div id="plArtistPicker" style="display:none;">
+                    <div class="input-group">
+                        <label>Artista</label>
+                        <select id="plArtistSelect" onchange="window.AlbumApp.setPlaylistArtist(this.value)"></select>
+                    </div>
+                    <p style="font-size:11px; color:var(--text-muted); margin:8px 0 0;">Incluye sus álbumes y las canciones donde aparece como feat.</p>
+                </div>
+            </div>
+
+            <div class="panel pl-result" id="plResult"></div>
+        </div>
     </div>
 
     <!-- ===== TAB: SERIES ===== -->
@@ -766,6 +840,16 @@ window.AlbumApp = (function() {
     let currentSelectedArtist = null;
     let currentSelectedSeries = null;
     let chartZoomEnabled = false;
+    let playlistHighlight = false;          // resaltar en el editor las canciones que van a la playlist
+    let playlistMinScore = 8;               // nota mínima para entrar a la playlist (8 = playlist, 9 = muy buena, 10 = perfecta)
+    let playlistSelectedAlbums = new Set(); // álbumes elegidos en la pestaña Playlist
+    let playlistMode = 'albums';            // 'albums' | 'artist'
+    let playlistArtist = '';
+    let playlistSort = 'album';             // 'album' (orden del disco) | 'score'
+    try {
+        const savedMin = parseFloat(localStorage.getItem('ara_playlist_min'));
+        if (!isNaN(savedMin)) playlistMinScore = savedMin;
+    } catch(e) {}
     let previousLibraryRanks = {}; // { albumId: rank } — última posición conocida, para mostrar movimiento
     let previousArtistRanks = {}; // { "nombre artista en minúsculas": rank }
     let artistFavoriteOverrides = {};
@@ -1608,6 +1692,182 @@ window.AlbumApp = (function() {
         artistFavoriteOverrides[`${artistName.toLowerCase()}_fav`] = key;
         saveLibraryCache();
         renderArtistProfile(artistName);
+    }
+
+    // ===================== PLAYLIST =====================
+
+    function durationToSeconds(d) {
+        if (!d) return 0;
+        const parts = String(d).split(':').map(x => parseInt(x, 10));
+        if (parts.some(isNaN)) return 0;
+        return parts.reduce((acc, v) => acc * 60 + v, 0);
+    }
+
+    function secondsToLabel(total) {
+        if (!total) return '';
+        const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+        return h > 0 ? `${h} h ${m} min` : `${m} min`;
+    }
+
+    function albumPlaylistCount(album) {
+        return album.tracks.filter(t => { const s = parseFloat(t.score); return !isNaN(s) && s >= playlistMinScore; }).length;
+    }
+
+    // Arma la lista de canciones que entran a la playlist según el modo activo.
+    function buildPlaylistEntries() {
+        let entries = [];
+        if (playlistMode === 'albums') {
+            library.filter(a => playlistSelectedAlbums.has(a.id)).forEach(album => {
+                album.tracks.forEach((t, idx) => {
+                    const s = parseFloat(t.score);
+                    if (isNaN(s) || s < playlistMinScore) return;
+                    entries.push({ albumId: album.id, trackIdx: idx, name: t.name, artist: album.artist, albumTitle: album.album,
+                                   cover: album.cover, score: s, duration: t.duration, released: album.released || '', isFeatured: false });
+                });
+            });
+        } else if (playlistArtist) {
+            entries = getArtistCatalog(playlistArtist)
+                .filter(t => t.score >= playlistMinScore)
+                .map(t => {
+                    const album = library.find(a => a.id === t.albumId) || {};
+                    return { ...t, artist: album.artist, cover: t.albumCover, released: album.released || '' };
+                });
+        }
+
+        if (playlistSort === 'score') {
+            entries.sort((a, b) => b.score - a.score);
+        } else {
+            entries.sort((a, b) => (a.released || '').localeCompare(b.released || '')
+                || (a.albumTitle || '').localeCompare(b.albumTitle || '')
+                || a.trackIdx - b.trackIdx);
+        }
+        return entries;
+    }
+
+    function renderPlaylistTab() {
+        document.getElementById('plMinScore').value = String(playlistMinScore);
+        document.getElementById('plSort').value = playlistSort;
+        document.querySelectorAll('#plModeSeg button').forEach(b => b.classList.toggle('active', b.dataset.mode === playlistMode));
+        document.getElementById('plAlbumsPicker').style.display = playlistMode === 'albums' ? 'block' : 'none';
+        document.getElementById('plArtistPicker').style.display = playlistMode === 'artist' ? 'block' : 'none';
+
+        if (playlistMode === 'artist') {
+            const artists = getAllArtistsWithCounts().filter(a => a.isMainArtist);
+            const sel = document.getElementById('plArtistSelect');
+            sel.innerHTML = `<option value="" ${!playlistArtist ? 'selected' : ''} disabled>-- Elige un artista --</option>` +
+                artists.map(a => `<option value="${a.name.replace(/"/g, '&quot;')}" ${a.name === playlistArtist ? 'selected' : ''}>${a.name}</option>`).join('');
+        } else {
+            renderPlaylistAlbumList();
+        }
+        renderPlaylistResult();
+    }
+
+    function getFilteredPlaylistAlbums() {
+        const q = (document.getElementById('plAlbumSearch').value || '').toLowerCase();
+        return [...library]
+            .filter(a => a.mode !== 'ranking')
+            .filter(a => !q || (a.album || '').toLowerCase().includes(q) || (a.artist || '').toLowerCase().includes(q))
+            .sort((a, b) => (a.artist || '').localeCompare(b.artist || '') || (a.released || '').localeCompare(b.released || ''));
+    }
+
+    function renderPlaylistAlbumList() {
+        const list = document.getElementById('plAlbumList');
+        const albums = getFilteredPlaylistAlbums();
+        if (albums.length === 0) {
+            list.innerHTML = `<p style="color:var(--text-muted); font-size:12px;">No hay álbumes que coincidan.</p>`;
+            return;
+        }
+        list.innerHTML = albums.map(a => {
+            const sel = playlistSelectedAlbums.has(a.id);
+            const n = albumPlaylistCount(a);
+            return `
+                <div class="pl-album-item ${sel ? 'selected' : ''}" onclick="window.AlbumApp.togglePlaylistAlbum(${a.id})">
+                    <div class="pl-check">${sel ? '✓' : ''}</div>
+                    <img src="${a.cover || 'https://via.placeholder.com/40'}" onerror="this.style.visibility='hidden'">
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.album || 'Sin título'}</div>
+                        <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.artist || ''}${a.released ? ' · ' + a.released : ''}</div>
+                    </div>
+                    <span class="pl-count">${n} 🎧</span>
+                </div>`;
+        }).join('');
+    }
+
+    function renderPlaylistResult() {
+        const box = document.getElementById('plResult');
+        const entries = buildPlaylistEntries();
+        const minLabel = playlistMinScore >= 10 ? '10' : `${playlistMinScore}+`;
+
+        const nothingChosen = playlistMode === 'albums' ? playlistSelectedAlbums.size === 0 : !playlistArtist;
+        if (nothingChosen) {
+            box.innerHTML = `<div class="library-empty" style="padding:60px 20px;"><div class="empty-icon">🎧</div>
+                <h3>Arma tu playlist</h3>
+                <p>${playlistMode === 'albums' ? 'Elige uno o varios álbumes a la izquierda.' : 'Elige un artista a la izquierda.'} Aquí aparecen las canciones con nota ${minLabel}.</p></div>`;
+            return;
+        }
+        if (entries.length === 0) {
+            box.innerHTML = `<div class="library-empty" style="padding:60px 20px;"><div class="empty-icon">🎧</div>
+                <h3>Ninguna canción llega a ${minLabel}</h3>
+                <p>Prueba bajando la nota mínima o agregando más álbumes.</p></div>`;
+            return;
+        }
+
+        const totalSec = entries.reduce((acc, e) => acc + durationToSeconds(e.duration), 0);
+        const title = playlistMode === 'artist' ? playlistArtist : (playlistSelectedAlbums.size === 1 ? entries[0].albumTitle : `${playlistSelectedAlbums.size} álbumes`);
+
+        const row = (e, n) => `
+            <div class="pl-track">
+                <span style="width:22px; font-size:12px; font-weight:800; color:var(--text-muted); text-align:right;">${n}</span>
+                <img src="${e.cover || 'https://via.placeholder.com/40'}" onerror="this.style.visibility='hidden'">
+                <div style="flex:1; overflow:hidden;">
+                    <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${e.name || 'Sin título'}${e.isFeatured ? ' <span style="font-size:10px; color:#93c5fd; background:rgba(59,130,246,0.15); padding:1px 5px; border-radius:4px;">feat.</span>' : ''}</div>
+                    <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${e.artist || ''} · ${e.albumTitle || ''}</div>
+                </div>
+                <span style="font-size:11px; color:var(--text-muted);">${e.duration || ''}</span>
+                <span class="preview-badge" style="background-color:${getBadgeColor(e.score)};">${e.score.toFixed(1)}</span>
+            </div>`;
+
+        let listHTML = '';
+        if (playlistSort === 'album') {
+            let lastAlbum = null, n = 0;
+            entries.forEach(e => {
+                if (e.albumId !== lastAlbum) {
+                    listHTML += `<div class="pl-group-title">💿 ${e.albumTitle || 'Sin título'}${e.released ? ' · ' + e.released : ''}</div>`;
+                    lastAlbum = e.albumId;
+                }
+                listHTML += row(e, ++n);
+            });
+        } else {
+            listHTML = entries.map((e, i) => row(e, i + 1)).join('');
+        }
+
+        box.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; flex-wrap:wrap; margin-bottom:6px;">
+                <div>
+                    <h2 style="margin:0;">🎧 ${title}</h2>
+                    <p style="color:var(--text-muted); font-size:13px; margin:6px 0 0;">${entries.length} ${entries.length === 1 ? 'canción' : 'canciones'} con nota ${minLabel}${totalSec ? ' · ' + secondsToLabel(totalSec) : ''}</p>
+                </div>
+                <button onclick="window.AlbumApp.copyPlaylist()" style="background:#16a34a; border:none; color:white; padding:10px 18px; border-radius:6px; cursor:pointer; font-weight:700; font-size:13px;">📋 Copiar lista</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">${listHTML}</div>`;
+    }
+
+    function copyPlaylist() {
+        const entries = buildPlaylistEntries();
+        if (entries.length === 0) return;
+        const text = entries.map((e, i) => `${i + 1}. ${e.name} — ${e.artist}`).join('\n');
+        const done = () => showToast(`📋 ${entries.length} canciones copiadas`);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        } else fallbackCopy(text, done);
+    }
+
+    function fallbackCopy(text, done) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch(e) { showToast('⚠️ No se pudo copiar'); }
+        ta.remove();
     }
 
     // ===================== SERIES / SAGAS =====================
@@ -2509,6 +2769,7 @@ window.AlbumApp = (function() {
         }
         if (tabName === 'tournament') renderTournamentEntry();
         if (tabName === 'duel') renderDuelEntry();
+        if (tabName === 'playlist') renderPlaylistTab();
         if (tabName === 'series') {
             if (currentSelectedSeries) renderSeriesDetail(currentSelectedSeries);
             else renderSeriesTab();
@@ -2855,6 +3116,25 @@ window.AlbumApp = (function() {
         });
 
         if(state.mode==='rating') updateChartData();
+        applyPlaylistHighlight();
+    }
+
+    // Marca en verde las filas del editor cuya nota alcanza el mínimo de playlist.
+    // Solo afecta al editor (no a la tarjeta exportable como imagen).
+    function applyPlaylistHighlight() {
+        const btn = document.getElementById('btnPlaylistHighlight');
+        const rows = document.querySelectorAll('#trackEditor .track-row');
+        let count = 0;
+        rows.forEach((row, i) => {
+            const s = parseFloat(state.tracks[i] && state.tracks[i].score);
+            const inPl = playlistHighlight && state.mode === 'rating' && !isNaN(s) && s >= playlistMinScore;
+            row.classList.toggle('in-playlist', inPl);
+            if (!isNaN(s) && s >= playlistMinScore) count++;
+        });
+        if (btn) {
+            btn.classList.toggle('active', playlistHighlight);
+            btn.textContent = playlistHighlight ? `🎧 Playlist (${count})` : '🎧 Playlist';
+        }
     }
 
     function renderEditor() {
@@ -2885,18 +3165,16 @@ window.AlbumApp = (function() {
 
     // ===================== CHART =====================
 
-    // Calcula el rango visual del eje Y cuando el zoom automático está activo:
-    // redondea hacia abajo la nota más baja y le resta 1, redondea hacia abajo
-    // la nota más alta y le suma 1 — así el rango se ajusta a dónde realmente
-    // se mueven tus notas, para poder afinar los decimales con más precisión.
+    // Calcula el rango visual del eje Y cuando el zoom automático está activo.
     function getChartYRange() {
         if (!chartZoomEnabled) return { min: 0, max: 10 };
         const scores = state.tracks.map(t => parseFloat(t.score)).filter(s => !isNaN(s));
         if (scores.length === 0) return { min: 0, max: 10 };
         const lo = Math.min(...scores), hi = Math.max(...scores);
-        let min = Math.max(0, Math.floor(lo) - 1);
-        let max = Math.min(10, Math.floor(hi) + 1);
-        if (max - min < 2) max = Math.min(10, min + 2); // margen mínimo para que no quede plano
+        // Exactamente 1 punto por debajo de la nota más baja y 1 por encima de la más alta
+        // (ej. 6.2–8.1 → 5.2–9.1; 6.7–10 → 5.7–10), sin salirse de 0–10.
+        const min = Math.max(0, Math.round((lo - 1) * 10) / 10);
+        const max = Math.min(10, Math.round((hi + 1) * 10) / 10);
         return { min, max };
     }
 
@@ -3108,6 +3386,27 @@ window.AlbumApp = (function() {
         renderArtistProfile,
         renderArtistTab,
         renderSeriesTab,
+        renderPlaylistAlbumList,
+        copyPlaylist,
+        setPlaylistMode: (m) => { playlistMode = m; renderPlaylistTab(); },
+        setPlaylistArtist: (name) => { playlistArtist = name; renderPlaylistResult(); },
+        setPlaylistSort: (v) => { playlistSort = v; renderPlaylistResult(); },
+        setPlaylistMin: (v) => {
+            playlistMinScore = parseFloat(v);
+            try { localStorage.setItem('ara_playlist_min', String(playlistMinScore)); } catch(e) {}
+            renderPlaylistTab();
+            applyPlaylistHighlight();
+        },
+        togglePlaylistAlbum: (id) => {
+            if (playlistSelectedAlbums.has(id)) playlistSelectedAlbums.delete(id); else playlistSelectedAlbums.add(id);
+            renderPlaylistAlbumList(); renderPlaylistResult();
+        },
+        playlistSelectVisible: () => {
+            getFilteredPlaylistAlbums().forEach(a => playlistSelectedAlbums.add(a.id));
+            renderPlaylistAlbumList(); renderPlaylistResult();
+        },
+        playlistClearSelection: () => { playlistSelectedAlbums.clear(); renderPlaylistAlbumList(); renderPlaylistResult(); },
+        togglePlaylistHighlight: () => { playlistHighlight = !playlistHighlight; applyPlaylistHighlight(); },
         selectSeries,
         uploadArtistPhoto,
         updateTrackFromArtistProfile,
