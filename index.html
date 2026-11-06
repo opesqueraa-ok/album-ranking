@@ -304,6 +304,11 @@
         }
         .lib-card-meta { font-size: 10px; color: var(--text-muted); margin-bottom: 8px; }
         .lib-card-actions { display: flex; gap: 5px; margin-top: auto; }
+        /* En My Library los botones quedan ocultos (para capturas limpias) y aparecen al tocar la tarjeta */
+        #libraryGrid .lib-card { cursor: pointer; }
+        #libraryGrid .lib-card-actions { display: none; }
+        #libraryGrid .lib-card.show-actions { border-color: var(--accent); }
+        #libraryGrid .lib-card.show-actions .lib-card-actions { display: flex; }
         .lib-card-actions button {
             flex: 1; padding: 5px 4px; font-size: 10px; font-weight: 600;
             border-radius: 4px; cursor: pointer; transition: 0.2s; border: 1px solid var(--border);
@@ -1401,6 +1406,13 @@ window.AlbumApp = (function() {
 
             const card = document.createElement('div');
             card.className = 'lib-card';
+            card.title = 'Toca para ver Editar / Eliminar';
+            card.onclick = (e) => {
+                if (e.target.closest('.lib-card-actions')) return;
+                const open = card.classList.contains('show-actions');
+                document.querySelectorAll('#libraryGrid .lib-card.show-actions').forEach(c => c.classList.remove('show-actions'));
+                if (!open) card.classList.add('show-actions');
+            };
             card.innerHTML = `
                 <div class="lib-card-cover-wrap">
                     <img class="lib-card-cover"
@@ -3691,6 +3703,12 @@ window.AlbumApp = (function() {
                 const file = e.target.files[0];
                 if(file) importLibrary(file);
                 e.target.value = ''; 
+            });
+
+            document.addEventListener('click', e => {
+                if (!e.target.closest('#libraryGrid .lib-card')) {
+                    document.querySelectorAll('#libraryGrid .lib-card.show-actions').forEach(c => c.classList.remove('show-actions'));
+                }
             });
 
             document.querySelectorAll('.tab-btn').forEach(btn => {
