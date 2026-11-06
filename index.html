@@ -103,13 +103,23 @@
         }
         input:focus, select:focus { border-color: var(--accent); }
 
+        .search-row { display: flex; gap: 8px; margin-bottom: 18px; }
+        .search-row input { flex: 1; min-width: 0; }
         #btnFetch {
-            width: 100%; background: rgba(59, 130, 246, 0.1); color: #60a5fa;
-            border: 1px dashed rgba(59, 130, 246, 0.3); padding: 12px;
-            cursor: pointer; margin-bottom: 20px; border-radius: 6px;
-            font-size: 13px; font-weight: 600; transition: 0.2s;
+            background: var(--accent); color: white; white-space: nowrap;
+            border: 1px solid var(--accent); padding: 0 18px;
+            cursor: pointer; border-radius: 6px;
+            font-size: 13px; font-weight: 700; transition: 0.2s;
         }
-        #btnFetch:hover { background: rgba(59, 130, 246, 0.2); border-color: #60a5fa; }
+        #btnFetch:disabled { opacity: 0.6; cursor: wait; }
+        .search-tag { display: inline-block; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 6px; border-radius: 4px; margin-right: 4px; background: rgba(255,255,255,0.08); color: #cbd5e1; }
+        .search-tag.t-album { background: rgba(59,130,246,0.18); color: #93c5fd; }
+        .search-tag.t-ep { background: rgba(168,85,247,0.18); color: #d8b4fe; }
+        .search-tag.t-single { background: rgba(234,179,8,0.15); color: #fde047; }
+        .search-tag.t-deluxe { background: rgba(34,197,94,0.15); color: #86efac; }
+        .search-more-btn { grid-column: 1 / -1; background: transparent; border: 1px dashed var(--border); color: var(--text-muted); padding: 10px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
+        .search-more-btn:hover { color: white; border-color: white; }
+        #btnFetch:hover:not(:disabled) { background: #2563eb; }
 
         /* MODAL */
         .modal-overlay {
@@ -276,6 +286,7 @@
         .lib-card-rank .trend-up { color: #4ade80; font-size: 10px; }
         .lib-card-rank .trend-down { color: #f87171; font-size: 10px; }
         .lib-card-rank .trend-new { color: #fbbf24; font-size: 10px; }
+        .lib-card-rank .trend-same { color: #64748b; font-size: 10px; }
 
         .lib-card-body {
             padding: 10px 10px 9px 10px;
@@ -520,6 +531,10 @@
             <div class="editor-col">
                 <div class="panel">
                     <h2>Metadata</h2>
+                    <div class="search-row">
+                        <input type="text" id="inSearch" placeholder="Busca como quieras: zuurkey everything mixtape">
+                        <button id="btnFetch">🔍 Search</button>
+                    </div>
                     <div class="input-row">
                         <div class="input-group">
                             <label>Artist</label>
@@ -530,8 +545,6 @@
                             <input type="text" id="inAlbum" placeholder="Ej. It's Us Vol. 2">
                         </div>
                     </div>
-
-                    <button id="btnFetch">🔍 Auto-Fill (Smart Search)</button>
 
                     <div class="input-row" style="margin-bottom: 20px;">
                         <div class="input-group">
@@ -550,8 +563,12 @@
                             <input type="text" id="inYear" placeholder="2026">
                         </div>
                         <div class="input-group">
-                            <label>Ranked By</label>
-                            <input type="text" id="inRanker" placeholder="Your Name">
+                            <label>Tipo <span id="typeHint" style="text-transform:none; letter-spacing:normal; color:#64748b; font-weight:500;"></span></label>
+                            <select id="selType" onchange="window.AlbumApp.changeType(this.value)">
+                                <option value="">Automático</option>
+                                <option value="album">Álbum</option>
+                                <option value="ep">EP</option>
+                            </select>
                         </div>
                     </div>
 
@@ -611,7 +628,7 @@
                         <div class="meta-preview">
                             <div id="prevArtist" class="meta-artist">Artist</div>
                             <div id="prevAlbum" class="meta-album">Album</div>
-                            <div id="prevDetails" class="meta-details">Year • Ranked by...</div>
+                            <div id="prevDetails" class="meta-details">Year</div>
                         </div>
                         <div class="track-list-preview">
                             <div class="preview-header-row" id="prevHeaderRow">
@@ -636,6 +653,11 @@
     <!-- ===== TAB: LIBRARY ===== -->
     <div class="tab-content" id="tab-library">
         <div class="lib-stats-bar" id="libStatsBar"></div>
+
+        <div class="pl-seg" id="libTypeSeg" style="max-width:340px; margin-bottom:20px;">
+            <button data-type="album" class="active" onclick="window.AlbumApp.setLibType('album')">💿 Álbumes (<span>0</span>)</button>
+            <button data-type="ep" onclick="window.AlbumApp.setLibType('ep')">🎶 EPs (<span>0</span>)</button>
+        </div>
 
         <div class="library-toolbar">
             <input type="text" id="libSearch" placeholder="🔍  Search artist or album..." oninput="window.AlbumApp.renderLibrary()">
@@ -850,8 +872,11 @@ window.AlbumApp = (function() {
         const savedMin = parseFloat(localStorage.getItem('ara_playlist_min'));
         if (!isNaN(savedMin)) playlistMinScore = savedMin;
     } catch(e) {}
-    let previousLibraryRanks = {}; // { albumId: rank } — última posición conocida, para mostrar movimiento
-    let previousArtistRanks = {}; // { "nombre artista en minúsculas": rank }
+    // Movimiento en rankings. Por cada lista guardamos { ranks: posiciones actuales, prev: posiciones
+    // antes del último cambio }. La flecha se mantiene visible hasta que el ranking vuelva a cambiar.
+    let previousLibraryRanks = { album: { ranks: {}, prev: null }, ep: { ranks: {}, prev: null } };
+    let previousArtistRanks = { ranks: {}, prev: null };
+    let libTypeFilter = 'album'; // 'album' | 'ep' — qué biblioteca se ve en My Library
     let artistFavoriteOverrides = {};
     let artistPhotos = {}; // { 'nombre artista en minúsculas': 'https://...url de Storage' }
     let tournamentStats = {}; // { "albumId_trackIdx": { plays, wins, losses } } — persistente, entre todos los torneos jugados
@@ -864,7 +889,7 @@ window.AlbumApp = (function() {
 
     const DEFAULT_STATE = () => ({
         mode: "rating",
-        artist: "", album: "", released: "", rankedby: "", cover: "", series: "",
+        artist: "", album: "", released: "", cover: "", series: "", type: "",
         tracks: [{name:"",duration:"",score:""},{name:"",duration:"",score:""},{name:"",duration:"",score:""}]
     });
 
@@ -876,7 +901,9 @@ window.AlbumApp = (function() {
         inAlbum: document.getElementById("inAlbum"),
         inYear: document.getElementById("inYear"),
         inSeries: document.getElementById("inSeries"),
-        inRanker: document.getElementById("inRanker"),
+        inSearch: document.getElementById("inSearch"),
+        selType: document.getElementById("selType"),
+        typeHint: document.getElementById("typeHint"),
         trackEditor: document.getElementById("trackEditor"),
         pCover: document.getElementById("prevCover"),
         pScore: document.getElementById("prevScore"),
@@ -961,8 +988,8 @@ window.AlbumApp = (function() {
                     tournamentStats = data.tournamentStats || {};
                     duelStats = data.duelStats || {};
                     correctionStats = data.correctionStats || { edits: 0, increases: 0, decreases: 0, netChange: 0 };
-                    previousLibraryRanks = data.previousLibraryRanks || {};
-                    previousArtistRanks = data.previousArtistRanks || {};
+                    previousLibraryRanks = migrateLibraryRankState(data.previousLibraryRanks);
+                    previousArtistRanks = migrateArtistRankState(data.previousArtistRanks);
 
                     // Migra portadas viejas guardadas como base64 (de antes de tener Storage)
                     // a Firebase Storage, para no exceder el límite de 1MB por documento en Firestore.
@@ -1022,8 +1049,8 @@ window.AlbumApp = (function() {
                 if (parsed.tournamentStats) tournamentStats = parsed.tournamentStats;
                 if (parsed.duelStats) duelStats = parsed.duelStats;
                 if (parsed.correctionStats) correctionStats = parsed.correctionStats;
-                if (parsed.previousLibraryRanks) previousLibraryRanks = parsed.previousLibraryRanks;
-                if (parsed.previousArtistRanks) previousArtistRanks = parsed.previousArtistRanks;
+                previousLibraryRanks = migrateLibraryRankState(parsed.previousLibraryRanks);
+                previousArtistRanks = migrateArtistRankState(parsed.previousArtistRanks);
             }
         } catch(e) {}
     }
@@ -1066,8 +1093,8 @@ window.AlbumApp = (function() {
                 tournamentStats = parsed.tournamentStats || {};
                 duelStats = parsed.duelStats || {};
                 correctionStats = parsed.correctionStats || { edits: 0, increases: 0, decreases: 0, netChange: 0 };
-                previousLibraryRanks = parsed.previousLibraryRanks || {};
-                previousArtistRanks = parsed.previousArtistRanks || {};
+                previousLibraryRanks = migrateLibraryRankState(parsed.previousLibraryRanks);
+                previousArtistRanks = migrateArtistRankState(parsed.previousArtistRanks);
                 persistLocalOnly();
                 updateLibCount();
                 renderLibrary();
@@ -1209,28 +1236,112 @@ window.AlbumApp = (function() {
 
     // Ranking global por score (independiente del orden/filtro que tengas activo en la UI) —
     // es la base para mostrar "#3", "▲2", "▼1" o "NEW" en cada tarjeta.
-    function computeLibraryRanks() {
-        const ranked = [...library].sort((a, b) => (computeScore(b.tracks) ?? -1) - (computeScore(a.tracks) ?? -1));
+    // ---- Álbum vs EP ----
+    function totalDurationSeconds(tracks) {
+        const real = (tracks || []).filter(t => (t.name && t.name.trim()) || t.score !== '');
+        if (real.length === 0) return null;
+        let total = 0;
+        for (const t of real) {
+            const sec = durationToSeconds(t.duration);
+            if (!sec) return null; // si falta alguna duración, no se puede usar el criterio de tiempo
+            total += sec;
+        }
+        return total;
+    }
+
+    // Regla: es EP si tiene menos de 10 canciones y, cuando se conocen las duraciones, dura
+    // menos de 30 min (límite que usan Spotify y Apple Music). Si no, es Álbum.
+    function detectAlbumType(tracks) {
+        const real = (tracks || []).filter(t => (t.name && t.name.trim()) || t.score !== '');
+        if (real.length === 0) return 'album';
+        if (real.length >= 10) return 'album';
+        const total = totalDurationSeconds(tracks);
+        if (total !== null && total >= 30 * 60) return 'album';
+        return 'ep';
+    }
+
+    function getAlbumType(album) { return album.type || detectAlbumType(album.tracks); }
+
+    function updateTypeHint() {
+        if (!dom.typeHint) return;
+        const real = state.tracks.filter(t => (t.name && t.name.trim()) || t.score !== '');
+        const auto = detectAlbumType(state.tracks);
+        const total = totalDurationSeconds(state.tracks);
+        const mins = total !== null ? ` · ${Math.round(total / 60)} min` : '';
+        dom.typeHint.textContent = state.type
+            ? `(${real.length} canciones${mins})`
+            : `→ ${auto === 'ep' ? 'EP' : 'Álbum'} (${real.length} canciones${mins})`;
+    }
+
+    // ---- Rankings con movimiento ----
+    function migrateLibraryRankState(x) {
+        const empty = () => ({ ranks: {}, prev: null });
+        if (x && (x.album || x.ep)) return { album: x.album || empty(), ep: x.ep || empty() };
+        // Formato viejo ({ albumId: rank }): se toma como punto de partida sin movimiento.
+        const old = x && typeof x === 'object' ? x : {};
+        return { album: { ranks: old, prev: Object.keys(old).length ? old : null }, ep: empty() };
+    }
+
+    function migrateArtistRankState(x) {
+        if (x && x.ranks) return { ranks: x.ranks, prev: x.prev || null };
+        const old = x && typeof x === 'object' ? x : {};
+        return { ranks: old, prev: Object.keys(old).length ? old : null };
+    }
+
+    function sameRanks(a, b) {
+        const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+        if (ka.length !== kb.length) return false;
+        return ka.every(k => a[k] === b[k]);
+    }
+
+    // Si el ranking cambió desde la última vez, guarda el anterior como "prev" para mostrar
+    // cuánto subió o bajó cada uno. Si no cambió, se conserva el último movimiento.
+    function updateRankBucket(bucket, currentRanks) {
+        if (Object.keys(currentRanks).length === 0) return false; // biblioteca aún cargando
+        if (sameRanks(bucket.ranks, currentRanks)) return false;
+        bucket.prev = Object.keys(bucket.ranks || {}).length ? bucket.ranks : null;
+        bucket.ranks = currentRanks;
+        return true;
+    }
+
+    function computeLibraryRanks(type) {
+        const ranked = library.filter(a => getAlbumType(a) === type)
+            .sort((a, b) => (computeScore(b.tracks) ?? -1) - (computeScore(a.tracks) ?? -1));
         const ranks = {};
         ranked.forEach((a, i) => { ranks[a.id] = i + 1; });
         return ranks;
     }
 
-    function rankTrendHTML(currentRank, previousRank) {
+    function rankTrendHTML(currentRank, prevRanks, key) {
+        if (!prevRanks) return `<span class="trend-same">=</span>`;
+        const previousRank = prevRanks[key];
         if (previousRank === undefined) return `<span class="trend-new">NEW</span>`;
-        const delta = previousRank - currentRank; // positivo = subió (rank number bajó)
+        const delta = previousRank - currentRank; // positivo = subió
         if (delta > 0) return `<span class="trend-up">▲${delta}</span>`;
         if (delta < 0) return `<span class="trend-down">▼${Math.abs(delta)}</span>`;
-        return '';
+        return `<span class="trend-same">=</span>`;
     }
+
+    function setLibType(type) { libTypeFilter = type; renderLibrary(); }
 
     function renderLibrary() {
         const query = dom.libSearch.value.toLowerCase();
         const modeFilter = dom.libFilterMode.value;
 
-        const currentRanks = computeLibraryRanks();
+        const typeLibrary = library.filter(a => getAlbumType(a) === libTypeFilter);
+        const currentRanks = computeLibraryRanks(libTypeFilter);
+        const bucket = previousLibraryRanks[libTypeFilter];
+        if (updateRankBucket(bucket, currentRanks)) saveLibraryCache();
 
-        let items = library.filter(a => {
+        // Contadores del selector Álbumes / EPs
+        const nAlbums = library.filter(a => getAlbumType(a) === 'album').length;
+        document.querySelectorAll('#libTypeSeg button').forEach(b => {
+            b.classList.toggle('active', b.dataset.type === libTypeFilter);
+            const n = b.dataset.type === 'album' ? nAlbums : library.length - nAlbums;
+            b.querySelector('span').textContent = n;
+        });
+
+        let items = typeLibrary.filter(a => {
             const matchQ = !query || a.artist.toLowerCase().includes(query) || a.album.toLowerCase().includes(query);
             const matchMode = modeFilter === 'all' || a.mode === modeFilter;
             return matchQ && matchMode;
@@ -1248,10 +1359,16 @@ window.AlbumApp = (function() {
             return 0;
         });
 
-        renderLibStats();
+        renderLibStats(typeLibrary);
 
         if (items.length === 0) {
-            dom.libGrid.innerHTML = library.length === 0 ?
+            dom.libGrid.innerHTML = typeLibrary.length === 0 ?
+                (libTypeFilter === 'ep' && library.length > 0 && typeLibrary.length === 0) ?
+                `<div class="library-empty">
+                    <div class="empty-icon">🎶</div>
+                    <h3>Todavía no tienes EPs</h3>
+                    <p>Un proyecto cuenta como EP si tiene menos de 10 canciones y dura menos de 30 min. También puedes marcarlo como EP a mano en el campo "Tipo" del Editor.</p>
+                </div>` :
                 `<div class="library-empty">
                     <div class="empty-icon">🎵</div>
                     <h3>Tu biblioteca está vacía</h3>
@@ -1264,10 +1381,6 @@ window.AlbumApp = (function() {
                 </div>`;
             // Aunque no haya nada que mostrar (filtrado), sigue siendo un buen momento
             // para fijar la base de comparación si la biblioteca cambió.
-            if (JSON.stringify(currentRanks) !== JSON.stringify(previousLibraryRanks)) {
-                previousLibraryRanks = currentRanks;
-                saveLibraryCache();
-            }
             return;
         }
 
@@ -1284,7 +1397,7 @@ window.AlbumApp = (function() {
             }
 
             const rank = currentRanks[a.id];
-            const trendHTML = rankTrendHTML(rank, previousLibraryRanks[a.id]);
+            const trendHTML = rankTrendHTML(rank, bucket.prev, a.id);
 
             const card = document.createElement('div');
             card.className = 'lib-card';
@@ -1308,15 +1421,12 @@ window.AlbumApp = (function() {
                 </div>`;
             dom.libGrid.appendChild(card);
         });
-
-        if (JSON.stringify(currentRanks) !== JSON.stringify(previousLibraryRanks)) {
-            previousLibraryRanks = currentRanks;
-            saveLibraryCache();
-        }
     }
 
-    function renderLibStats() {
+    function renderLibStats(list) {
+        const library = list; // estadísticas solo de la biblioteca visible (Álbumes o EPs)
         if (library.length === 0) { dom.libStatsBar.innerHTML = ''; return; }
+        const isEp = libTypeFilter === 'ep';
 
         const scores = library.map(a => computeScore(a.tracks)).filter(s => s !== null);
         const avgAlbum = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
@@ -1353,9 +1463,9 @@ window.AlbumApp = (function() {
         const goldenLabel = goldenAvg !== null ? `${goldenAvg.toFixed(1)} · ${goldenYear}` : '—';
 
         dom.libStatsBar.innerHTML = `
-            <div class="lib-stat"><div class="lib-stat-val">${library.length}</div><div class="lib-stat-label">Albums</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${library.length}</div><div class="lib-stat-label">${isEp ? 'EPs' : 'Albums'}</div></div>
             <div class="lib-stat clickable" onclick="window.AlbumApp.openArtistsModal()" title="Click to see all artists"><div class="lib-stat-val">${artistsCount}</div><div class="lib-stat-label">Artists →</div></div>
-            <div class="lib-stat"><div class="lib-stat-val">${avgAlbum}</div><div class="lib-stat-label">AVG Album Score</div></div>
+            <div class="lib-stat"><div class="lib-stat-val">${avgAlbum}</div><div class="lib-stat-label">AVG ${isEp ? 'EP' : 'Album'} Score</div></div>
             <div class="lib-stat"><div class="lib-stat-val">${avgSong}</div><div class="lib-stat-label">AVG Song Score</div></div>
             <div class="lib-stat"><div class="lib-stat-val" style="font-size:20px;">${goldenLabel}</div><div class="lib-stat-label">🏅 Golden Year</div></div>
         `;
@@ -1574,6 +1684,7 @@ window.AlbumApp = (function() {
         const rankedByWeighted = artists.filter(a => a.isMainArtist).sort((a, b) => (b.weighted ?? -1) - (a.weighted ?? -1));
         const currentArtistRanks = {};
         rankedByWeighted.forEach((a, i) => { currentArtistRanks[a.name.toLowerCase()] = i + 1; });
+        if (updateRankBucket(previousArtistRanks, currentArtistRanks)) saveLibraryCache();
 
         // ---- Stats bar (siempre sobre el total, sin importar el filtro de búsqueda) ----
         const withScore = artists.filter(a => a.avgScore !== null);
@@ -1637,7 +1748,7 @@ window.AlbumApp = (function() {
             const cover = customPhoto || (a.favoriteTrack ? (a.favoriteTrack.albumCover || '') : '');
             const favName = a.favoriteTrack ? a.favoriteTrack.name : 'Sin tracks puntuados aún';
             const rank = currentArtistRanks[a.name.toLowerCase()];
-            const trendHTML = rank !== undefined ? rankTrendHTML(rank, previousArtistRanks[a.name.toLowerCase()]) : '';
+            const trendHTML = rank !== undefined ? rankTrendHTML(rank, previousArtistRanks.prev, a.name.toLowerCase()) : '';
             const nameEscaped = a.name.replace(/'/g, "\\'");
 
             const card = document.createElement('div');
@@ -1665,10 +1776,7 @@ window.AlbumApp = (function() {
             dom.artistsGrid.appendChild(card);
         });
 
-        if (JSON.stringify(currentArtistRanks) !== JSON.stringify(previousArtistRanks)) {
-            previousArtistRanks = currentArtistRanks;
-            saveLibraryCache();
-        }
+
     }
 
     function selectArtist(artistName) {
@@ -2816,230 +2924,308 @@ window.AlbumApp = (function() {
     }
 
     // ===================== SEARCH =====================
+    // Busca en 4 fuentes a la vez (Deezer, iTunes, Discogs, MusicBrainz) con texto libre,
+    // ej. "zuurkey everything mixtape". Junta duplicados y ordena por qué tan bien coincide.
     const DISCOGS_KEY = "RzuSUUssEDbaCqSwTzWC";
+    const SOURCE_PRIORITY = { deezer: 0, itunes: 1, discogs: 2, musicbrainz: 3 };
+    const SOURCE_LABEL = { deezer: '🟣 Deezer', itunes: '🍎 iTunes', discogs: '🟡 Discogs', musicbrainz: '🟤 MusicBrainz' };
+    let lastSearchResults = [];
 
-    function dedupeResults(results) {
-        const seen = new Set();
-        return results.filter(r => {
-            const key = `${r.artistName.toLowerCase()}||${r.albumName.toLowerCase()}`;
-            if (seen.has(key)) return false;
-            seen.add(key); return true;
-        });
+    // Minúsculas, sin acentos, sin apóstrofes (Pi'erre → pierre), & → and, sin signos.
+    function normalizeText(str) {
+        return String(str || '')
+            .toLowerCase()
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/['’`´]/g, '')
+            .replace(/&/g, ' and ')
+            .replace(/\$/g, 's')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
     }
 
-    function relevanceScore(item, artist, album) {
-        const a = artist.toLowerCase(); const b = album.toLowerCase();
-        const ia = item.artistName.toLowerCase(); const ib = item.albumName.toLowerCase();
-        let score = 0;
-        if (ia === a) score += 40; else if (ia.includes(a) || a.includes(ia)) score += 20;
-        if (ib === b) score += 40; else if (ib.includes(b) || b.includes(ib)) score += 20;
-        if (a === b && ia.includes(a) && ib.includes(b)) score += 10;
+    const EDITION_WORDS = /\b(deluxe|edition|expanded|version|remaster(ed)?|explicit|clean|bonus|anniversary|single|ep)\b/g;
+    function cleanAlbumTitle(title) {
+        return normalizeText(String(title || '').replace(/\s+-\s+(single|ep)$/i, '')).replace(EDITION_WORDS, ' ').replace(/\s+/g, ' ').trim();
+    }
+    const isDeluxe = (title) => /\b(deluxe|expanded|bonus)\b/i.test(title || '');
+
+    function scoreSearchResult(item, queryTokens) {
+        const artistN = normalizeText(item.artistName);
+        const albumClean = cleanAlbumTitle(item.albumName);
+        const haystack = (artistN + ' ' + normalizeText(item.albumName)).split(' ');
+        // Cada palabra buscada cuenta si aparece (o es el inicio de una palabra: "zuurkey" → "zuurkey").
+        const hits = queryTokens.filter(q => haystack.some(h => h === q || (q.length >= 3 && h.startsWith(q)))).length;
+        const coverage = queryTokens.length ? hits / queryTokens.length : 0;
+        const albumTokens = albumClean.split(' ').filter(Boolean);
+        const albumCovered = albumTokens.length > 0 && albumTokens.every(t => queryTokens.includes(t));
+        const artistMentioned = artistN.split(' ').some(t => t.length > 1 && queryTokens.includes(t));
+        let score = coverage * 60 + (albumCovered ? 25 : 0) + (artistMentioned ? 10 : 0);
+        if (item.kind === 'single') score -= 15;
         return score;
     }
 
-    async function openSearchSelector() {
-        const art = dom.inArtist.value.trim();
-        const alb = dom.inAlbum.value.trim();
-        if (!art || !alb) { alert("Ingresa Artista y Álbum."); return; }
+    // Peticiones a Deezer por JSONP (su API no permite fetch directo desde el navegador).
+    function jsonp(url, timeoutMs = 9000) {
+        return new Promise((resolve, reject) => {
+            const cb = '__araJsonp' + Date.now() + Math.floor(Math.random() * 1e6);
+            const script = document.createElement('script');
+            const cleanup = () => { delete window[cb]; script.remove(); clearTimeout(timer); };
+            const timer = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
+            window[cb] = (data) => { cleanup(); resolve(data); };
+            script.onerror = () => { cleanup(); reject(new Error('jsonp error')); };
+            script.src = `${url}${url.includes('?') ? '&' : '?'}output=jsonp&callback=${cb}`;
+            document.head.appendChild(script);
+        });
+    }
 
-        dom.btnFetch.textContent = "⏳ Consultando 3 fuentes...";
+    function withTimeout(promise, ms) {
+        return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+    }
+
+    async function searchDeezer(query) {
+        const data = await jsonp(`https://api.deezer.com/search/album?q=${encodeURIComponent(query)}&limit=25`);
+        return (data.data || []).map(a => ({
+            source: 'deezer', id: a.id,
+            albumName: a.title, artistName: a.artist ? a.artist.name : '',
+            year: '----',
+            coverUrl: a.cover_xl || a.cover_big || a.cover_medium || '',
+            trackCount: a.nb_tracks || null,
+            kind: a.record_type === 'single' ? 'single' : a.record_type === 'ep' ? 'ep' : 'album'
+        }));
+    }
+
+    async function searchItunes(query) {
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=album&limit=25`);
+        const data = await res.json();
+        return (data.results || []).map(item => {
+            const name = item.collectionName || '';
+            const kind = / - single$/i.test(name) ? 'single' : / - ep$/i.test(name) ? 'ep' : 'album';
+            return {
+                source: 'itunes', id: item.collectionId,
+                albumName: name.replace(/\s+-\s+(single|ep)$/i, ''), artistName: item.artistName,
+                year: item.releaseDate ? item.releaseDate.substring(0,4) : '----',
+                coverUrl: (item.artworkUrl100 || '').replace('100x100bb', '1000x1000bb'),
+                trackCount: item.trackCount || null, kind
+            };
+        });
+    }
+
+    async function searchDiscogs(query) {
+        for (const type of ['master', 'release']) {
+            const res = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=${type}&per_page=15&key=${DISCOGS_KEY}`);
+            const data = await res.json();
+            if (data.results && data.results.length > 0) {
+                return data.results.map(item => {
+                    const parts = item.title ? item.title.split(' - ') : [];
+                    const formats = (item.format || []).join(' ').toLowerCase();
+                    const kind = /\bsingle\b/.test(formats) ? 'single' : /\bep\b/.test(formats) ? 'ep' : 'album';
+                    return {
+                        source: 'discogs', id: item.id, discogsType: type,
+                        artistName: parts.length >= 2 ? parts[0].replace(/\s*\(\d+\)$/, '').trim() : '',
+                        albumName: parts.length >= 2 ? parts.slice(1).join(' - ').trim() : (item.title || ''),
+                        year: item.year ? String(item.year) : '----',
+                        coverUrl: item.cover_image || item.thumb || '',
+                        trackCount: null, kind
+                    };
+                });
+            }
+        }
+        return [];
+    }
+
+    async function searchMusicBrainz(query) {
+        const q = query.replace(/([+\-!(){}\[\]^"~*?:\\/]|&&|\|\|)/g, ' ');
+        const res = await fetch(`https://musicbrainz.org/ws/2/release-group?query=${encodeURIComponent(q)}&limit=10&fmt=json`);
+        const data = await res.json();
+        return (data['release-groups'] || []).map(rg => {
+            const releases = rg.releases || [];
+            const rel = releases.find(r => r.status === 'Official') || releases[0];
+            const type = (rg['primary-type'] || '').toLowerCase();
+            return {
+                source: 'musicbrainz', id: rel ? rel.id : null, groupId: rg.id,
+                albumName: rg.title,
+                artistName: (rg['artist-credit'] || []).map(c => (c.name || '') + (c.joinphrase || '')).join('').trim(),
+                year: rg['first-release-date'] ? rg['first-release-date'].substring(0,4) : '----',
+                coverUrl: `https://coverartarchive.org/release-group/${rg.id}/front-250`,
+                trackCount: null,
+                kind: type === 'single' ? 'single' : type === 'ep' ? 'ep' : 'album'
+            };
+        }).filter(r => r.id);
+    }
+
+    // Une el mismo disco encontrado en varias fuentes en un solo resultado.
+    // Deluxe y estándar se mantienen separados porque traen tracklists distintos.
+    function mergeResults(results) {
+        const groups = new Map();
+        results.forEach(r => {
+            const key = `${normalizeText(r.artistName)}|${cleanAlbumTitle(r.albumName)}|${isDeluxe(r.albumName) ? 'dlx' : 'std'}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(r);
+        });
+        return [...groups.values()].map(list => {
+            list.sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]);
+            const main = { ...list[0] };
+            main.alts = list.slice(1);
+            main.sources = [...new Set(list.map(x => x.source))];
+            if (main.year === '----') main.year = (list.find(x => x.year !== '----') || {}).year || '----';
+            if (!main.trackCount) main.trackCount = (list.find(x => x.trackCount) || {}).trackCount || null;
+            if (list.some(x => x.kind !== 'single')) main.kind = list.find(x => x.kind !== 'single').kind;
+            return main;
+        });
+    }
+
+    async function openSearchSelector() {
+        const typed = dom.inSearch.value.trim();
+        const query = typed || `${dom.inArtist.value.trim()} ${dom.inAlbum.value.trim()}`.trim();
+        if (!query) { showToast('⚠️ Escribe el artista, el álbum, o ambos'); dom.inSearch.focus(); return; }
+
+        dom.btnFetch.textContent = '⏳ Buscando...';
         dom.btnFetch.disabled = true;
 
         try {
-            const [discogsRes, itunesRes, mbRes] = await Promise.allSettled([
-                searchDiscogs(art, alb),
-                searchItunes(art, alb),
-                searchMusicBrainz(art, alb)
-            ]);
+            const sources = [searchDeezer, searchItunes, searchDiscogs, searchMusicBrainz];
+            const settled = await Promise.allSettled(sources.map(fn => withTimeout(fn(query), 10000)));
+            const all = settled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-            const discogs  = discogsRes.status  === 'fulfilled' ? discogsRes.value  : [];
-            const itunes   = itunesRes.status   === 'fulfilled' ? itunesRes.value   : [];
-            const mb       = mbRes.status       === 'fulfilled' ? mbRes.value       : [];
+            const queryTokens = normalizeText(query).split(' ').filter(Boolean);
+            let merged = mergeResults(all).map(r => ({ ...r, _score: scoreSearchResult(r, queryTokens) }));
+            // Descarta lo que casi no se parece a lo buscado (menos de la mitad de las palabras).
+            const minScore = 30;
+            const good = merged.filter(r => r._score >= minScore);
+            merged = (good.length ? good : merged).sort((a, b) => b._score - a._score).slice(0, 30);
 
-            let combined = [...discogs, ...itunes, ...mb];
-            combined.sort((a, b) => relevanceScore(b, art, alb) - relevanceScore(a, art, alb));
-            combined = dedupeResults(combined);
-
-            if (combined.length === 0) {
-                alert("No se encontró el álbum en ninguna fuente. Intenta con un nombre más corto o revisa la ortografía.");
-                resetFetchBtn(); return;
+            if (merged.length === 0) {
+                const failed = settled.filter(r => r.status === 'rejected').length;
+                alert(failed === sources.length
+                    ? 'No hubo conexión con ninguna fuente de búsqueda. Revisa tu internet e intenta de nuevo.'
+                    : 'No se encontró en ninguna fuente. Si el proyecto solo está en SoundCloud o YouTube no va a aparecer: llénalo a mano.');
+            } else {
+                lastSearchResults = merged;
+                renderSearchResults(false);
             }
-
-            renderSearchResults(combined);
         } catch(e) {
             console.error(e);
-            alert("Error de conexión inesperado.");
+            alert('Error de conexión inesperado.');
         }
         resetFetchBtn();
     }
 
-    async function searchDiscogs(artist, album) {
-        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
-        const queries = [
-            `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(album)}&type=master&per_page=10&key=${DISCOGS_KEY}`,
-            `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(cleanAlb)}&type=master&per_page=10&key=${DISCOGS_KEY}`,
-            `https://api.discogs.com/database/search?q=${encodeURIComponent(artist + ' ' + cleanAlb)}&type=master&per_page=10&key=${DISCOGS_KEY}`
-        ];
+    function renderSearchResults(showSingles) {
+        const list = document.getElementById('searchResultsList');
+        list.innerHTML = '';
+        document.getElementById('searchModal').classList.add('open');
 
-        for (const url of queries) {
-            try {
-                const res = await fetch(url, { headers: { 'User-Agent': 'ARA-AlbumRater/2.1' } });
-                const data = await res.json();
-                if (data.results && data.results.length > 0) {
-                    return data.results.map(item => {
-                        const parts = item.title ? item.title.split(' - ') : [];
-                        const artistName = parts.length >= 2 ? parts[0].trim() : artist;
-                        const albumName  = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : item.title;
-                        return {
-                            source: 'discogs',
-                            id: item.master_id || item.id,
-                            masterId: item.master_id,
-                            albumName, artistName,
-                            year: item.year ? String(item.year) : "----",
-                            coverUrl: item.cover_image || item.thumb || ""
-                        };
-                    });
-                }
-            } catch(e) { console.warn('Discogs query failed:', e); }
-        }
-        return [];
-    }
+        const nonSingles = lastSearchResults.filter(r => r.kind !== 'single');
+        const singles = lastSearchResults.filter(r => r.kind === 'single');
+        const visible = (showSingles || nonSingles.length === 0) ? lastSearchResults : nonSingles;
+        const kindLabel = { album: 'Álbum', ep: 'EP', single: 'Single' };
 
-    async function searchItunes(artist, album) {
-        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
-        const attempts = [
-            `${artist} ${album}`,
-            `${artist} ${cleanAlb}`,
-            artist
-        ];
-        for (const term of attempts) {
-            try {
-                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=12`);
-                const data = await res.json();
-                if (data.results && data.results.length > 0) {
-                    return data.results.map(item => ({
-                        source: 'itunes', id: item.collectionId,
-                        albumName: item.collectionName, artistName: item.artistName,
-                        year: item.releaseDate ? item.releaseDate.substring(0,4) : "----",
-                        coverUrl: item.artworkUrl100.replace("100x100bb","600x600bb")
-                    }));
-                }
-            } catch(e) { console.warn('iTunes query failed:', e); }
-        }
-        return [];
-    }
-
-    async function searchMusicBrainz(artist, album) {
-        const cleanAlb = album.replace(/\s*\(.*?\)\s*/g, '').trim();
-        const query = encodeURIComponent(`release:"${cleanAlb}" AND artist:"${artist}"`);
-        try {
-            const res = await fetch(`https://musicbrainz.org/ws/2/release?query=${query}&limit=8&fmt=json`,
-                { headers: { 'User-Agent': 'ARA-AlbumRater/2.1 (personal)' } });
-            const data = await res.json();
-            if (!data.releases) return [];
-            return data.releases.map(item => ({
-                source: 'musicbrainz', id: item.id,
-                albumName: item.title,
-                artistName: item["artist-credit"] ? item["artist-credit"][0].name : artist,
-                year: item.date ? item.date.substring(0,4) : "----",
-                coverUrl: `https://coverartarchive.org/release/${item.id}/front-250`
-            }));
-        } catch(e) { console.warn('MusicBrainz query failed:', e); return []; }
-    }
-
-    function renderSearchResults(results) {
-        const list = document.getElementById("searchResultsList");
-        list.innerHTML = "";
-        document.getElementById("searchModal").classList.add('open');
-
-        const sourceEmoji = { discogs: '🟡', itunes: '🍎', musicbrainz: '🟣' };
-        const sourceLabel = { discogs: 'Discogs', itunes: 'iTunes', musicbrainz: 'MusicBrainz' };
-
-        results.forEach(item => {
-            const div = document.createElement("div");
-            div.className = "search-item";
+        visible.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'search-item';
             const thumb = item.coverUrl
-                ? `<img src="${item.coverUrl}" onerror="this.style.display='none'" style="width:50px;height:50px;border-radius:4px;object-fit:cover;flex-shrink:0;">`
-                : `<div style="width:50px;height:50px;border-radius:4px;background:#1a1a1a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;">🎵</div>`;
+                ? `<img src="${item.coverUrl}" onerror="this.style.visibility='hidden'" style="width:56px;height:56px;border-radius:4px;object-fit:cover;flex-shrink:0;background:#1a1a1a;">`
+                : `<div style="width:56px;height:56px;border-radius:4px;background:#1a1a1a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;">🎵</div>`;
             div.innerHTML = `
                 ${thumb}
                 <div style="overflow:hidden;width:100%;">
                     <div style="font-size:12px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.albumName}</div>
-                    <div style="font-size:11px;color:#888;margin-top:2px;">${item.artistName} · ${item.year}</div>
-                    <div style="font-size:10px;color:#555;margin-top:2px;">${sourceEmoji[item.source] || '📀'} ${sourceLabel[item.source] || item.source}</div>
+                    <div style="font-size:11px;color:#888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.artistName} · ${item.year}</div>
+                    <div style="margin-top:4px;">
+                        <span class="search-tag t-${item.kind}">${kindLabel[item.kind]}</span>${isDeluxe(item.albumName) ? '<span class="search-tag t-deluxe">Deluxe</span>' : ''}${item.trackCount ? `<span class="search-tag">${item.trackCount} canciones</span>` : ''}
+                    </div>
+                    <div style="font-size:10px;color:#555;margin-top:3px;">${item.sources.map(s => SOURCE_LABEL[s]).join(' · ')}</div>
                 </div>`;
             div.onclick = () => fetchTracks(item);
             list.appendChild(div);
         });
+
+        if (!showSingles && nonSingles.length > 0 && singles.length > 0) {
+            const more = document.createElement('button');
+            more.className = 'search-more-btn';
+            more.textContent = `Mostrar también ${singles.length} single${singles.length === 1 ? '' : 's'}`;
+            more.onclick = () => renderSearchResults(true);
+            list.appendChild(more);
+        }
+    }
+
+    async function loadTracksFrom(item) {
+        let tracks = [], coverUrl = item.coverUrl, year = item.year;
+
+        if (item.source === 'deezer') {
+            const [album, tl] = await Promise.all([
+                jsonp(`https://api.deezer.com/album/${item.id}`),
+                jsonp(`https://api.deezer.com/album/${item.id}/tracks?limit=300`)
+            ]);
+            if (album && album.release_date) year = album.release_date.substring(0, 4);
+            if (album && album.cover_xl) coverUrl = album.cover_xl;
+            tracks = ((tl && tl.data) || (album && album.tracks && album.tracks.data) || []).map(t => ({
+                name: t.title, duration: t.duration ? msToTime(t.duration * 1000) : '--:--', score: ''
+            }));
+
+        } else if (item.source === 'itunes') {
+            const res = await fetch(`https://itunes.apple.com/lookup?id=${item.id}&entity=song&limit=300`);
+            const data = await res.json();
+            tracks = (data.results || []).filter(x => x.wrapperType === 'track').map(t => ({
+                name: t.trackName, duration: msToTime(t.trackTimeMillis), score: ''
+            }));
+
+        } else if (item.source === 'discogs') {
+            const endpoint = item.discogsType === 'master'
+                ? `https://api.discogs.com/masters/${item.id}`
+                : `https://api.discogs.com/releases/${item.id}`;
+            const res = await fetch(`${endpoint}?key=${DISCOGS_KEY}`);
+            const data = await res.json();
+            if (data.images && data.images.length > 0) coverUrl = data.images[0].uri || coverUrl;
+            tracks = (data.tracklist || [])
+                .filter(t => t.type_ === 'track' || !t.type_)
+                .map(t => ({ name: t.title, duration: t.duration || '--:--', score: '' }));
+
+        } else if (item.source === 'musicbrainz') {
+            const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`);
+            const data = await res.json();
+            tracks = (data.media || []).flatMap(m => m.tracks || []).map(t => ({
+                name: t.recording ? t.recording.title : t.title,
+                duration: t.length ? msToTime(t.length) : '--:--',
+                score: ''
+            }));
+        }
+        return { tracks, coverUrl, year };
     }
 
     async function fetchTracks(item) {
-        document.getElementById("searchModal").classList.remove('open');
-        dom.btnFetch.textContent = "⏳ Cargando tracklist...";
+        document.getElementById('searchModal').classList.remove('open');
+        dom.btnFetch.textContent = '⏳ Cargando...';
         dom.btnFetch.disabled = true;
         try {
-            let tracks = [];
-            let coverUrl = item.coverUrl;
-
-            if (item.source === 'discogs') {
-                const endpoint = item.masterId
-                    ? `https://api.discogs.com/masters/${item.masterId}`
-                    : `https://api.discogs.com/releases/${item.id}`;
-                const res = await fetch(`${endpoint}?key=${DISCOGS_KEY}`,
-                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.1' } });
-                const data = await res.json();
-
-                if (data.images && data.images.length > 0) {
-                    coverUrl = data.images[0].uri || coverUrl;
-                }
-
-                if (data.tracklist && data.tracklist.length > 0) {
-                    tracks = data.tracklist
-                        .filter(t => t.type_ === 'track' || !t.type_)
-                        .map(t => ({
-                            name: t.title,
-                            duration: t.duration || "--:--",
-                            score: ""
-                        }));
-                }
-
-            } else if (item.source === 'itunes') {
-                const res = await fetch(`https://itunes.apple.com/lookup?id=${item.id}&entity=song&limit=200`);
-                const data = await res.json();
-                tracks = data.results.filter(x => x.wrapperType === 'track').map(t => ({
-                    name: t.trackName, duration: msToTime(t.trackTimeMillis), score: ""
-                }));
-
-            } else if (item.source === 'musicbrainz') {
-                const res = await fetch(`https://musicbrainz.org/ws/2/release/${item.id}?inc=recordings&fmt=json`,
-                    { headers: { 'User-Agent': 'ARA-AlbumRater/2.1 (personal)' } });
-                const data = await res.json();
-                if (data.media && data.media.length > 0) {
-                    tracks = data.media.flatMap(m => m.tracks).map(t => ({
-                        name: t.recording.title,
-                        duration: t.length ? msToTime(t.length) : "--:--",
-                        score: ""
-                    }));
-                }
+            // Si la fuente principal falla o no trae canciones, prueba con las otras del mismo disco.
+            let result = { tracks: [] };
+            for (const candidate of [item, ...(item.alts || [])]) {
+                try {
+                    result = await withTimeout(loadTracksFrom(candidate), 12000);
+                    if (result.tracks.length > 0) break;
+                } catch(e) { console.warn('Tracklist falló en', candidate.source, e); }
             }
+            if (result.tracks.length === 0) showToast('⚠️ No se pudo cargar el tracklist. Llénalo a mano.');
 
             setState({
                 artist: item.artistName,
                 album: item.albumName,
-                released: item.year,
-                cover: coverUrl,
-                tracks: tracks.length > 0 ? tracks : [{name:"",duration:"",score:""}]
+                released: (result.year && result.year !== '----') ? result.year : item.year,
+                cover: result.coverUrl || item.coverUrl,
+                type: '',
+                tracks: result.tracks.length > 0 ? result.tracks : [{name:'',duration:'',score:''}]
             });
-
+            dom.inSearch.value = '';
         } catch(e) {
             console.error(e);
-            alert("Error al cargar el tracklist.");
+            alert('Error al cargar el tracklist.');
         }
         resetFetchBtn();
     }
 
     function resetFetchBtn() {
-        dom.btnFetch.textContent = "🔍 Auto-Fill (Smart Search)";
+        dom.btnFetch.textContent = '🔍 Search';
         dom.btnFetch.disabled = false;
     }
 
@@ -3070,7 +3256,9 @@ window.AlbumApp = (function() {
     function render(forceRebuildEditor = false) {
         dom.pArtist.textContent = state.artist || "Artist";
         dom.pAlbum.textContent = state.album || "Album Title";
-        dom.pDetails.textContent = `${state.released || "Year"} • Ranked by ${state.rankedby || "You"}`;
+        const resolvedType = state.type || detectAlbumType(state.tracks);
+        dom.pDetails.textContent = `${state.released || "Year"}${resolvedType === 'ep' ? ' • EP' : ''}`;
+        updateTypeHint();
         dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
 
         if (state.mode === 'ranking') {
@@ -3320,7 +3508,7 @@ window.AlbumApp = (function() {
         if(ns.album!==undefined) dom.inAlbum.value = state.album;
         if(ns.released!==undefined) dom.inYear.value = state.released;
         if(ns.series!==undefined) dom.inSeries.value = state.series || '';
-        if(ns.rankedby!==undefined) dom.inRanker.value = state.rankedby;
+        if(ns.type!==undefined || ns.tracks!==undefined) dom.selType.value = state.type || '';
         if(ns.mode!==undefined) document.getElementById('selMode').value = state.mode;
         saveSession();
         render(true);
@@ -3344,6 +3532,8 @@ window.AlbumApp = (function() {
         },
         clearScores: () => { state.tracks.forEach(t=>t.score=""); saveSession(); render(true); },
         changeMode: (m) => { state.mode=m; saveSession(); render(true); },
+        setLibType,
+        changeType: (t) => { state.type = t; saveSession(); render(); },
         toggleChartZoom: (enabled) => { chartZoomEnabled = enabled; updateChartData(); },
         removeCover: () => { state.cover=""; saveSession(); render(); },
         toggleSortByScore: (btn) => {
@@ -3451,7 +3641,7 @@ window.AlbumApp = (function() {
                     dom.inAlbum.value = '';
                     dom.inYear.value = '';
                     dom.inSeries.value = '';
-                    dom.inRanker.value = '';
+                    dom.selType.value = '';
                     document.getElementById('selMode').value = 'rating';
                     render(true);
                     showToast("🆕 Nueva sesión iniciada");
@@ -3470,7 +3660,8 @@ window.AlbumApp = (function() {
             dom.inAlbum.addEventListener("input", e => { state.album=e.target.value; saveSession(); render(); });
             dom.inYear.addEventListener("input", e => { state.released=e.target.value; saveSession(); render(); });
             dom.inSeries.addEventListener("input", e => { state.series=e.target.value; saveSession(); });
-            dom.inRanker.addEventListener("input", e => { state.rankedby=e.target.value; saveSession(); render(); });
+            dom.inSearch.addEventListener("keydown", e => { if (e.key === 'Enter') openSearchSelector(); });
+            dom.selType.value = state.type || '';
 
             if (saved && saved.mode) document.getElementById('selMode').value = saved.mode;
 
@@ -3548,7 +3739,7 @@ window.AlbumApp = (function() {
                     library = [];
                     artistFavoriteOverrides = {}; artistPhotos = {};
                     tournamentStats = {}; duelStats = {}; correctionStats = { edits: 0, increases: 0, decreases: 0, netChange: 0 };
-                    previousLibraryRanks = {}; previousArtistRanks = {};
+                    previousLibraryRanks = migrateLibraryRankState(null); previousArtistRanks = migrateArtistRankState(null);
                     updateLibCount();
                     renderLibrary();
                     loginScreen.classList.add('open');
