@@ -124,6 +124,12 @@
         .search-queue-btn { flex-shrink: 0; align-self: center; background: transparent; border: 1px solid rgba(134,239,172,0.35); color: #86efac; border-radius: 6px; padding: 6px 8px; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .search-queue-btn:hover:not(:disabled) { background: rgba(34,197,94,0.1); }
         .search-queue-btn:disabled { opacity: 0.7; cursor: default; }
+        .queue-toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+        .queue-toolbar input { flex: 1; min-width: 160px; padding: 10px 14px; font-size: 13px; }
+        .queue-group { display: flex; align-items: center; gap: 8px; }
+        .queue-group > span { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .queue-group .pl-seg button { flex: none; padding: 8px 11px; white-space: nowrap; }
+        .queue-hint { font-size: 11px; color: var(--text-muted); margin: 0 0 18px; }
         .ex-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
         @media (max-width: 500px) { .ex-grid { grid-template-columns: 1fr; } }
         .ex-section { margin-bottom: 0; }
@@ -536,8 +542,8 @@
 
     <div class="tabs-bar">
         <button class="tab-btn active" data-tab="editor">🎵 Editor</button>
-        <button class="tab-btn" data-tab="queue">📝 Por escuchar <span class="tab-count" id="queueCount" style="display:none;">0</span></button>
         <button class="tab-btn" data-tab="library">📚 My Library <span class="tab-count" id="libCount">0</span></button>
+        <button class="tab-btn" data-tab="queue">📝 Por escuchar <span class="tab-count" id="queueCount" style="display:none;">0</span></button>
         <button class="tab-btn" data-tab="artists">🎤 Artists</button>
         <button class="tab-btn" data-tab="series">📚 Series</button>
         <button class="tab-btn" data-tab="explore">📅 Explorar</button>
@@ -932,7 +938,11 @@ window.AlbumApp = (function() {
     let tournament = null; // { band, size, rounds, roundIndex, matchIndex, winnersThisRound, currentMatch, champion, pendingWinner }
     let duelStats = {}; // { "nombre artista en minúsculas": { duels, wins, losses, displayName } } — persistente
     let duel = null; // { artistA, artistB, poolA, poolB, rounds, roundIndex, scoreA, scoreB, currentRound, finished }
-    let listenQueue = []; // álbumes guardados para escuchar después, con su tracklist ya cargado
+    let listenQueue = [];
+    let queueSort = 'added';     // 'added' | 'duration' | 'tracks' | 'alpha'
+    let queueSortAsc = false;    // dirección del orden
+    let queueMaxMin = 0;         // filtro de duración: 0 = todos, o máximo de minutos
+    let queueSearch = ''; // álbumes guardados para escuchar después, con su tracklist ya cargado
     let correctionStats = { edits: 0, increases: 0, decreases: 0, netChange: 0 }; // qué tan beneficiosas han sido las correcciones hechas en los minijuegos
     let cloudSyncTimeout = null;
     let applyingRemoteUpdate = false; // evita loops al recibir nuestro propio write via onSnapshot
@@ -2229,15 +2239,63 @@ window.AlbumApp = (function() {
             </div>`;
             return;
         }
+        // Datos calculados de cada álbum: canciones reales y duración total
+        const enriched = listenQueue.map(q => {
+            const real = (q.tracks || []).filter(t => t.name && t.name.trim());
+            const total = totalDurationSeconds(q.tracks);
+            return { q, nTracks: real.length, secs: total };
+        });
+
+        const totalSecs = enriched.reduce((acc, e) => acc + (e.secs || 0), 0);
+        const durLabel = (secs) => secs ? (secs >= 3600 ? `${Math.floor(secs / 3600)} h ${Math.round((secs % 3600) / 60)} min` : `${Math.round(secs / 60)} min`) : '? min';
+
+        let list = enriched;
+        const needle = normalizeText(queueSearch);
+        if (needle) list = list.filter(e => normalizeText(`${e.q.artist} ${e.q.album}`).includes(needle));
+        if (queueMaxMin) list = list.filter(e => e.secs !== null && e.secs <= queueMaxMin * 60);
+
+        const dir = queueSortAsc ? 1 : -1;
+        const natural = (a, b) => (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
+        list = [...list].sort((a, b) => {
+            if (queueSort === 'duration') {
+                if (a.secs === null) return 1; if (b.secs === null) return -1; // sin duración, al final
+                return (a.secs - b.secs) * dir;
+            }
+            if (queueSort === 'tracks') return (a.nTracks - b.nTracks) * dir || natural(a.q.album, b.q.album);
+            if (queueSort === 'alpha') return natural(a.q.album, b.q.album) * dir || natural(a.q.artist, b.q.artist) * dir;
+            return (new Date(a.q.queuedAt) - new Date(b.q.queuedAt)) * dir;
+        });
+
+        const sortBtn = (key, label) => `<button class="${queueSort === key ? 'active' : ''}" onclick="window.AlbumApp.setQueueSort('${key}')">${label}${queueSort === key ? (queueSortAsc ? ' ↑' : ' ↓') : ''}</button>`;
+        const durBtn = (min, label) => `<button class="${queueMaxMin === min ? 'active' : ''}" onclick="window.AlbumApp.setQueueMaxMin(${min})">${label}</button>`;
+        const sortHint = {
+            added: queueSortAsc ? 'Los más antiguos primero' : 'Los más recientes primero',
+            duration: queueSortAsc ? 'Los más cortos primero' : 'Los más largos primero',
+            tracks: queueSortAsc ? 'Menos canciones primero' : 'Más canciones primero',
+            alpha: queueSortAsc ? 'A → Z (1, 2, 3...)' : 'Z → A'
+        }[queueSort];
+
         box.innerHTML = `
             <div class="lib-stats-bar">
                 <div class="lib-stat"><div class="lib-stat-val">${listenQueue.length}</div><div class="lib-stat-label">Pendientes</div></div>
                 <div class="lib-stat"><div class="lib-stat-val">${listenQueue.filter(q => q.startedAt).length}</div><div class="lib-stat-label">En curso</div></div>
+                <div class="lib-stat"><div class="lib-stat-val" style="font-size:22px;">${durLabel(totalSecs)}</div><div class="lib-stat-label">De música pendiente</div></div>
             </div>
-            <div class="library-grid" id="queueGrid"></div>`;
+            <div class="queue-toolbar">
+                <input type="text" id="queueSearchInput" placeholder="🔍  Buscar..." value="${queueSearch.replace(/"/g, '&quot;')}" oninput="window.AlbumApp.setQueueSearch(this.value)">
+                <div class="queue-group"><span>Ordenar</span><div class="pl-seg">
+                    ${sortBtn('added', '🕐 Guardado')}${sortBtn('duration', '⏱️ Duración')}${sortBtn('tracks', '🎵 Canciones')}${sortBtn('alpha', '🔤 A-Z')}
+                </div></div>
+                <div class="queue-group"><span>Tengo</span><div class="pl-seg">
+                    ${durBtn(0, 'Todo')}${durBtn(30, '≤ 30 min')}${durBtn(45, '≤ 45 min')}${durBtn(60, '≤ 1 h')}
+                </div></div>
+            </div>
+            <p class="queue-hint">${sortHint} · toca el mismo botón otra vez para invertir el orden${queueMaxMin || needle ? ` · mostrando ${list.length} de ${listenQueue.length}` : ''}</p>
+            ${list.length ? '<div class="library-grid" id="queueGrid"></div>' : `<div class="library-empty" style="padding:50px 20px;"><div class="empty-icon">⏱️</div><h3>Nada cabe en ese tiempo</h3><p>Ningún álbum pendiente coincide. Prueba con más tiempo o quita la búsqueda.</p></div>`}`;
+
         const grid = document.getElementById('queueGrid');
-        listenQueue.forEach(q => {
-            const real = (q.tracks || []).filter(t => t.name && t.name.trim()).length;
+        if (!grid) return;
+        list.forEach(({ q, nTracks, secs }) => {
             const card = document.createElement('div');
             card.className = 'lib-card';
             card.innerHTML = `
@@ -2245,11 +2303,12 @@ window.AlbumApp = (function() {
                     <img class="lib-card-cover" src="${q.cover || 'https://via.placeholder.com/400x400/111/333?text=ARA'}"
                          onerror="this.src='https://via.placeholder.com/400x400/111/333?text=No+Cover'" alt="">
                     ${q.startedAt ? '<div class="lib-card-rank"><span class="trend-new">EN CURSO</span></div>' : ''}
+                    <div class="lib-card-score" style="font-size:12px;">⏱️ ${durLabel(secs)}</div>
                 </div>
                 <div class="lib-card-body">
                     <div class="lib-card-artist">${q.artist || ''}</div>
                     <div class="lib-card-album" title="${(q.album || '').replace(/"/g, '&quot;')}">${q.album || 'Sin título'}</div>
-                    <div class="lib-card-meta">${q.released || '—'} · ${real} canciones · guardado ${timeAgo(q.queuedAt)}</div>
+                    <div class="lib-card-meta">${q.released || '—'} · ${nTracks} canciones · guardado ${timeAgo(q.queuedAt)}</div>
                     <div class="lib-card-actions">
                         <button class="btn-edit" onclick="window.AlbumApp.startQueueItem(${q.qid})">▶ Empezar</button>
                         <button class="btn-del" onclick="window.AlbumApp.removeQueueItem(${q.qid})">🗑️ Quitar</button>
@@ -3974,6 +4033,18 @@ window.AlbumApp = (function() {
         setLibType,
         addEditorToQueue,
         startQueueItem,
+        setQueueSort: (key) => {
+            if (queueSort === key) queueSortAsc = !queueSortAsc;
+            else { queueSort = key; queueSortAsc = (key === 'alpha' || key === 'duration'); } // A-Z y cortos primero por defecto
+            renderQueueTab();
+        },
+        setQueueMaxMin: (min) => { queueMaxMin = min; renderQueueTab(); },
+        setQueueSearch: (v) => {
+            queueSearch = v;
+            renderQueueTab();
+            const inp = document.getElementById('queueSearchInput');
+            if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
+        },
         removeQueueItem,
         autoFillReleaseDates,
         changeType: (t) => { state.type = t; saveSession(); render(); },
