@@ -711,18 +711,10 @@
             <span class="lib-cycle-info" id="libCycleInfo" title="Las flechas muestran cuánto se movió cada álbum desde que empezó el ciclo. Cada 10 álbumes nuevos empieza uno nuevo."></span>
         </div>
 
-        <div class="library-toolbar">
-            <input type="text" id="libSearch" placeholder="🔍  Search artist or album..." oninput="window.AlbumApp.renderLibrary()">
-            <select id="libFilterMode" onchange="window.AlbumApp.renderLibrary()">
-                <option value="all">All Modes</option>
-                <option value="rating">Rating only</option>
-                <option value="ranking">Ranking only</option>
-            </select>
-            <button class="lib-sort-btn active" data-sort="score" onclick="window.AlbumApp.setSort('score',this)">⭐ Score</button>
-            <button class="lib-sort-btn" data-sort="year" onclick="window.AlbumApp.setSort('year',this)">📅 Year</button>
-            <button class="lib-sort-btn" data-sort="artist" onclick="window.AlbumApp.setSort('artist',this)">🎤 Artist</button>
-            <button class="lib-sort-btn" data-sort="added" onclick="window.AlbumApp.setSort('added',this)">🕐 Recent</button>
+        <div class="queue-toolbar">
+            <input type="text" id="libSearch" placeholder="🔍  Buscar artista o álbum..." oninput="window.AlbumApp.renderLibrary()">
         </div>
+        <div id="libSortBar"></div>
 
         <div id="libraryGrid" class="library-grid"></div>
     </div>
@@ -732,15 +724,11 @@
         <div id="artistsListView">
             <div class="lib-stats-bar" id="artistsStatsBar"></div>
 
-            <div class="library-toolbar">
-                <input type="text" id="artistSearch" placeholder="🔍  Search artist..." oninput="window.AlbumApp.renderArtistTab()">
-                <select id="artistSortMode" onchange="window.AlbumApp.renderArtistTab()">
-                    <option value="weighted" selected>⚖️ Mejor relación promedio-ranking</option>
-                    <option value="score">🏆 Mayor promedio</option>
-                    <option value="tracks">🎧 Más canciones punteadas</option>
-                </select>
+            <div class="queue-toolbar">
+                <input type="text" id="artistSearch" placeholder="🔍  Buscar artista..." oninput="window.AlbumApp.renderArtistTab()">
             </div>
-            <div class="library-toolbar" style="gap:20px; align-items:center;">
+            <div id="artistSortBar"></div>
+            <div class="library-toolbar" style="gap:20px; align-items:center; margin-bottom:18px;">
                 <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer;">
                     <input type="checkbox" id="artistFilterHasAlbum" checked onchange="window.AlbumApp.renderArtistTab()"> Solo artistas con álbum propio puntuado
                 </label>
@@ -808,14 +796,10 @@
         <div id="seriesListView">
             <div class="lib-stats-bar" id="seriesStatsBar"></div>
 
-            <div class="library-toolbar">
-                <input type="text" id="seriesSearch" placeholder="🔍  Search series..." oninput="window.AlbumApp.renderSeriesTab()">
-                <select id="seriesSortMode" onchange="window.AlbumApp.renderSeriesTab()">
-                    <option value="score" selected>⭐ Mayor promedio combinado</option>
-                    <option value="albums">📚 Más álbumes</option>
-                    <option value="name">🔤 Alfabético</option>
-                </select>
+            <div class="queue-toolbar">
+                <input type="text" id="seriesSearch" placeholder="🔍  Buscar serie..." oninput="window.AlbumApp.renderSeriesTab()">
             </div>
+            <div id="seriesSortBar"></div>
 
             <div id="seriesGrid" class="library-grid"></div>
         </div>
@@ -907,7 +891,6 @@ window.AlbumApp = (function() {
     let ratingChart = null;
     let lastRenderedMode = null;
     let dragSrcEl = null;
-    let libSort = 'score';
     let confirmCallback = null;
     let sortedByScore = false;        
     let originalTrackOrder = null;    
@@ -939,9 +922,6 @@ window.AlbumApp = (function() {
     let duelStats = {}; // { "nombre artista en minúsculas": { duels, wins, losses, displayName } } — persistente
     let duel = null; // { artistA, artistB, poolA, poolB, rounds, roundIndex, scoreA, scoreB, currentRound, finished }
     let listenQueue = [];
-    let queueSort = 'added';     // 'added' | 'duration' | 'tracks' | 'alpha'
-    let queueSortAsc = false;    // dirección del orden
-    let queueMaxMin = 0;         // filtro de duración: 0 = todos, o máximo de minutos
     let queueSearch = ''; // álbumes guardados para escuchar después, con su tracklist ya cargado
     let correctionStats = { edits: 0, increases: 0, decreases: 0, netChange: 0 }; // qué tan beneficiosas han sido las correcciones hechas en los minijuegos
     let cloudSyncTimeout = null;
@@ -981,19 +961,16 @@ window.AlbumApp = (function() {
         libGrid: document.getElementById("libraryGrid"),
         libStatsBar: document.getElementById("libStatsBar"),
         libSearch: document.getElementById("libSearch"),
-        libFilterMode: document.getElementById("libFilterMode"),
         artistsListView: document.getElementById("artistsListView"),
         artistsStatsBar: document.getElementById("artistsStatsBar"),
         artistsGrid: document.getElementById("artistsGrid"),
         artistSearch: document.getElementById("artistSearch"),
-        artistSortMode: document.getElementById("artistSortMode"),
         artistFilterHasAlbum: document.getElementById("artistFilterHasAlbum"),
         artistFilterMinTracks: document.getElementById("artistFilterMinTracks"),
         artistProfileContainer: document.getElementById("artistProfileContainer"),
         seriesListView: document.getElementById("seriesListView"),
         seriesStatsBar: document.getElementById("seriesStatsBar"),
         seriesSearch: document.getElementById("seriesSearch"),
-        seriesSortMode: document.getElementById("seriesSortMode"),
         seriesGrid: document.getElementById("seriesGrid"),
         seriesDetailContainer: document.getElementById("seriesDetailContainer"),
         tournamentArena: document.getElementById("tournamentArena"),
@@ -1465,8 +1442,8 @@ window.AlbumApp = (function() {
     function setLibType(type) { libTypeFilter = type; renderLibrary(); }
 
     function renderLibrary() {
-        const query = dom.libSearch.value.toLowerCase();
-        const modeFilter = dom.libFilterMode.value;
+        const query = normalizeText(dom.libSearch.value);
+        const pref = viewPrefs.library;
 
         const typeLibrary = library.filter(a => getAlbumType(a) === libTypeFilter);
         if (updateLibraryRankHistory()) saveLibraryCache();
@@ -1484,23 +1461,30 @@ window.AlbumApp = (function() {
             b.querySelector('span').textContent = n;
         });
 
-        let items = typeLibrary.filter(a => {
-            const matchQ = !query || a.artist.toLowerCase().includes(query) || a.album.toLowerCase().includes(query);
-            const matchMode = modeFilter === 'all' || a.mode === modeFilter;
-            return matchQ && matchMode;
+        const secsOf = new Map(typeLibrary.map(a => [a.id, totalDurationSeconds(a.tracks)]));
+        let items = typeLibrary.filter(a => !query || normalizeText(`${a.artist} ${a.album}`).includes(query));
+        if (pref.maxMin) items = items.filter(a => secsOf.get(a.id) !== null && secsOf.get(a.id) <= pref.maxMin * 60);
+
+        const dir = pref.asc ? 1 : -1;
+        const dateKey = (a) => a.releaseDate || (a.released ? `${a.released}-00-00` : '');
+        items = [...items].sort((a, b) => {
+            let r = 0;
+            if (pref.sort === 'score') r = (computeScore(a.tracks) ?? -1) - (computeScore(b.tracks) ?? -1);
+            else if (pref.sort === 'year') r = dateKey(a).localeCompare(dateKey(b));
+            else if (pref.sort === 'duration') {
+                const sa = secsOf.get(a.id), sb = secsOf.get(b.id);
+                if (sa === null && sb !== null) return 1; if (sb === null && sa !== null) return -1; // sin duración, al final
+                r = (sa || 0) - (sb || 0);
+            }
+            else if (pref.sort === 'tracks') r = a.tracks.length - b.tracks.length;
+            else if (pref.sort === 'alpha') r = naturalCompare(a.album, b.album);
+            else if (pref.sort === 'artist') r = naturalCompare(a.artist, b.artist) || naturalCompare(dateKey(a), dateKey(b)) * dir;
+            else if (pref.sort === 'added') r = new Date(a.addedAt) - new Date(b.addedAt);
+            return r * dir || (currentRanks[a.id] - currentRanks[b.id]);
         });
 
-        items = [...items].sort((a, b) => {
-            if (libSort === 'score') {
-                const sa = computeScore(a.tracks) ?? -1;
-                const sb = computeScore(b.tracks) ?? -1;
-                return sb - sa;
-            }
-            if (libSort === 'year') return (b.released || '0') > (a.released || '0') ? 1 : -1;
-            if (libSort === 'artist') return a.artist.localeCompare(b.artist);
-            if (libSort === 'added') return new Date(b.addedAt) - new Date(a.addedAt);
-            return 0;
-        });
+        const sortBar = document.getElementById('libSortBar');
+        if (sortBar) sortBar.innerHTML = sortBarHTML('library', { withDuration: true, shown: items.length, total: typeLibrary.length });
 
         renderLibStats(typeLibrary);
 
@@ -1520,7 +1504,7 @@ window.AlbumApp = (function() {
                 `<div class="library-empty">
                     <div class="empty-icon">🔍</div>
                     <h3>Sin resultados</h3>
-                    <p>No hay álbumes que coincidan con tu búsqueda.</p>
+                    <p>${pref.maxMin ? 'Ninguno coincide con la búsqueda y la duración elegida. Prueba con "Todo".' : 'No hay álbumes que coincidan con tu búsqueda.'}</p>
                 </div>`;
             // Aunque no haya nada que mostrar (filtrado), sigue siendo un buen momento
             // para fijar la base de comparación si la biblioteca cambió.
@@ -1563,7 +1547,7 @@ window.AlbumApp = (function() {
                 <div class="lib-card-body">
                     <div class="lib-card-artist">${a.artist || 'Unknown Artist'}</div>
                     <div class="lib-card-album" title="${(a.album || '').replace(/"/g, '&quot;')}">${a.album || 'Unknown Album'}</div>
-                    <div class="lib-card-meta">${a.released || '—'} · ${trackCount} tracks · ${a.mode === 'ranking' ? 'Ranking' : 'Rating'}</div>
+                    <div class="lib-card-meta">${a.released || '—'} · ${secsOf.get(a.id) ? '⏱️ ' + formatDuration(secsOf.get(a.id)) : `${trackCount} tracks`}</div>
                     <div class="lib-card-peak">${peakText(rank, peaks[a.id])}</div>
                     <div class="lib-card-actions">
                         <button class="btn-edit" onclick="window.AlbumApp.editFromLibrary(${a.id})">✏️ Edit</button>
@@ -1818,11 +1802,14 @@ window.AlbumApp = (function() {
                 ? (scoredTracks / (scoredTracks + M)) * avgScore + (M / (scoredTracks + M)) * globalMean
                 : null;
             const fav = getArtistFavorite(name, tracks);
+            const lower = name.toLowerCase();
             return {
                 name,
                 scoredTracks,
                 avgScore,
                 weighted,
+                albums: library.filter(a => parseArtistNames(a.artist).some(n => n.toLowerCase() === lower)).length,
+                secs: knownDurationSeconds(tracks),
                 isMainArtist: mainArtistNames.has(name),
                 favoriteTrack: fav ? fav.favoriteTrack : null
             };
@@ -1855,34 +1842,33 @@ window.AlbumApp = (function() {
         }
 
         // ---- Filtro de búsqueda ----
-        const query = (dom.artistSearch.value || '').toLowerCase();
-        if (query) artists = artists.filter(a => a.name.toLowerCase().includes(query));
+        const query = normalizeText(dom.artistSearch.value);
+        const passesChecks = a => (!dom.artistFilterHasAlbum.checked || a.isMainArtist) && (!dom.artistFilterMinTracks.checked || a.scoredTracks >= 10);
+        const totalBeforeSearch = artists.filter(passesChecks).length;
+        if (query) artists = artists.filter(a => normalizeText(a.name).includes(query));
 
         // ---- Filtros: solo con álbum propio / mínimo de canciones ----
         if (dom.artistFilterHasAlbum.checked) artists = artists.filter(a => a.isMainArtist);
         if (dom.artistFilterMinTracks.checked) artists = artists.filter(a => a.scoredTracks >= 10);
 
         // ---- Orden ----
-        const sortMode = dom.artistSortMode.value; // 'weighted' (default) | 'score' | 'tracks'
+        const pref = viewPrefs.artists;
+        const dir = pref.asc ? 1 : -1;
+        const metric = {
+            weighted: a => a.weighted ?? -1,
+            score: a => a.avgScore ?? -1,
+            tracks: a => a.scoredTracks,
+            albums: a => a.albums,
+            duration: a => a.secs
+        }[pref.sort];
         artists.sort((a, b) => {
-            if (sortMode === 'tracks') {
-                if (b.scoredTracks !== a.scoredTracks) return b.scoredTracks - a.scoredTracks;
-                const sa = a.avgScore ?? -1, sb = b.avgScore ?? -1;
-                if (sb !== sa) return sb - sa;
-                return a.name.localeCompare(b.name);
-            }
-            if (sortMode === 'score') {
-                const sa = a.avgScore ?? -1, sb = b.avgScore ?? -1;
-                if (sb !== sa) return sb - sa;
-                if (b.scoredTracks !== a.scoredTracks) return b.scoredTracks - a.scoredTracks;
-                return a.name.localeCompare(b.name);
-            }
-            // default: mejor relación promedio-ranking (score ponderado)
-            const wa = a.weighted ?? -1, wb = b.weighted ?? -1;
-            if (wb !== wa) return wb - wa;
-            if (b.scoredTracks !== a.scoredTracks) return b.scoredTracks - a.scoredTracks;
-            return a.name.localeCompare(b.name);
+            if (pref.sort === 'alpha') return naturalCompare(a.name, b.name) * dir;
+            return (metric(a) - metric(b)) * dir
+                || ((b.weighted ?? -1) - (a.weighted ?? -1))
+                || naturalCompare(a.name, b.name);
         });
+        const artistSortBar = document.getElementById('artistSortBar');
+        if (artistSortBar) artistSortBar.innerHTML = sortBarHTML('artists', { shown: artists.length, total: totalBeforeSearch });
 
         if (artists.length === 0) {
             dom.artistsGrid.innerHTML = `
@@ -1922,7 +1908,7 @@ window.AlbumApp = (function() {
                     </label>
                 </div>
                 <div class="lib-card-body">
-                    <div class="lib-card-artist">🎧 ${a.scoredTracks} track${a.scoredTracks === 1 ? '' : 's'} punteado${a.scoredTracks === 1 ? '' : 's'}</div>
+                    <div class="lib-card-artist">🎧 ${a.scoredTracks} track${a.scoredTracks === 1 ? '' : 's'}${a.secs ? ' · ' + formatDuration(a.secs) : ''}${a.albums ? ` · 💿 ${a.albums}` : ''}</div>
                     <div class="lib-card-album" title="${a.name.replace(/"/g, '&quot;')}">${a.name}</div>
                     <div class="lib-card-meta">⭐ ${favName}</div>
                 </div>`;
@@ -2131,6 +2117,120 @@ window.AlbumApp = (function() {
         ta.remove();
     }
 
+    // ===================== ORDEN Y FILTROS (compartido) =====================
+    // Cada pestaña (Por escuchar, Library, Artists, Series) recuerda en este dispositivo cómo la
+    // ordenaste: criterio, dirección (tocando dos veces el mismo botón) y filtro de duración.
+    const VIEW_DEFAULTS = {
+        queue:   { sort: 'added',    asc: false, maxMin: 0 },
+        library: { sort: 'score',    asc: false, maxMin: 0 },
+        artists: { sort: 'weighted', asc: false, maxMin: 0 },
+        series:  { sort: 'score',    asc: false, maxMin: 0 }
+    };
+    // Criterios que la primera vez se ordenan de menor a mayor (A→Z, y en Por escuchar los más cortos).
+    const VIEW_ASC_FIRST = { queue: ['alpha', 'duration'], library: ['alpha', 'artist'], artists: ['alpha'], series: ['alpha'] };
+
+    const VIEW_SORTS = {
+        queue: [
+            { key: 'added',    label: '🕐 Guardado',  hint: ['Los más antiguos primero', 'Los más recientes primero'] },
+            { key: 'duration', label: '⏱️ Duración',  hint: ['Los más cortos primero', 'Los más largos primero'] },
+            { key: 'tracks',   label: '🎵 Canciones', hint: ['Menos canciones primero', 'Más canciones primero'] },
+            { key: 'alpha',    label: '🔤 A-Z',       hint: ['A → Z (1, 2, 3...)', 'Z → A'] }
+        ],
+        library: [
+            { key: 'score',    label: '⭐ Nota',      hint: ['Peor nota primero', 'Mejor nota primero'] },
+            { key: 'year',     label: '📅 Año',       hint: ['Los más antiguos primero', 'Los más recientes primero'] },
+            { key: 'duration', label: '⏱️ Duración',  hint: ['Los más cortos primero', 'Los más largos primero'] },
+            { key: 'tracks',   label: '🎵 Canciones', hint: ['Menos canciones primero', 'Más canciones primero'] },
+            { key: 'alpha',    label: '🔤 A-Z',       hint: ['Álbumes de A → Z', 'Álbumes de Z → A'] },
+            { key: 'artist',   label: '🎤 Artista',   hint: ['Artistas de A → Z', 'Artistas de Z → A'] },
+            { key: 'added',    label: '🕐 Agregado',  hint: ['Los primeros que agregaste', 'Los últimos que agregaste'] }
+        ],
+        artists: [
+            { key: 'weighted', label: '⚖️ Relación',  hint: ['Peor relación nota-cantidad primero', 'Mejor relación nota-cantidad primero'] },
+            { key: 'score',    label: '⭐ Promedio',  hint: ['Peor promedio primero', 'Mejor promedio primero'] },
+            { key: 'tracks',   label: '🎵 Canciones', hint: ['Menos canciones punteadas primero', 'Más canciones punteadas primero'] },
+            { key: 'albums',   label: '💿 Álbumes',   hint: ['Menos álbumes primero', 'Más álbumes primero'] },
+            { key: 'duration', label: '⏱️ Minutos',   hint: ['Menos minutos escuchados primero', 'Más minutos escuchados primero'] },
+            { key: 'alpha',    label: '🔤 A-Z',       hint: ['A → Z', 'Z → A'] }
+        ],
+        series: [
+            { key: 'score',    label: '⭐ Promedio',  hint: ['Peor promedio primero', 'Mejor promedio primero'] },
+            { key: 'albums',   label: '📚 Álbumes',   hint: ['Menos entregas primero', 'Más entregas primero'] },
+            { key: 'tracks',   label: '🎵 Canciones', hint: ['Menos canciones primero', 'Más canciones primero'] },
+            { key: 'duration', label: '⏱️ Duración',  hint: ['Las más cortas primero', 'Las más largas primero'] },
+            { key: 'alpha',    label: '🔤 A-Z',       hint: ['A → Z', 'Z → A'] }
+        ]
+    };
+
+    let viewPrefs = (() => {
+        const prefs = JSON.parse(JSON.stringify(VIEW_DEFAULTS));
+        try {
+            const saved = JSON.parse(localStorage.getItem('ara_view_prefs') || '{}');
+            Object.keys(prefs).forEach(v => {
+                if (saved[v] && VIEW_SORTS[v].some(o => o.key === saved[v].sort)) Object.assign(prefs[v], saved[v]);
+            });
+        } catch(e) {}
+        return prefs;
+    })();
+
+    function saveViewPrefs() {
+        try { localStorage.setItem('ara_view_prefs', JSON.stringify(viewPrefs)); } catch(e) {}
+    }
+
+    function formatDuration(secs) {
+        if (!secs) return '';
+        const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
+        if (h === 0) return `${Math.max(1, m)} min`;
+        return m ? `${h} h ${m} min` : `${h} h`;
+    }
+
+    // Suma las duraciones conocidas (sirve para artistas y series, donde puede faltar alguna).
+    function knownDurationSeconds(tracks) {
+        return (tracks || []).reduce((acc, t) => acc + (durationToSeconds(t.duration) || 0), 0);
+    }
+
+    // Barra de orden: un recuadro con todos los criterios; tocar el activo invierte la dirección.
+    function sortBarHTML(view, { withDuration = false, shown = null, total = null } = {}) {
+        const pref = viewPrefs[view];
+        const opts = VIEW_SORTS[view];
+        const active = opts.find(o => o.key === pref.sort) || opts[0];
+        const sortBtns = opts.map(o =>
+            `<button class="${o.key === active.key ? 'active' : ''}" onclick="window.AlbumApp.setViewSort('${view}','${o.key}')">${o.label}${o.key === active.key ? (pref.asc ? ' ↑' : ' ↓') : ''}</button>`).join('');
+        const durBtn = (min, label) => `<button class="${pref.maxMin === min ? 'active' : ''}" onclick="window.AlbumApp.setViewMaxMin('${view}',${min})">${label}</button>`;
+        const filtered = shown !== null && total !== null && shown !== total;
+        return `
+            <div class="queue-toolbar">
+                <div class="queue-group"><span>Ordenar</span><div class="pl-seg">${sortBtns}</div></div>
+                ${withDuration ? `<div class="queue-group"><span>${view === 'queue' ? 'Tengo' : 'Duración'}</span><div class="pl-seg">
+                    ${durBtn(0, 'Todo')}${durBtn(30, '≤ 30 min')}${durBtn(45, '≤ 45 min')}${durBtn(60, '≤ 1 h')}
+                </div></div>` : ''}
+            </div>
+            <p class="queue-hint">${active.hint[pref.asc ? 0 : 1]} · toca el mismo botón otra vez para invertir el orden${filtered ? ` · mostrando ${shown} de ${total}` : ''}</p>`;
+    }
+
+    const VIEW_RENDER = {
+        queue: () => renderQueueTab(),
+        library: () => renderLibrary(),
+        artists: () => renderArtistTab(),
+        series: () => renderSeriesTab()
+    };
+
+    function setViewSort(view, key) {
+        const pref = viewPrefs[view];
+        if (pref.sort === key) pref.asc = !pref.asc;
+        else { pref.sort = key; pref.asc = (VIEW_ASC_FIRST[view] || []).includes(key); }
+        saveViewPrefs();
+        VIEW_RENDER[view]();
+    }
+
+    function setViewMaxMin(view, min) {
+        viewPrefs[view].maxMin = min;
+        saveViewPrefs();
+        VIEW_RENDER[view]();
+    }
+
+    const naturalCompare = (a, b) => (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
+
     // ===================== POR ESCUCHAR =====================
 
     function queueKey(x) {
@@ -2247,33 +2347,24 @@ window.AlbumApp = (function() {
         });
 
         const totalSecs = enriched.reduce((acc, e) => acc + (e.secs || 0), 0);
-        const durLabel = (secs) => secs ? (secs >= 3600 ? `${Math.floor(secs / 3600)} h ${Math.round((secs % 3600) / 60)} min` : `${Math.round(secs / 60)} min`) : '? min';
+        const durLabel = (secs) => formatDuration(secs) || '? min';
+        const pref = viewPrefs.queue;
 
         let list = enriched;
         const needle = normalizeText(queueSearch);
         if (needle) list = list.filter(e => normalizeText(`${e.q.artist} ${e.q.album}`).includes(needle));
-        if (queueMaxMin) list = list.filter(e => e.secs !== null && e.secs <= queueMaxMin * 60);
+        if (pref.maxMin) list = list.filter(e => e.secs !== null && e.secs <= pref.maxMin * 60);
 
-        const dir = queueSortAsc ? 1 : -1;
-        const natural = (a, b) => (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
+        const dir = pref.asc ? 1 : -1;
         list = [...list].sort((a, b) => {
-            if (queueSort === 'duration') {
+            if (pref.sort === 'duration') {
                 if (a.secs === null) return 1; if (b.secs === null) return -1; // sin duración, al final
                 return (a.secs - b.secs) * dir;
             }
-            if (queueSort === 'tracks') return (a.nTracks - b.nTracks) * dir || natural(a.q.album, b.q.album);
-            if (queueSort === 'alpha') return natural(a.q.album, b.q.album) * dir || natural(a.q.artist, b.q.artist) * dir;
+            if (pref.sort === 'tracks') return (a.nTracks - b.nTracks) * dir || naturalCompare(a.q.album, b.q.album);
+            if (pref.sort === 'alpha') return naturalCompare(a.q.album, b.q.album) * dir || naturalCompare(a.q.artist, b.q.artist) * dir;
             return (new Date(a.q.queuedAt) - new Date(b.q.queuedAt)) * dir;
         });
-
-        const sortBtn = (key, label) => `<button class="${queueSort === key ? 'active' : ''}" onclick="window.AlbumApp.setQueueSort('${key}')">${label}${queueSort === key ? (queueSortAsc ? ' ↑' : ' ↓') : ''}</button>`;
-        const durBtn = (min, label) => `<button class="${queueMaxMin === min ? 'active' : ''}" onclick="window.AlbumApp.setQueueMaxMin(${min})">${label}</button>`;
-        const sortHint = {
-            added: queueSortAsc ? 'Los más antiguos primero' : 'Los más recientes primero',
-            duration: queueSortAsc ? 'Los más cortos primero' : 'Los más largos primero',
-            tracks: queueSortAsc ? 'Menos canciones primero' : 'Más canciones primero',
-            alpha: queueSortAsc ? 'A → Z (1, 2, 3...)' : 'Z → A'
-        }[queueSort];
 
         box.innerHTML = `
             <div class="lib-stats-bar">
@@ -2283,14 +2374,8 @@ window.AlbumApp = (function() {
             </div>
             <div class="queue-toolbar">
                 <input type="text" id="queueSearchInput" placeholder="🔍  Buscar..." value="${queueSearch.replace(/"/g, '&quot;')}" oninput="window.AlbumApp.setQueueSearch(this.value)">
-                <div class="queue-group"><span>Ordenar</span><div class="pl-seg">
-                    ${sortBtn('added', '🕐 Guardado')}${sortBtn('duration', '⏱️ Duración')}${sortBtn('tracks', '🎵 Canciones')}${sortBtn('alpha', '🔤 A-Z')}
-                </div></div>
-                <div class="queue-group"><span>Tengo</span><div class="pl-seg">
-                    ${durBtn(0, 'Todo')}${durBtn(30, '≤ 30 min')}${durBtn(45, '≤ 45 min')}${durBtn(60, '≤ 1 h')}
-                </div></div>
             </div>
-            <p class="queue-hint">${sortHint} · toca el mismo botón otra vez para invertir el orden${queueMaxMin || needle ? ` · mostrando ${list.length} de ${listenQueue.length}` : ''}</p>
+            ${sortBarHTML('queue', { withDuration: true, shown: list.length, total: listenQueue.length })}
             ${list.length ? '<div class="library-grid" id="queueGrid"></div>' : `<div class="library-empty" style="padding:50px 20px;"><div class="empty-icon">⏱️</div><h3>Nada cabe en ese tiempo</h3><p>Ningún álbum pendiente coincide. Prueba con más tiempo o quita la búsqueda.</p></div>`}`;
 
         const grid = document.getElementById('queueGrid');
@@ -2495,6 +2580,7 @@ window.AlbumApp = (function() {
                 albumCount: g.albums.length,
                 totalTracks,
                 combinedAvg,
+                secs: g.albums.reduce((acc, a) => acc + knownDurationSeconds(a.tracks), 0),
                 cover
             };
         });
@@ -2520,16 +2606,19 @@ window.AlbumApp = (function() {
             `;
         }
 
-        const query = (dom.seriesSearch.value || '').toLowerCase();
-        if (query) series = series.filter(s => s.name.toLowerCase().includes(query));
+        const totalSeries = series.length;
+        const query = normalizeText(dom.seriesSearch.value);
+        if (query) series = series.filter(s => normalizeText(s.name).includes(query));
 
-        const sortMode = dom.seriesSortMode.value;
+        const pref = viewPrefs.series;
+        const dir = pref.asc ? 1 : -1;
+        const metric = { score: x => x.combinedAvg ?? -1, albums: x => x.albumCount, tracks: x => x.totalTracks, duration: x => x.secs }[pref.sort];
         series.sort((a, b) => {
-            if (sortMode === 'albums') return b.albumCount - a.albumCount || a.name.localeCompare(b.name);
-            if (sortMode === 'name') return a.name.localeCompare(b.name);
-            const sa = a.combinedAvg ?? -1, sb = b.combinedAvg ?? -1;
-            return sb - sa || a.name.localeCompare(b.name);
+            if (pref.sort === 'alpha') return naturalCompare(a.name, b.name) * dir;
+            return (metric(a) - metric(b)) * dir || naturalCompare(a.name, b.name);
         });
+        const seriesSortBar = document.getElementById('seriesSortBar');
+        if (seriesSortBar) seriesSortBar.innerHTML = totalSeries ? sortBarHTML('series', { shown: series.length, total: totalSeries }) : '';
 
         if (series.length === 0) {
             dom.seriesGrid.innerHTML = `
@@ -2559,7 +2648,7 @@ window.AlbumApp = (function() {
                 <div class="lib-card-body">
                     <div class="lib-card-artist">📚 ${s.albumCount} álbum${s.albumCount === 1 ? '' : 'es'}</div>
                     <div class="lib-card-album" title="${s.name.replace(/"/g, '&quot;')}">${s.name}</div>
-                    <div class="lib-card-meta">${s.totalTracks} canciones combinadas</div>
+                    <div class="lib-card-meta">${s.totalTracks} canciones${s.secs ? ' · ⏱️ ' + formatDuration(s.secs) : ''}</div>
                 </div>`;
             dom.seriesGrid.appendChild(card);
         });
@@ -3754,7 +3843,8 @@ window.AlbumApp = (function() {
         dom.pArtist.textContent = state.artist || "Artist";
         dom.pAlbum.textContent = state.album || "Album Title";
         const resolvedType = state.type || detectAlbumType(state.tracks);
-        dom.pDetails.textContent = `${state.released || "Year"}${resolvedType === 'ep' ? ' • EP' : ''}`;
+        const editorSecs = totalDurationSeconds(state.tracks);
+        dom.pDetails.textContent = [state.released || "Year", resolvedType === 'ep' ? 'EP' : '', editorSecs ? formatDuration(editorSecs) : ''].filter(Boolean).join(' • ');
         updateTypeHint();
         dom.pCover.src = state.cover || "https://via.placeholder.com/800x800/111/333?text=ARA";
 
@@ -4033,12 +4123,8 @@ window.AlbumApp = (function() {
         setLibType,
         addEditorToQueue,
         startQueueItem,
-        setQueueSort: (key) => {
-            if (queueSort === key) queueSortAsc = !queueSortAsc;
-            else { queueSort = key; queueSortAsc = (key === 'alpha' || key === 'duration'); } // A-Z y cortos primero por defecto
-            renderQueueTab();
-        },
-        setQueueMaxMin: (min) => { queueMaxMin = min; renderQueueTab(); },
+        setViewSort,
+        setViewMaxMin,
         setQueueSearch: (v) => {
             queueSearch = v;
             renderQueueTab();
@@ -4070,12 +4156,6 @@ window.AlbumApp = (function() {
             }
             saveSession();
             render(true);
-        },
-        setSort: (s, btn) => {
-            libSort = s;
-            document.querySelectorAll('.lib-sort-btn').forEach(b=>b.classList.remove('active'));
-            btn.classList.add('active');
-            renderLibrary();
         },
         editFromLibrary,
         deleteFromLibrary,
