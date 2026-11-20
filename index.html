@@ -2722,7 +2722,8 @@ window.AlbumApp = (function() {
                     artist: album.artist || 'Unknown Artist',
                     albumTitle: album.album,
                     cover: album.cover,
-                    score: s
+                    score: s,
+                    duration: t.duration || ''
                 });
             });
         });
@@ -2835,6 +2836,7 @@ window.AlbumApp = (function() {
 
     function renderTournamentEntry() {
         if (!tournament) { renderTournamentSetup(); return; }
+        if (tournament.stage === 'preview') { renderTournamentPreview(); return; }
         if (tournament.champion) { renderTournamentChampion(); return; }
         if (tournament.currentMatch) { renderTournamentMatch(); return; }
         advanceTournament();
@@ -2884,21 +2886,92 @@ window.AlbumApp = (function() {
             </div>`;
     }
 
+    // Paso 1: elige las canciones y las muestra como lista (para armar la playlist), sin
+    // decir todavía quién se enfrenta con quién. Cada canción se puede cambiar por otra.
     function startTournament(bandId, size) {
         const band = TOURNAMENT_BANDS.find(b => b.id === bandId);
         const pool = getTournamentPool(band);
-        const selected = shuffle(weightedTournamentPick(pool, size));
+        tournament = {
+            band, size, stage: 'preview',
+            participants: weightedTournamentPick(pool, size),
+            rejected: [] // canciones que cambiaste: no vuelven a salir en esta lista
+        };
+        renderTournamentPreview();
+    }
 
-        selected.forEach(t => {
-            const key = tournamentKey(t);
+    function renderTournamentPreview() {
+        const t = tournament;
+        // Ordenadas por artista y álbum (como en el disco) para armar la playlist fácil
+        // y para que la lista no deje adivinar los enfrentamientos.
+        const list = [...t.participants].sort((a, b) =>
+            naturalCompare(a.artist, b.artist) || naturalCompare(a.albumTitle, b.albumTitle) || a.trackIdx - b.trackIdx);
+        const secs = list.reduce((acc, x) => acc + (durationToSeconds(x.duration) || 0), 0);
+        const rows = list.map((x, i) => `
+            <div class="pl-track" style="text-align:left;">
+                <span style="width:22px; font-size:12px; font-weight:800; color:var(--text-muted); text-align:right;">${i + 1}</span>
+                <img src="${x.cover || 'https://via.placeholder.com/40'}" onerror="this.style.visibility='hidden'">
+                <div style="flex:1; overflow:hidden;">
+                    <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${x.name}</div>
+                    <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${x.artist} · ${x.albumTitle || ''}</div>
+                </div>
+                ${x.duration ? `<span style="font-size:11px; color:var(--text-muted);">${x.duration}</span>` : ''}
+                <button class="pl-mini-btn" style="flex:none;" onclick="window.AlbumApp.swapTournamentParticipant('${tournamentKey(x)}')" title="Cambiar por otra canción al azar de esta banda">🔄 Cambiar</button>
+            </div>`).join('');
+
+        dom.tournamentArena.innerHTML = `
+            <div class="tourn-setup-box" style="max-width:640px;">
+                <h2 style="margin-top:0;">🎧 Canciones del torneo</h2>
+                <p style="color:var(--text-muted); font-size:13px; margin-bottom:15px;">Banda ${t.band.label} · ${list.length} canciones${secs ? ' · ' + formatDuration(secs) : ''}. Agrégalas a tu playlist; si alguna no te convence, cámbiala. Los enfrentamientos se sortean al azar cuando empieces, y otra vez en cada ronda.</p>
+                <div style="display:flex; flex-direction:column; gap:6px;">${rows}</div>
+                <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:20px;">
+                    <button onclick="window.AlbumApp.cancelTournament()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:10px 16px; border-radius:6px; cursor:pointer; font-size:12px;">← Volver</button>
+                    <button onclick="window.AlbumApp.copyTournamentList()" style="background:transparent; border:1px solid rgba(134,239,172,0.4); color:#86efac; padding:10px 16px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">📋 Copiar lista</button>
+                    <button class="battle-next-btn" style="margin:0;" onclick="window.AlbumApp.beginTournament()">▶ Comenzar torneo</button>
+                </div>
+            </div>`;
+    }
+
+    function swapTournamentParticipant(key) {
+        const t = tournament;
+        if (!t || t.stage !== 'preview') return;
+        const idx = t.participants.findIndex(x => tournamentKey(x) === key);
+        if (idx < 0) return;
+        const taken = new Set([...t.participants.map(tournamentKey), ...t.rejected, key]);
+        const available = getTournamentPool(t.band).filter(x => !taken.has(tournamentKey(x)));
+        if (available.length === 0) { showToast('⚠️ Ya no quedan más canciones en esta banda para cambiar'); return; }
+        t.rejected.push(key);
+        const [replacement] = weightedTournamentPick(available, 1);
+        t.participants[idx] = replacement;
+        renderTournamentPreview();
+        showToast(`🔄 Entró "${replacement.name}"`);
+    }
+
+    function copyTournamentList() {
+        if (!tournament || !tournament.participants) return;
+        const list = [...tournament.participants].sort((a, b) =>
+            naturalCompare(a.artist, b.artist) || naturalCompare(a.albumTitle, b.albumTitle) || a.trackIdx - b.trackIdx);
+        const text = list.map((x, i) => `${i + 1}. ${x.name} — ${x.artist}`).join('\n');
+        const done = () => showToast(`📋 ${list.length} canciones copiadas`);
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        else fallbackCopy(text, done);
+    }
+
+    // Paso 2: arranca el torneo. Los pares se sortean al azar ahora (no según el orden de la lista).
+    function beginTournament() {
+        const t = tournament;
+        if (!t || t.stage !== 'preview') return;
+        const selected = t.participants;
+
+        selected.forEach(x => {
+            const key = tournamentKey(x);
             if (!tournamentStats[key]) tournamentStats[key] = { plays: 0, wins: 0, losses: 0 };
             tournamentStats[key].plays++;
         });
         saveLibraryCache();
 
         tournament = {
-            band, size,
-            rounds: [chunkPairs(selected)],
+            band: t.band, size: t.size, stage: 'playing',
+            rounds: [chunkPairs(shuffle(selected))],
             roundIndex: 0,
             matchIndex: 0,
             winnersThisRound: [],
@@ -2917,7 +2990,8 @@ window.AlbumApp = (function() {
                 renderTournamentChampion();
                 return;
             }
-            tournament.rounds.push(chunkPairs(tournament.winnersThisRound));
+            // Nueva ronda: los ganadores se vuelven a sortear al azar, sin llaves fijas.
+            tournament.rounds.push(chunkPairs(shuffle(tournament.winnersThisRound)));
             tournament.roundIndex++;
             tournament.matchIndex = 0;
             tournament.winnersThisRound = [];
@@ -4202,6 +4276,9 @@ window.AlbumApp = (function() {
         nextTournamentMatch,
         updateTournamentTrackScore,
         cancelTournament,
+        swapTournamentParticipant,
+        copyTournamentList,
+        beginTournament,
         renderSongRanking,
         setSongRankingSort,
         resetTournamentStats,
